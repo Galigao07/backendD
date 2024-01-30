@@ -230,6 +230,53 @@ class CompanySetup(models.Model):
 
 
 
+
+class Employee(models.Model):
+    autonum = models.AutoField(primary_key=True)
+    id_code = models.SmallIntegerField(unique=True)
+    Emp_ID = models.IntegerField(default=0)
+    last_name = models.CharField(max_length=55, default=' ')
+    first_name = models.CharField(max_length=55, default=' ')
+    middle_name = models.CharField(max_length=55, default=' ')
+    department = models.CharField(max_length=50, default=' ')
+    designation = models.CharField(max_length=75, default=' ')
+    home_phone_no = models.CharField(max_length=15, default=' ')
+    mobile_no = models.CharField(max_length=25, default=' ')
+    fax_no = models.CharField(max_length=15, default=' ')
+    st_address = models.CharField(max_length=60, default=' ')
+    city_address = models.CharField(max_length=30, default=' ')
+    zip_code = models.IntegerField(default=0)
+    date_of_birth = models.DateField(default='0000-00-00')
+    place_of_birth = models.CharField(max_length=100, default='0.000')
+    balance = models.DecimalField(max_digits=15, decimal_places=3, default=0.000)
+    date_as_of = models.DateField(default='0000-00-00')
+    remarks = models.CharField(max_length=100, default=' ')
+    active = models.CharField(max_length=1, default='Y')
+    employee_image = models.BinaryField(null=True, blank=True)  # BinaryField for longblob
+    date_entered = models.DateField(default='0000-00-00')
+    ul_code = models.IntegerField(default=0)
+    Manual_YN = models.CharField(max_length=1, default='')
+    Release_type = models.CharField(max_length=10, default='CASH')
+    FlexiBreak = models.CharField(max_length=5, default='N')
+    SCHEDULE = models.IntegerField(default=0)
+    Civil_stat = models.CharField(max_length=15, default=' ')
+    Confidential = models.CharField(max_length=5, default='N')
+    Finger_ID = models.CharField(max_length=20, default=' ')
+    Auto_FillDTR = models.CharField(max_length=5, default=' ')
+    Basic_Comp = models.CharField(max_length=1, default='Y')
+    PerJob_Comp = models.CharField(max_length=1, default='N')
+    Acct_no = models.CharField(max_length=20, default=' ')
+    Paid_Lunch = models.CharField(max_length=5, default='N')
+    SSS_chk = models.CharField(max_length=5, default='Y')
+    PHIC_chk = models.CharField(max_length=5, default='Y')
+    HDMF_chk = models.CharField(max_length=5, default='Y')
+    Tax_chk = models.CharField(max_length=5, default='Y')
+    sl_category = models.CharField(max_length=50, default='')
+
+    class Meta:
+        db_table = 'tbl_employee'
+
+
 class PosPayor(models.Model):
     autonum = models.BigAutoField(primary_key=True)
     id_code = models.IntegerField(default=0)
@@ -303,6 +350,26 @@ class PosWaiterList(models.Model):
     class Meta:
         db_table = 'tbl_pos_waiterlist'
 
+
+class SeniorCitizenDiscount(models.Model):
+    autonum = models.BigAutoField(primary_key=True)
+    sales_trans_id = models.IntegerField(null=True, blank=True)
+    terminal_no = models.CharField(max_length=21, default='0')
+    cashier_id = models.CharField(max_length=21, default='')
+    document_type = models.CharField(max_length=10, default=' ')
+    details_id = models.IntegerField(default=0)
+    id_no = models.CharField(max_length=100, null=True, blank=True)
+    senior_member_name = models.CharField(max_length=500, null=True, blank=True)
+    id = models.IntegerField(default=0)
+    tin_no = models.CharField(max_length=100, default='0')
+    so_no = models.CharField(max_length=50, default=' ')
+
+    class Meta:
+        db_table = 'tbl_pos_sales_trans_senior_citizen_discount'
+        managed = False  # Set this to False if you don't want Django to manage this table
+
+    def __str__(self):
+        return f"SeniorCitizenDiscount - autonum: {self.autonum}, sales_trans_id: {self.sales_trans_id}"
 
 class Product(models.Model):
     autonum = models.BigAutoField(primary_key=True)

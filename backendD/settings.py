@@ -23,11 +23,13 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = 'django-insecure-q(#tia376$n+1ugieitp!znvus1!!q0v(vz#(-da5m&ot!w53y'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+# DEBUG = True
 
-ALLOWED_HOSTS = []
-# ALLOWED_HOSTS = ['localhost', '127.0.0.1', '0.0.0.0']
-# DEBUG = False
+# ALLOWED_HOSTS = []
+# ALLOWED_HOSTS = ['localhost', '127.0.0.1', '0.0.0.0','192.168.68.106','192.168.43.155']
+ALLOWED_HOSTS = ['*']
+# ALLOWED_HOSTS = ['0.0.0.0','192.168.68.106']
+DEBUG = False
 
 # Application definition
 
@@ -40,13 +42,11 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'rest_framework',  # Add this line for Django REST Framework
-     'corsheaders',
+    'corsheaders',
 ]
 
 MIDDLEWARE = [
-
     'corsheaders.middleware.CorsMiddleware',
-    'django.middleware.common.CommonMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -80,8 +80,13 @@ CORS_ALLOWED_ORIGINS = [
     'http://localhost:3000',
     'http://localhost:5173',
     'http://localhost:5174',
+    'http://192.168.68.106:5173',
+    'http://192.168.43.155:5173',
+ 
     # Add other allowed origins as needed
 ]
+
+
 APPEND_SLASH = False
 CORS_EXPOSE_HEADERS = ["Content-Type", "X-CSRFToken"]
 CORS_ALLOW_HEADERS = [
@@ -110,7 +115,7 @@ DATABASES = {
         'NAME': 'db_restaurant',
         'USER': 'root',
         'PASSWORD': 'lsi2010',
-        'HOST': '127.0.0.1',
+        'HOST': 'localhost',
         'PORT': '3307',
     
     }
