@@ -9,8 +9,10 @@ https://docs.djangoproject.com/en/4.2/topics/settings/
 For the full list of settings and their values, see
 https://docs.djangoproject.com/en/4.2/ref/settings/
 """
-
+import os
 from pathlib import Path
+from django.conf import settings
+ 
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -35,6 +37,8 @@ DEBUG = False
 
 INSTALLED_APPS = [
     'backend',
+    'channels',
+    'channels_redis',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -74,7 +78,16 @@ TEMPLATES = [
     },
 ]
 
+CHANNEL_LAYERS = {
+    'default': {
+        'BACKEND': 'channels_redis.core.RedisChannelLayer',
+        'CONFIG': {
+            'hosts': [('localhost', 6379)],
+        },
+    },
+}
 WSGI_APPLICATION = 'backendD.wsgi.application'
+ASGI_APPLICATION = 'backendD.asgi.application'
 CORS_ORIGIN_ALLOW_ALL = True
 CORS_ALLOWED_ORIGINS = [
     'http://localhost:3000',
@@ -120,6 +133,19 @@ DATABASES = {
     
     }
 }
+
+# DATABASES = {
+#     'default': {
+#         'ENGINE': 'django.db.backends.posgresql',
+#         'NAME': 'db_restaurant',
+#         'USER': 'root',
+#         'PASSWORD': 'lsi2010',
+#         'HOST': 'localhost',
+#         'PORT': '3307',
+    
+#     }
+# }
+
 
 
 # Password validation

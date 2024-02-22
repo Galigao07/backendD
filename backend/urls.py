@@ -4,7 +4,7 @@ from .views import user_login_api,get_csrf_token,verification_account
 from .Restaurant.restaurantviews import (get_product_data, get_productCategory_data,product_list_by_category,table_list_view,save_sales_order,
                                          get_sales_order_list,get_sales_order_listing,get_add_order_view,save_cash_payment,get_customer_list,
                                          get_waiter_list,cancel_sales_order,save_sales_order_payment,get_reprint_transaction,get_reprint_transaction_for_receipt
-                                         ,get_company_details,queing_list_view)
+                                         ,get_company_details,queing_list_view,pos_extended)
 
 urlpatterns = [
     # Other URL patterns
@@ -29,6 +29,7 @@ urlpatterns = [
     path('reprint-transacion-receipt/', get_reprint_transaction_for_receipt, name='get_reprint_transaction_for_receipt'),
     path('company-details/', get_company_details, name='get_company_details'),
     path('que-list/', queing_list_view, name='queing_list_view'),
+    path('extended-data/', pos_extended, name='pos_extended'),
     
     
 ]

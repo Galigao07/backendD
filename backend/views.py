@@ -11,8 +11,7 @@ from django.contrib.auth.hashers import make_password, check_password
 from django.http import JsonResponse
 import json
 import base64 
-from Crypto.Cipher import AES
-from Crypto.Util.Padding import unpad
+
 from django.contrib.auth.hashers import make_password, check_password
 
 import platform
@@ -55,15 +54,27 @@ def user_login_api(request):
             print('yy',serial_number)
             if (serial_number =='PF19PSL1'):
                     print('yy',serial_number)
-                    machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number).first()
+                    # machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number.replace(' ','')).first()
+                    # print('machineInfo',machineInfo)
+                    # infolist ={
+                    #     'UserRank': 'Admin',
+                    #     'FullName':'Admin',
+                    #     'UserID':'9999999',
+                    #     'UserName':'Admin',
+                    #     'TerminalNo': machineInfo.terminal_no,
+                    #     'SiteCode': machineInfo.site_no,
+                    #     'PTU': machineInfo.PTU_no
+                        
+                    # }
+
                     infolist ={
                         'UserRank': 'Admin',
                         'FullName':'Admin',
                         'UserID':'9999999',
                         'UserName':'Admin',
-                        'TerminalNo': machineInfo.terminal_no,
-                        'SiteCode': machineInfo.site_no,
-                        'PTU': machineInfo.PTU_no
+                        'TerminalNo':0,
+                        'SiteCode': 0,
+                        'PTU': 0
                         
                     }
                     print('infolist',infolist)
@@ -72,6 +83,7 @@ def user_login_api(request):
         user = User.objects.filter(user_name=username).first()
         stored_hashed_password = user.password
         if user is not None:
+            print('login')
             if check_password(password, stored_hashed_password):
             
                 serial_number = get_serial_number()
@@ -132,11 +144,12 @@ def verification_account(request):
 
 def decrypt_aes(encrypted_data, key):
     try:
-        key = key.encode() if isinstance(key, str) else key
-        cipher = AES.new(key, AES.MODE_ECB)  # Use appropriate mode (e.g., CBC) if known
-        encrypted_data = base64.b64decode(encrypted_data)
-        decrypted_data = unpad(cipher.decrypt(encrypted_data), AES.block_size).decode('utf-8')
-        return decrypted_data
+        # key = key.encode() if isinstance(key, str) else key
+        # cipher = AES.new(key, AES.MODE_ECB)  # Use appropriate mode (e.g., CBC) if known
+        # encrypted_data = base64.b64decode(encrypted_data)
+        # decrypted_data = unpad(cipher.decrypt(encrypted_data), AES.block_size).decode('utf-8')
+        # return decrypted_data
+        print("adasdasdsdas")
     except Exception as e:
         print(f"Decryption error: {e}")
         return None  # Handle decryption errors accordingly

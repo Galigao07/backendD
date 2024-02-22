@@ -228,6 +228,19 @@ class CompanySetup(models.Model):
     class Meta:
         db_table = 'tbl_company_setup'
 
+class PosExtended(models.Model):
+    autonum = models.AutoField(primary_key=True)
+    barcode = models.CharField(max_length=50, default='0')
+    qty = models.DecimalField(max_digits=15, decimal_places=3, default=0.000)
+    description = models.CharField(max_length=225, default='')
+    price = models.DecimalField(max_digits=15, decimal_places=3, default=0.000)
+    amount = models.DecimalField(max_digits=15, decimal_places=3, default=0.000)
+    line_no = models.IntegerField(default=0)
+    serial_no = models.CharField(max_length=50, default='')
+
+    class Meta:
+        db_table = 'tbl_pos_extended'
+
 
 
 
@@ -496,7 +509,6 @@ class User(models.Model):
 
 class POS_Terminal(models.Model):
     autonum = models.BigAutoField(primary_key=True)
-    ul_code = models.IntegerField(null=True, blank=True)
     terminal_no = models.IntegerField(null=True, blank=True)
     description = models.CharField(max_length=100, null=True, blank=True)
     site_no = models.DecimalField(max_digits=15, decimal_places=3, default=0.000)
@@ -508,7 +520,7 @@ class POS_Terminal(models.Model):
     date_valid = models.CharField(max_length=30, default='0000-00-00')
 
     class Meta:
-        db_table = 'tbl_pos_terminal'  # Optional: Specify the table name if needed
+        db_table = 'tbl_pos_terminal'
 
 
 class PosSalesTransDetails(models.Model):

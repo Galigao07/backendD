@@ -5,10 +5,10 @@ import pdb
 from django.http import JsonResponse
 from rest_framework.response import Response
 from backend.models import (Product,PosRestTable,PosSalesOrder,PosSalesTransDetails,InvRefNo,POS_Terminal,PosSalesTrans,PosSalesInvoiceList,PosSalesInvoiceListing,
-                            CompanySetup,Customer,PosWaiterList,PosPayor,SeniorCitizenDiscount)
+                            CompanySetup,Customer,PosWaiterList,PosPayor,SeniorCitizenDiscount,PosExtended)
 from backend.serializers import (ProductSerializer,ProductCategorySerializer,PosSalesOrderSerializer,PosSalesTransDetailsSerializer,PosSalesTransSerializer,
                                  PosSalesInvoiceListing,PosSalesInvoiceList,CustomerSerializer,PosWaiterListSerializer,PosPayorSerializer,PosSalesInvoiceListSerializer,
-                                 SeniorCitizenDiscountSerializer)
+                                 SeniorCitizenDiscountSerializer,PosExtendedSerializer)
 from rest_framework.decorators import api_view
 from django.db.models import Min,Max
 from django.utils import timezone
@@ -19,6 +19,84 @@ from django.db.models import Q
 from django.utils import timezone
 import pytz
 
+
+
+
+@api_view(['GET','POST','PUT','DELETE'])
+def pos_extended(request):
+    if request.method == 'GET':
+        data = request.GET.get('data')
+        data_list = PosExtended.objects.all()
+    elif request.method == 'POST':
+        try:
+            # Parse the JSON data sent in the request body
+            data = json.loads(request.body)
+            print(data)
+            serial_number = get_serial_number()
+            machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number).first()
+            data = data['data']
+
+            data_exist_queryset = PosExtended.objects.filter(serial_no=serial_number, barcode=data['barcode'])
+
+            # Check if any records exist in the queryset
+            if data_exist_queryset.exists():
+                # Access the first instance in the queryset (assuming there's only one matching record)
+                data_exist_instance = data_exist_queryset.first()
+                
+                # Update the fields of the instance
+                data_exist_instance.qty = data['quantity']
+                data_exist_instance.amount = data['totalAmount']
+                data_exist_instance.price = data['price']
+                
+                # Save the changes to the instance
+                data_exist_instance.save()
+
+
+            else:
+                saveExtended = PosExtended(
+                    barcode=data['barcode'],
+                    qty=data['quantity'],
+                    description=data['description'],
+                    price=data['price'],
+                    amount=data['totalAmount'],
+                    serial_no=serial_number
+                )
+                saveExtended.save()
+            # Process the data as needed
+            # For example, you can access data['data'] to get the 'data' key sent from Axios
+
+            # Optionally, save the data to the database
+            # Example: ExtendedData.objects.create(**data)
+
+            return JsonResponse({'success': True, 'message': 'Data received successfully'}, status=200)
+        except json.JSONDecodeError:
+            return JsonResponse({'success': False, 'message': 'Invalid JSON data'}, status=400)
+    elif request.method == 'DELETE':
+        try:
+    # Parse the JSON data sent in the request body
+            received_data = json.loads(request.body)  # Decode and load JSON data
+        
+            data = received_data.get('deletedata')  # Assuming the data is under 'user' key
+            print('DXelete',data)
+            # data = json.loads(request.body)
+            print('DXelete',data['barcode'])
+            
+            serial_number = get_serial_number()
+            machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number).first()
+    
+
+            # Retrieve the queryset of existing records based on the specified conditions
+            data_exist_queryset = PosExtended.objects.filter(serial_no=serial_number, barcode=data['barcode'])
+
+            # Check if any records exist in the queryset
+            if data_exist_queryset.exists():
+                # Delete all matching records from the database
+                data_exist_queryset.delete()
+
+        except Exception as e:
+            # Handle exceptions here
+            print("An error occurred:", e)
+    
 @api_view(['GET'])
 def get_product_data(request):
     products = Product.objects.exclude(reg_price=0).exclude(long_desc='')
@@ -215,6 +293,9 @@ def get_add_order_view(request):
     paid = PosSalesOrder.objects.filter(paid = 'N',active='Y',terminal_no = machineInfo.terminal_no,site_code = int(machineInfo.site_no),table_no = tableNo)
     serializer = PosSalesOrderSerializer(paid, many=True)
     return Response(serializer.data)
+
+
+
 
 
 @api_view(['GET'])

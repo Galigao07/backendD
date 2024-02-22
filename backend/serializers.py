@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from .models import (Product, PosRestTable,PosSalesOrder,User,POS_Terminal,PosSalesTransDetails,PosSalesTrans,PosSalesInvoiceList,PosSalesInvoiceListing,
-                     CompanySetup,Customer,PosWaiterList,PosPayor,Employee,SeniorCitizenDiscount)
+                     CompanySetup,Customer,PosWaiterList,PosPayor,Employee,SeniorCitizenDiscount,PosExtended)
 
 
 
@@ -9,6 +9,10 @@ class CompanySetupSerializer(serializers.ModelSerializer):
         model =  CompanySetup
         fields = '__all__'
         
+class PosExtendedSerializer(serializers.ModelSerializer):
+    class Meta:
+        model =  PosExtended
+        fields = '__all__'
 
 class SeniorCitizenDiscountSerializer(serializers.ModelSerializer):
     class Meta:
