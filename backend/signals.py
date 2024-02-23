@@ -37,6 +37,7 @@ def send_to_extended(instance, action, **kwargs):
         pos_extended_count = PosExtended.objects.filter(serial_no=serial_number).count()
         # Convert model instance to JSON serializable format
         print('dataaaaaa',data)
+        print('action',action)
         instance_data = {
             "data":data,
             "action": action,

@@ -19,14 +19,100 @@ from django.db.models import Q
 from django.utils import timezone
 import pytz
 
+import pygetwindow as gw
+import time
+import pyautogui
+from pywinauto.application import Application
+@api_view(['GET','POST','PUT','DELETE'])
+def print_electron(request):
+    # Sleep for 5 seconds (you may remove this in production)
 
 
+    try:
+        # Connect to the application
+        time.sleep(5)  # Wait for 5 seconds
+        app = Application().connect(title="Print")
+        print('0')
+        print_dialog = app.window(class_name="#32770")
+        print('1')
+        print_dialog.print_button.click()
+        print('1')
+        return JsonResponse({"message": "Print Success"}, status=200)
+            
+    except TimeoutError:
+        print("Timeout: Print dialog not found within 10 seconds.")
+        return JsonResponse({"error": "Timeout: Print dialog not found"}, status=404)
+
+
+
+# def print_electron(request):
+#     # try:
+#     #     time.sleep(10)
+#     #     app = Application(backend="uia").connect(title="Print")
+#     #     window = app.window(title="Print")
+#     #     print_dialog = window.child_window(title="Print", control_type="Dialog")
+#     #     if print_dialog.exists():
+#     #         print("Print dialog detected!")
+#     #     # Search for the button based on its text
+#     #         button = window.child_window(title="Print", control_type="Button")
+#     #         button.click_input()
+#     #         # Check if the button exists
+#     #         if button.exists():
+#     #             print("Button Print detected!")
+#     #             # Simulate clicking the button
+#     #             button.click_input()
+#     #             return JsonResponse({"message": "Print command sent"})
+#     #         else:
+#     #             print("Button Print not found.")
+#     #             return JsonResponse({"error": "Button Print not found"}, status=404)
+#     # except Exception as e:
+#     #     print("Error:", e)
+#     #     return JsonResponse({"error": str(e)}, status=500)
+    
+#     # Get all currently open windows
+#     time.sleep(5)
+#     windows = gw.getAllWindows()
+    
+#     # Search for a window with "Print" in its title
+#     print_dialog = None
+#     for window in windows:
+#         if "Print" in window.title:
+#             print_dialog = window
+#             break
+ 
+#     # If the print dialog is found, print its title and position
+#     if print_dialog:
+#         print("Print dialog detected - Title:", print_dialog.title, "Position:", print_dialog.left, print_dialog.top)
+#         app = Application().connect(title=print_dialog.title)
+#         dialog_window = app.window(title=print_dialog.title)
+#         print(print_dialog.title)
+#             # Wait for the "Print" button to appear within the dialog window with a timeout of 10 seconds
+#         button = dialog_window.child_window(title="Print", control_type="Button").wait('exists', timeout=10)
+#         print(button)  
+            
+#             # If the button is found, click it
+#         if button:
+#                 print("Button 'Print' detected!")
+#                 button.click_input()
+#                 return JsonResponse({"message": "Print command sent"})
+#         else:
+#                 print("Button 'Print' not found.")
+#                 return JsonResponse({"error": "Button 'Print' not found"}, status=404)
+       
+
+
+    
 
 @api_view(['GET','POST','PUT','DELETE'])
 def pos_extended(request):
     if request.method == 'GET':
         data = request.GET.get('data')
+        serial_number = get_serial_number()
+        machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number).first()
         data_list = PosExtended.objects.all()
+        serialize = PosExtendedSerializer(data_list,many=True)
+
+        return Response(serialize.data)
     elif request.method == 'POST':
         try:
             # Parse the JSON data sent in the request body
@@ -34,32 +120,40 @@ def pos_extended(request):
             print(data)
             serial_number = get_serial_number()
             machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number).first()
-            data = data['data']
-
-            data_exist_queryset = PosExtended.objects.filter(serial_no=serial_number, barcode=data['barcode'])
-
+            # data = data['data']
+            TableNo = data['TableNo']
+            orderType = data['OrderType']
+            quantity = data['data']['quantity']
+            description = data['data']['description']
+            price = data['data']['price']
+            total_amount = data['data']['totalAmount']
+            barcode = data['data']['barcode']
+            data_exist_queryset = PosExtended.objects.filter(serial_no=serial_number, barcode=barcode)
             # Check if any records exist in the queryset
             if data_exist_queryset.exists():
                 # Access the first instance in the queryset (assuming there's only one matching record)
                 data_exist_instance = data_exist_queryset.first()
                 
                 # Update the fields of the instance
-                data_exist_instance.qty = data['quantity']
-                data_exist_instance.amount = data['totalAmount']
-                data_exist_instance.price = data['price']
+                data_exist_instance.qty = quantity
+                data_exist_instance.amount = total_amount
+                data_exist_instance.price = price
                 
                 # Save the changes to the instance
                 data_exist_instance.save()
 
 
             else:
+     
                 saveExtended = PosExtended(
-                    barcode=data['barcode'],
-                    qty=data['quantity'],
-                    description=data['description'],
-                    price=data['price'],
-                    amount=data['totalAmount'],
-                    serial_no=serial_number
+                    barcode=barcode,
+                    qty=quantity,
+                    description=description,
+                    price=price,
+                    amount=total_amount,
+                    serial_no=serial_number,
+                    table_no=int(TableNo),
+                    order_type=orderType
                 )
                 saveExtended.save()
             # Process the data as needed
@@ -74,29 +168,47 @@ def pos_extended(request):
     elif request.method == 'DELETE':
         try:
     # Parse the JSON data sent in the request body
-            received_data = json.loads(request.body)  # Decode and load JSON data
+            data = json.loads(request.body)  # Decode and load JSON data
         
-            data = received_data.get('deletedata')  # Assuming the data is under 'user' key
-            print('DXelete',data)
-            # data = json.loads(request.body)
-            print('DXelete',data['barcode'])
+    
+            quantity = data['deleteData']['quantity']
+            description = data['deleteData']['description']
+            price = data['deleteData']['price']
+            total_amount = data['deleteData']['totalAmount']
+            barcode = data['deleteData']['barcode']
             
             serial_number = get_serial_number()
             machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number).first()
     
 
             # Retrieve the queryset of existing records based on the specified conditions
-            data_exist_queryset = PosExtended.objects.filter(serial_no=serial_number, barcode=data['barcode'])
+            data_exist_queryset = PosExtended.objects.filter(serial_no=serial_number, barcode=barcode)
 
             # Check if any records exist in the queryset
             if data_exist_queryset.exists():
                 # Delete all matching records from the database
                 data_exist_queryset.delete()
+                return Response('Delete Successfully')
 
         except Exception as e:
             # Handle exceptions here
             print("An error occurred:", e)
-    
+   
+@api_view(['GET','POST','PUT','DELETE'])
+def pos_extended_delete_all(request):
+    if request.method == 'DELETE':
+        try:
+            serial_number = get_serial_number()
+            machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number).first()
+            data_exist_queryset = PosExtended.objects.filter(serial_no=serial_number)
+            if data_exist_queryset.exists():
+                data_exist_queryset.delete()
+                return Response('Delete Successfully')
+
+        except Exception as e:
+            # Handle exceptions here
+            print("An error occurred:", e)
+
 @api_view(['GET'])
 def get_product_data(request):
     products = Product.objects.exclude(reg_price=0).exclude(long_desc='')

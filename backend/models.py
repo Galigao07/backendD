@@ -237,6 +237,8 @@ class PosExtended(models.Model):
     amount = models.DecimalField(max_digits=15, decimal_places=3, default=0.000)
     line_no = models.IntegerField(default=0)
     serial_no = models.CharField(max_length=50, default='')
+    table_no = models.IntegerField(default=0)
+    order_type = models.CharField(max_length=20, default='')
 
     class Meta:
         db_table = 'tbl_pos_extended'
