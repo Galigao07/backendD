@@ -1,6 +1,6 @@
 from django.urls import path
 from backend.Reference.referenceviews import (add_user,view_user,update_user,get_employee_list,delete_user,view_waiter,add_waiter,update_waiter,delete_waiter,
-                                              view_table,add_table,delete_table,update_table)
+                                              view_table,add_table,delete_table,update_table,UploadVideo,terminal_setup)
 
 
 urlpatterns = [
@@ -18,4 +18,7 @@ urlpatterns = [
     path('add-table/', add_table, name='add_table'),
     path('update-table/', update_table, name='update_table'),
     path('delete-table/', delete_table, name='delete_table'),
+    path('video-upload/', UploadVideo, name='UploadVideo'),
+    path('terminal-setup/', terminal_setup, name='terminal_setup'),
+    
 ]

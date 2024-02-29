@@ -23,85 +23,44 @@ import pygetwindow as gw
 import time
 import pyautogui
 from pywinauto.application import Application
+from pywinauto import Application
+from pywinauto.findwindows import ElementNotFoundError
+
+
+
 @api_view(['GET','POST','PUT','DELETE'])
+
 def print_electron(request):
-    # Sleep for 5 seconds (you may remove this in production)
-
-
-    try:
-        # Connect to the application
-        time.sleep(5)  # Wait for 5 seconds
-        app = Application().connect(title="Print")
-        print('0')
-        print_dialog = app.window(class_name="#32770")
-        print('1')
-        print_dialog.print_button.click()
-        print('1')
-        return JsonResponse({"message": "Print Success"}, status=200)
-            
-    except TimeoutError:
-        print("Timeout: Print dialog not found within 10 seconds.")
-        return JsonResponse({"error": "Timeout: Print dialog not found"}, status=404)
-
-
+    max_attempts = 1000
+    attempts = 0
+    
+    while attempts < max_attempts:
+        try:
+            app = Application().connect(title="Print")
+            print_dialog = app.window(class_name="#32770")
+            print_dialog.print_button.click()
+            return JsonResponse({"message": "Print Success"}, status=200)
+        
+        except ElementNotFoundError:
+            attempts += 1
+            print(f"Attempt {attempts}: Print dialog not found. Retrying...")
+            time.sleep(2)  # Wait for 2 seconds before retrying
+    
+    print("Failed to connect to the application after maximum attempts.")
+    return JsonResponse({"error": "Failed to connect to the application"}, status=404)
 
 # def print_electron(request):
-#     # try:
-#     #     time.sleep(10)
-#     #     app = Application(backend="uia").connect(title="Print")
-#     #     window = app.window(title="Print")
-#     #     print_dialog = window.child_window(title="Print", control_type="Dialog")
-#     #     if print_dialog.exists():
-#     #         print("Print dialog detected!")
-#     #     # Search for the button based on its text
-#     #         button = window.child_window(title="Print", control_type="Button")
-#     #         button.click_input()
-#     #         # Check if the button exists
-#     #         if button.exists():
-#     #             print("Button Print detected!")
-#     #             # Simulate clicking the button
-#     #             button.click_input()
-#     #             return JsonResponse({"message": "Print command sent"})
-#     #         else:
-#     #             print("Button Print not found.")
-#     #             return JsonResponse({"error": "Button Print not found"}, status=404)
-#     # except Exception as e:
-#     #     print("Error:", e)
-#     #     return JsonResponse({"error": str(e)}, status=500)
-    
-#     # Get all currently open windows
-#     time.sleep(5)
-#     windows = gw.getAllWindows()
-    
-#     # Search for a window with "Print" in its title
-#     print_dialog = None
-#     for window in windows:
-#         if "Print" in window.title:
-#             print_dialog = window
-#             break
- 
-#     # If the print dialog is found, print its title and position
-#     if print_dialog:
-#         print("Print dialog detected - Title:", print_dialog.title, "Position:", print_dialog.left, print_dialog.top)
-#         app = Application().connect(title=print_dialog.title)
-#         dialog_window = app.window(title=print_dialog.title)
-#         print(print_dialog.title)
-#             # Wait for the "Print" button to appear within the dialog window with a timeout of 10 seconds
-#         button = dialog_window.child_window(title="Print", control_type="Button").wait('exists', timeout=10)
-#         print(button)  
+#     try:
+#         time.sleep(5)  # Wait for 5 seconds
+#         app = Application().connect(title="Print")
+#         print_dialog = app.window(class_name="#32770")
+#         print_dialog.print_button.click()
+#         return JsonResponse({"message": "Print Success"}, status=200)
             
-#             # If the button is found, click it
-#         if button:
-#                 print("Button 'Print' detected!")
-#                 button.click_input()
-#                 return JsonResponse({"message": "Print command sent"})
-#         else:
-#                 print("Button 'Print' not found.")
-#                 return JsonResponse({"error": "Button 'Print' not found"}, status=404)
-       
+#     except TimeoutError:
+#         print("Timeout: Print dialog not found within 10 seconds.")
+#         return JsonResponse({"error": "Timeout: Print dialog not found"}, status=404)
 
-
-    
 
 @api_view(['GET','POST','PUT','DELETE'])
 def pos_extended(request):
@@ -895,7 +854,7 @@ def save_cash_payment(request):
             else:
                 total_net_total = total_net_total + net_total
             
-            
+            # pdb.set_trace()
             totalQty = totalQty + float(items['quantity'])
             
             SaveToPOSSalesInvoiceListing = PosSalesInvoiceListing(
@@ -935,7 +894,7 @@ def save_cash_payment(request):
             )
             SaveToPOSSalesInvoiceListing.save()
 
-        # pdb.set_trace()
+  
         net_vat = 0
         net_discount = 0
         vat_exempted = 0

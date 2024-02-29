@@ -1,13 +1,17 @@
 import abc
+import base64
 import json
 import locale
-from django.http import JsonResponse
+import os
+import pdb
+from django.conf import settings
+from django.http import FileResponse, JsonResponse
 from rest_framework.response import Response
 from backend.models import (Product,PosRestTable,PosSalesOrder,PosSalesTransDetails,InvRefNo,POS_Terminal,PosSalesTrans,PosSalesInvoiceList,PosSalesInvoiceListing,
                             CompanySetup,Customer,PosWaiterList,PosPayor,User,Employee)
 from backend.serializers import (ProductSerializer,ProductCategorySerializer,PosSalesOrderSerializer,PosSalesTransDetailsSerializer,PosSalesTransSerializer,
                                  PosSalesInvoiceListing,PosSalesInvoiceList,CustomerSerializer,PosWaiterListSerializer,PosPayorSerializer,PosSalesInvoiceListSerializer,
-                                 UserSerializer,EmployeeSetupSerializer,PosRestTableSerializer)
+                                 UserSerializer,EmployeeSetupSerializer,PosRestTableSerializer,POS_TerminalSerializer)
 from rest_framework.decorators import api_view
 from django.db.models import Min,Max
 from django.utils import timezone
@@ -16,7 +20,8 @@ from datetime import datetime, timedelta
 from datetime import datetime
 from django.contrib.auth.hashers import make_password
 from django.db.models import Q
-
+from django.core.files.storage import default_storage
+from django.core.files.base import ContentFile
 
 @api_view(['GET'])
 def get_employee_list(request):
@@ -329,4 +334,120 @@ def delete_table(request):
             return JsonResponse({'error': 'User data not provided'}, status=400)
 
     return JsonResponse({'error': 'Invalid request method'}, status=400)
+
+
+####* **************************** VIDEO *******************************
+@api_view(['GET','POST'])
+def UploadVideo(request):
+    if request.method == 'POST':
+        video_file = request.FILES.get('video')
+        if video_file:
+            # Save the file to the media directory
+            filename = video_file.name
+            filepath = os.path.join(settings.MEDIA_ROOT, filename)
+            with open(filepath, 'wb') as destination:
+                # Read the entire file content at once
+                file_content = video_file.read()
+                # Write the file content to the destination
+                destination.write(file_content)
+            
+            # Return a response indicating success
+            video_url = os.path.join(settings.MEDIA_URL, filename)
+            return Response({'message': 'Video uploaded successfully', 'url': video_url}, status=200)
+        else:
+            return Response({'error': 'No video file provided'}, status=400)
+    
+    elif request.method == 'GET':
+
+        media_dir = os.path.join(settings.BASE_DIR, 'media')
+
+        # Check if the videos directory exists
+        if os.path.isdir(media_dir):
+            # List all files in the videos directory
+            video_files = [f for f in os.listdir(media_dir) if os.path.isfile(os.path.join(media_dir, f))]
+
+            # Sort files by modification time (latest first)
+            video_files.sort(key=lambda x: os.path.getmtime(os.path.join(media_dir, x)), reverse=True)
+
+            # Get the path to the latest video file
+            if video_files:
+                latest_video_file = os.path.join(media_dir, video_files[0])
+                with open(latest_video_file, 'rb') as file:
+                    file_content = file.read()
+
+                    # Encode the file content to Base64
+                    base64_content = base64.b64encode(file_content).decode()
+                    # print(base64_content)
+                    # Construct the data URL
+                    # data_url = 'data:base64,{base64_content}'
+
+                    data_url = f'data:video/mp4;base64,{base64_content}'
+      
+                return JsonResponse({'data':data_url})
+                # Serve the latest video file
+            else:
+                return Response({'error': 'No videos found in the media directory'}, status=404)
+        else:
+            return Response({'error': 'Media directory not found'}, status=404)
+
+
+
+@api_view(['GET','POST'])       
+def terminal_setup(request):
+    if request.method == 'GET':
+        data = POS_Terminal.objects.all()
+        
+        serializer = POS_TerminalSerializer(data,many=True).data
+        return JsonResponse({'data': serializer}, status=200)
+    
+    elif request.method == 'POST':
+    
+        received_data = json.loads(request.body)
+        print('received_data',received_data)
+        autonum = received_data.get('autonum')
+        ulcode = received_data.get('ulcode')
+        terminalno = received_data.get('terminalno')
+        description = received_data.get('description')
+        siteno = received_data.get('siteno')
+        serialno = received_data.get('serialno')
+        machineno = received_data.get('machineno')
+        modelno = received_data.get('modelno')
+        ptu = received_data.get('ptu')
+        dateissue = received_data.get('dateissue')
+        datevalid = received_data.get('datevalid')
+
+        CheckDtata = POS_Terminal.objects.filter(autonum=autonum).first()
+        # pdb.set_trace()
+        if CheckDtata:
+                CheckDtata.ul_code = ulcode
+                CheckDtata.terminal_no = terminalno
+                CheckDtata.description= description
+                CheckDtata.site_no = siteno
+                CheckDtata.Serial_no = serialno
+                CheckDtata.Machine_no = machineno
+                CheckDtata.Model_no = modelno
+                CheckDtata.PTU_no = ptu
+                CheckDtata.date_issue =dateissue
+                CheckDtata.date_valid = datevalid
+                CheckDtata.save()
+                return JsonResponse({'data':'Terminal Successfully Update'},status=200)
+
+        else:    
+            SaveTerminalSetup = POS_Terminal (
+                ul_code = ulcode,
+                terminal_no = terminalno,
+                description= description,
+                site_no = siteno,
+                Serial_no = serialno,
+                Machine_no = machineno,
+                Model_no = modelno,
+                PTU_no = ptu,
+                date_issue =dateissue,
+                date_valid = datevalid,
+            )
+
+            SaveTerminalSetup.save()
+
+            return JsonResponse({'data':'Terminal Successfully Added'},status=200)
+
 

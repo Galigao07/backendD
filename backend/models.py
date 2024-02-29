@@ -520,7 +520,7 @@ class POS_Terminal(models.Model):
     PTU_no = models.CharField(max_length=100, default='')
     date_issue = models.CharField(max_length=30, default='0000-00-00')
     date_valid = models.CharField(max_length=30, default='0000-00-00')
-
+    ul_code = models.IntegerField(default=0)
     class Meta:
         db_table = 'tbl_pos_terminal'
 
