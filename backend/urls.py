@@ -1,14 +1,17 @@
 
 from django.urls import path
-from .views import user_login_api,get_csrf_token,verification_account
+from .views import user_login_api,get_csrf_token,verification_account,user_logout_api,user_endshift_api
 from .Restaurant.restaurantviews import (get_product_data, get_productCategory_data,product_list_by_category,table_list_view,save_sales_order,
                                          get_sales_order_list,get_sales_order_listing,get_add_order_view,save_cash_payment,get_customer_list,
                                          get_waiter_list,cancel_sales_order,save_sales_order_payment,get_reprint_transaction,get_reprint_transaction_for_receipt
-                                         ,get_company_details,queing_list_view,pos_extended,pos_extended_delete_all,print_electron)
+                                         ,get_company_details,queing_list_view,pos_extended,pos_extended_delete_all,print_electron,
+                                         cash_breakdown)
 
 urlpatterns = [
     # Other URL patterns
     path('login/', user_login_api, name='user_login_api'),
+    path('logout/', user_logout_api, name='user_logout_api'),
+    path('end-shift/', user_endshift_api, name='user_endshift_api'),
     path('verification/', verification_account, name='verification_account'),
     
     path('product/', get_product_data, name='get_product_data'),
@@ -32,5 +35,6 @@ urlpatterns = [
     path('extended-data/', pos_extended, name='pos_extended'),
     path('extended-data-terminal/', pos_extended_delete_all, name='pos_extended_delete_all'),
     path('print/', print_electron, name='print_electron'),
-    
+    path('cash-breakdown/', cash_breakdown, name='cash_breakdown'),
+
 ]

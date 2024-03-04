@@ -1,14 +1,15 @@
 import abc
+import decimal
 import json
 import locale
 import pdb
 from django.http import JsonResponse
 from rest_framework.response import Response
 from backend.models import (Product,PosRestTable,PosSalesOrder,PosSalesTransDetails,InvRefNo,POS_Terminal,PosSalesTrans,PosSalesInvoiceList,PosSalesInvoiceListing,
-                            CompanySetup,Customer,PosWaiterList,PosPayor,SeniorCitizenDiscount,PosExtended)
+                            CompanySetup,Customer,PosWaiterList,PosPayor,SeniorCitizenDiscount,PosExtended,PosCashBreakdown)
 from backend.serializers import (ProductSerializer,ProductCategorySerializer,PosSalesOrderSerializer,PosSalesTransDetailsSerializer,PosSalesTransSerializer,
                                  PosSalesInvoiceListing,PosSalesInvoiceList,CustomerSerializer,PosWaiterListSerializer,PosPayorSerializer,PosSalesInvoiceListSerializer,
-                                 SeniorCitizenDiscountSerializer,PosExtendedSerializer)
+                                 SeniorCitizenDiscountSerializer,PosExtendedSerializer,PosCashBreakdownSerializer)
 from rest_framework.decorators import api_view
 from django.db.models import Min,Max
 from django.utils import timezone
@@ -25,6 +26,7 @@ import pyautogui
 from pywinauto.application import Application
 from pywinauto import Application
 from pywinauto.findwindows import ElementNotFoundError
+from backend.globalFunction import GetPHilippineDate,GetPHilippineDateTime
 
 
 
@@ -1504,3 +1506,48 @@ def save_credit_card_payment(request):
         } 
     return Response({'data':data}, status=200)
         
+
+@api_view(['GET','POST'])
+def cash_breakdown(request):
+    if request.method == 'GET':
+        cash_breakdown = PosCashBreakdown.objects.filter(login_record='1')
+        serialize = PosCashBreakdownSerializer(cash_breakdown,many=True)
+        return JsonResponse({'CashBreakdown':serialize.data},status=200)
+    elif request.method == 'POST':
+        data_recieve = json.loads(request.body)
+        TransID = data_recieve.get('TransID')
+        data = data_recieve.get('data')
+        dinomination = data.get('dinomination')
+        Totaldenominations = data.get('Totaldenominations')
+        current_date_ph = GetPHilippineDate()
+        cash_breakdown_instances = []
+        conversion_rates = {
+            'OneThousand': 1000,
+            'Fivehundred': 500,
+            'Twohundred': 200,
+            'Onehundred': 100,
+            'Fifty': 50,
+            'Twenty': 20,
+            'Ten': 10,
+            'Five': 5,
+            'Peso': 1,
+            'Cent25': 0.25,
+            'Cent05': 0.05
+        }
+
+        # Iterate over the keys in dinomination
+        for denomination, quantity in dinomination.items():
+            if int(quantity) > 0:
+                value = conversion_rates[denomination]
+                print((float(value) * int(quantity)))
+                breakdown_instance = PosCashBreakdown(
+                        login_record=TransID,  # Provide appropriate value
+                        date_stamp=current_date_ph,  # Provide appropriate value
+                        quantity=quantity,
+                        denomination= value,
+                        total=float(value) * int(quantity),  # Get the total amount by multiplying quantity with value
+                        reviewed_by=0,  # Provide appropriate value
+                    )
+                breakdown_instance.save()
+        return JsonResponse({'message':"This endpoint is for POST requests only."},status=200)
+            
