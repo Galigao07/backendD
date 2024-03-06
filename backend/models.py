@@ -236,7 +236,9 @@ class PosExtended(models.Model):
     line_no = models.IntegerField(default=0)
     serial_no = models.CharField(max_length=50, default='')
     table_no = models.IntegerField(default=0)
+    que_no = models.IntegerField(default=0)
     order_type = models.CharField(max_length=20, default='')
+    entry_type = models.CharField(max_length=225, default='')
 
     class Meta:
         db_table = 'tbl_pos_extended'

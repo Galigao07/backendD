@@ -5,8 +5,7 @@ import json
 
 class CountConsumer(AsyncWebsocketConsumer):
     async def connect(self):
-        self.room_name = "count_room"
-        self.room_group_name = f"count_group_{self.room_name}"
+        self.room_group_name = "count_group"
         await self.channel_layer.group_add(self.room_group_name, self.channel_name)
         await self.accept()
         await self.send(text_data=json.dumps({'message': 'Connected to WebSocket.'}))
@@ -17,16 +16,18 @@ class CountConsumer(AsyncWebsocketConsumer):
     async def receive(self, text_data):
         data = json.loads(text_data)
         message = data['message']
-        print('message', message)
+        TableNO = data['message']
         await self.channel_layer.group_send(
             self.room_group_name,
             {
-                'type': 'send_to_frontend',
-                'message': f'Received: {message}'
+                'type': 'send_to_frontendCOunt',
+                'message': data 
+                # 'message': f'Received: {message}'
             }
         )
 
-    async def send_to_frontend(self, event):
+    async def send_to_frontendCOunt(self, event):
+        print('refresh2')
         await self.send(text_data=json.dumps(event))
 
 

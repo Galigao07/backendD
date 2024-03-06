@@ -4,7 +4,7 @@ from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
 import json
 from django.core.serializers import serialize
-from backend.models import POS_Terminal, PosExtended
+from backend.models import POS_Terminal, PosExtended,PosSalesOrder,PosSalesInvoiceList
 from backend.login import get_serial_number
 
 @receiver(post_save,sender=PosExtended)
@@ -24,6 +24,7 @@ def model_saved(sender, instance, created, **kwargs):
 def model_deleted(sender, instance, **kwargs):
     action = "Delete"
     send_to_extended(instance, action)
+    send_to_frontend_data(instance, action)
 
 def send_to_extended(instance, action, **kwargs):
     try:
@@ -51,6 +52,50 @@ def send_to_extended(instance, action, **kwargs):
             {
                 "type": "Send_to_front_end_extended",
                 "data": instance_data,  # Convert instance data to JSON
+            }
+        )
+    except Exception as e:
+        # Handle any exceptions that may occur during message sending
+        print(f"Error sending message to consumer: {e}")
+
+
+@receiver(post_save,sender=PosSalesOrder)
+def model_savedSales(sender, instance, created, **kwargs):
+    if not created:
+        action = "Update"
+
+        send_to_frontend_data(instance, action)
+    else:
+        action = "Save" 
+        send_to_frontend_data(instance, action)
+
+@receiver(post_save,sender=PosSalesInvoiceList)
+def model_savedSalesInvoice(sender, instance, created, **kwargs):
+    if not created:
+        action = "Update"
+
+        send_to_frontend_data(instance, action)
+    else:
+        action = "Save" 
+        send_to_frontend_data(instance, action)
+
+
+def send_to_frontend_data(instance, action, **kwargs):
+    try:
+       
+        instance_data = {
+            "data":'refresh',
+            "action":action,
+            "message":'',
+        }
+        print('refreshxxxxx',action)
+        # Send message to consumer
+        channel_layer = get_channel_layer()
+        async_to_sync(channel_layer.group_send)(
+            "count_group",  # Channel group name
+            {
+                "type": "send_to_frontendCOunt",
+                "message": instance_data,  # Convert instance data to JSON
             }
         )
     except Exception as e:

@@ -51,31 +51,21 @@ def print_electron(request):
     print("Failed to connect to the application after maximum attempts.")
     return JsonResponse({"error": "Failed to connect to the application"}, status=404)
 
-# def print_electron(request):
-#     try:
-#         time.sleep(5)  # Wait for 5 seconds
-#         app = Application().connect(title="Print")
-#         print_dialog = app.window(class_name="#32770")
-#         print_dialog.print_button.click()
-#         return JsonResponse({"message": "Print Success"}, status=200)
-            
-#     except TimeoutError:
-#         print("Timeout: Print dialog not found within 10 seconds.")
-#         return JsonResponse({"error": "Timeout: Print dialog not found"}, status=404)
-
-
+     
+##********** EXTENDED MONITOR TRANSACTION ********##
 @api_view(['GET','POST','PUT','DELETE'])
 def pos_extended(request):
     if request.method == 'GET':
         data = request.GET.get('data')
         serial_number = get_serial_number()
         machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number).first()
-        data_list = PosExtended.objects.all()
+        data_list = PosExtended.objects.filter(serial_no = machineInfo.Serial_no)
         serialize = PosExtendedSerializer(data_list,many=True)
-
         return Response(serialize.data)
+    
     elif request.method == 'POST':
         try:
+            # pdb.set_trace()
             # Parse the JSON data sent in the request body
             data = json.loads(request.body)
             print(data)
@@ -89,6 +79,8 @@ def pos_extended(request):
             price = data['data']['price']
             total_amount = data['data']['totalAmount']
             barcode = data['data']['barcode']
+            if TableNo =='':
+                TableNo = 0
             data_exist_queryset = PosExtended.objects.filter(serial_no=serial_number, barcode=barcode)
             # Check if any records exist in the queryset
             if data_exist_queryset.exists():
@@ -170,6 +162,42 @@ def pos_extended_delete_all(request):
             # Handle exceptions here
             print("An error occurred:", e)
 
+
+def pos_extended_save_from_listing(data,TableNo,QueNO):
+    serial_number = get_serial_number()
+    machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number).first()
+    check_data = PosExtended.objects.filter(serial_no=machineInfo.Serial_no)
+    # pdb.set_trace()
+    if not check_data:
+        if TableNo:
+            for item in data:
+                new_item = PosExtended(
+                    serial_no=machineInfo.Serial_no,
+                    barcode=item.get('barcode'),
+                    qty=item.get('quantity'),
+                    description=item.get('description'),
+                    price=item.get('price'),
+                    order_type = 'DINE IN',
+                    amount=int(item.get('quantity')) * float(item.get('price')),
+                    table_no = TableNo,
+                    entry_type = 'view',)
+                new_item.save()
+        else:
+
+            for item in data:
+                new_item = PosExtended(
+                    serial_no=machineInfo.Serial_no,
+                    barcode=item.get('barcode'),
+                    qty=item.get('quantity'),
+                    description=item.get('description'),
+                    price=item.get('price'),
+                    order_type = 'TAKE OUT',
+                    amount=int(item.get('quantity')) * float(item.get('price')),
+                    que_no = int(float(QueNO)),
+                    entry_type = 'view', )
+                new_item.save()
+
+## ********************* END HERE  ************************##
 @api_view(['GET'])
 def get_product_data(request):
     products = Product.objects.exclude(reg_price=0).exclude(long_desc='')
@@ -185,15 +213,6 @@ def get_productCategory_data(request):
     serializer = ProductCategorySerializer(distinct_categories, many=True)
     return Response(serializer.data)
 
-# @api_view(['GET'])
-# def product_list_by_category(request, category):
-#     # Query the Product model based on the category received in the URL
-#     print('xxxxxxxxxxxxxx')
-#     products = Product.objects.filter(category=category).exclude(reg_price='0')
-
-#     # Serialize the products (convert to JSON or any desired format)
-#     serializer = ProductSerializer(products, many=True)
-#     return Response(serializer.data)
 @api_view(['GET'])
 def product_list_by_category(request):
     if request.method == 'GET':
@@ -246,8 +265,6 @@ def table_list_view(request):
     return Response({"tables": table_list})
 
 
-
-
 @api_view(['GET'])
 def queing_list_view(request):
     site_code = request.GET.get('site_code', None)  # Assuming site_code is passed as a query parameter
@@ -275,13 +292,13 @@ def queing_list_view(request):
     return Response({"que": que_list})
 
 
-
-
 @api_view(['GET'])
 def get_sales_order_list(request):
     if request.method == 'GET':
         tableno = request.GET.get('tableno')
         queno = request.GET.get('queno')
+        print(tableno,queno)
+
         if tableno is not None:
             if tableno == 0:
                 serial_number = get_serial_number()
@@ -313,7 +330,8 @@ def get_sales_order_listing(request):
     serial_number = get_serial_number()
     machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number).first()
     queno = request.GET.get('queno')
-
+    print(TableNo,queno)
+    # pdb.set_trace()
     if TableNo:
         pos_sales_order_data = PosSalesOrder.objects.filter(paid = 'N',terminal_no = machineInfo.terminal_no,site_code = int(machineInfo.site_no) ,table_no =TableNo)
         result = []
@@ -332,6 +350,7 @@ def get_sales_order_listing(request):
                 params=[item.document_no]  
             )
             result.extend(list(matched_records.values()))
+        pos_extended_save_from_listing(result ,TableNo,queno)   
     else:
         pos_sales_order_data = PosSalesOrder.objects.filter(paid = 'N',terminal_no = machineInfo.terminal_no,site_code = int(machineInfo.site_no) ,q_no =queno)
         result = []
@@ -350,9 +369,9 @@ def get_sales_order_listing(request):
                 params=[item.document_no]  
             )
             result.extend(list(matched_records.values()))
+            print('result',result)
+        pos_extended_save_from_listing(result ,TableNo,queno)   
     return Response(result)
-
-
 
 
 @api_view(['GET'])
@@ -366,9 +385,6 @@ def get_add_order_view(request):
     paid = PosSalesOrder.objects.filter(paid = 'N',active='Y',terminal_no = machineInfo.terminal_no,site_code = int(machineInfo.site_no),table_no = tableNo)
     serializer = PosSalesOrderSerializer(paid, many=True)
     return Response(serializer.data)
-
-
-
 
 
 @api_view(['GET'])
@@ -546,8 +562,12 @@ def save_sales_order(request):
         waiterName = data_from_modal.get('Waiter')
         waiterID = data_from_modal.get('waiterID')
         payment_type = data_from_modal.get('PaymentType')
+        QueNo = data_from_modal.get('QueNO')
 
-            
+        if table_no == '':
+            table_no = 0
+        
+        # pdb.set_trace()
         try:
             rs = InvRefNo.objects.filter(description='POS SO', terminalno=TerminalNo).first()
 
@@ -653,13 +673,14 @@ def save_sales_order(request):
              
             SaveOrderToDetails.save()
             
-            
+        # pdb.set_trace()
         SaveToSalesOrder = PosSalesOrder(
             SO_no = so_no,
             document_no = min_sales_trans_id,
             customer_type = 'W',
             customer_name = customer,
             table_no = table_no,
+            q_no = QueNo,
             dinein_takeout = 'Dine In',
             guest_count = guest_count,
             waiter_id = int(waiterID),
@@ -733,6 +754,9 @@ def save_cash_payment(request):
         DiscountType = received_data.get('DiscountType')
         DiscountData= received_data.get('DiscountData')
         QueNo= received_data.get('QueNo')
+
+        if table_no =='':
+            table_no = 0
      
         
         
@@ -1506,7 +1530,7 @@ def save_credit_card_payment(request):
         } 
     return Response({'data':data}, status=200)
         
-
+###*************** SAVE AFTER CASH COUNT END SHIFT-----*******************
 @api_view(['GET','POST'])
 def cash_breakdown(request):
     if request.method == 'GET':
