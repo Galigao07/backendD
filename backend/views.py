@@ -140,12 +140,12 @@ def user_logout_api(request):
 
             current_date_ph = GetPHilippineDate()
             current_datetime_ph = GetPHilippineDateTime()
+            if user.user_rank == 'Cashier':
+                cashier_data = PosCashiersLogin.objects.get(id_code=UserID,trans_id = TransID,islogout='NO')
 
-            cashier_data = PosCashiersLogin.objects.get(id_code=UserID,trans_id = TransID,islogout='NO')
-
-            cashier_data.time_logout = current_datetime_ph
-            cashier_data.islogout = "YES"
-            cashier_data.save()
+                cashier_data.time_logout = current_datetime_ph
+                cashier_data.islogout = "YES"
+                cashier_data.save()
 
             return JsonResponse({"message": "Logout Successfully"}, status=200)
 

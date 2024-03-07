@@ -333,7 +333,54 @@ class PosPayor(models.Model):
     class Meta:
         db_table = 'tbl_pos_payor'
 
+class BankCompany(models.Model):
+    autonum = models.AutoField(primary_key=True)
+    id_code = models.CharField(max_length=10, default='0')
+    company_description = models.CharField(max_length=30, default=' ')
+    active = models.CharField(max_length=1, default='Y')
 
+    class Meta:
+        db_table = 'tbl_bank_company'
+
+class TSetup(models.Model):
+    autonum = models.AutoField(primary_key=True)
+    event_name = models.CharField(max_length=150, default=' ')
+    acct_title = models.TextField()  # longtext is equivalent to TextField in Django
+    sl_acct = models.CharField(max_length=900, default=' ')
+    sl_id = models.IntegerField(default=0)
+    sl_type = models.CharField(max_length=1, default='')
+    acct_title2 = models.CharField(max_length=150, default=' ')
+    sys_info = models.CharField(max_length=20, default='')
+    terminal_no = models.CharField(max_length=21, default=' ')
+    status = models.CharField(max_length=21, default=' ')
+    module = models.CharField(max_length=100, default='')
+    sl_acct2 = models.CharField(max_length=100, default='')
+    sl_id2 = models.IntegerField(default=0)
+    sl_type2 = models.CharField(max_length=1, default='')
+
+    class Meta:
+        db_table = 'tbl_setup'
+
+class OtherAccount(models.Model):
+    autonum = models.AutoField(primary_key=True)
+    id_code = models.PositiveSmallIntegerField(default=0)
+    sl_name = models.CharField(max_length=150, default=' ')
+    trade_name = models.CharField(max_length=100, default=' ')
+    abbr = models.CharField(max_length=10, default=' ')
+    last_name = models.CharField(max_length=30, default=' ')
+    first_name = models.CharField(max_length=30, default=' ')
+    middle_name = models.CharField(max_length=30, default=' ')
+    code = models.CharField(max_length=75, default='')
+    acct_title = models.CharField(max_length=100, default=' ')
+    balance = models.DecimalField(max_digits=15, decimal_places=3, default=0.000)
+    date_as_of = models.DateField(default='0000-00-00')
+    calculation = models.BooleanField(default=False)
+    ul_code = models.IntegerField(default=0)
+    alter_code = models.CharField(max_length=50, default=' ')
+    active = models.CharField(max_length=1, default='Y')
+
+    class Meta:
+        db_table = 'tbl_other_acct'
 
 class PosCashBreakdown(models.Model):
     login_record = models.IntegerField(default=0)

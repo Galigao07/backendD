@@ -12,3 +12,6 @@ def GetPHilippineDate():
     current_date_ph = datetime.datetime.now(ph_time_zone).strftime('%Y-%m-%d')
     return current_date_ph
 
+def GetSLnameInOtherAccounts():
+    return True
+
