@@ -63,6 +63,7 @@ def user_login_api(request):
         stored_hashed_password = user.password
         if user is not None:
             if check_password(password, stored_hashed_password):
+                # pdb.set_trace()
                 serial_number = get_serial_number()
                 machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number).first()
                 latest_trans_id = PosCashiersLogin.objects.aggregate(max_trans_id=Max('trans_id'))['max_trans_id']

@@ -392,13 +392,20 @@ def get_customer_list(request):
     customer = request.GET.get('customer')
     print('customer',customer)
     if customer:
-        customers = Customer.objects.filter(trade_name__icontains=customer)
+        customers = Customer.objects.filter(trade_name__icontains=customer)[:30]
         serialized_data = CustomerSerializer(customers, many=True).data
 
         return Response({"customers": serialized_data})
     else:
-        return Response({"message": "No 'str' parameter provided"}, status=400)
+
+        customers = Customer.objects.filter()[:30]
+        serialized_data = CustomerSerializer(customers, many=True).data
+
+        return Response({"customers": serialized_data})
+    # else:
+    #     return Response({"message": "No 'str' parameter provided"}, status=400)
     
+
 @api_view(['GET'])
 def get_waiter_list(request):
     waiter = request.GET.get('waiter')
@@ -409,7 +416,12 @@ def get_waiter_list(request):
 
         return Response({"waiter": serialized_data})
     else:
-        return Response({"message": "No 'str' parameter provided"}, status=400)
+        waiters = PosWaiterList.objects.all()
+        serialized_data = PosWaiterListSerializer(waiters, many=True).data
+
+        return Response({"waiter": serialized_data})
+        # return Response({"message": "No 'str' parameter provided"}, status=400)
+
 
 @api_view(['GET'])  
 def get_company_details(request):
@@ -740,7 +752,7 @@ def save_sales_order(request):
 @api_view(['POST'])
 def save_cash_payment(request):
     if request.method == 'POST':
-    
+        # pdb.set_trace()
         received_data = json.loads(request.body)
         cart_items = received_data.get('data', [])
         data_from_modal = received_data.get('CustomerPaymentData')
@@ -1116,7 +1128,7 @@ def cancel_sales_order(request):
 @api_view(['POST'])
 def save_sales_order_payment(request):
     if request.method == 'POST':
-
+        # pdb.set_trace()
         received_data = json.loads(request.body)
         cart_items = received_data.get('data', [])
         table_no = received_data.get('TableNo')

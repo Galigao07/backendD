@@ -36,6 +36,7 @@ DEBUG = False
 # Application definition
 
 INSTALLED_APPS = [
+    'daphne',
     'backend',
     'channels',
     'channels_redis',
@@ -122,6 +123,7 @@ CORS_ALLOW_HEADERS = [
 #         'NAME': BASE_DIR / 'db.sqlite3',
 #     }
 # }
+
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.mysql',
@@ -129,10 +131,24 @@ DATABASES = {
         'USER': 'root',
         'PASSWORD': 'lsi2010',
         'HOST': 'localhost',
-        'PORT': '3307',
-    
+        'PORT': '3308'
     }
 }
+
+
+
+
+# DATABASES = {
+#     'default': {
+#         'ENGINE': 'django.db.backends.mysql',
+#         'NAME': 'db_restaurant',
+#         'USER': 'root',
+#         'PASSWORD': 'lsi2010',
+#         'HOST': 'localhost',
+#         'PORT': '3307',
+    
+#     }
+# }
 
 # DATABASES = {
 #     'default': {
