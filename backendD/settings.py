@@ -124,14 +124,24 @@ CORS_ALLOW_HEADERS = [
 #     }
 # }
 
+# DATABASES = {
+#     'default': {
+#         'ENGINE': 'django.db.backends.mysql',
+#         'NAME': 'db_restaurant',
+#         'USER': 'root',
+#         'PASSWORD': 'lsi2010',
+#         'HOST': 'localhost',
+#         'PORT': '3308'
+#     }
+# }
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.mysql',
         'NAME': 'db_restaurant',
         'USER': 'root',
         'PASSWORD': 'lsi2010',
-        'HOST': 'localhost',
-        'PORT': '3308'
+        'HOST': 'localhost',  # Use the service name
+        'PORT': '3308'    # MySQL default port
     }
 }
 

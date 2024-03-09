@@ -226,6 +226,22 @@ class CompanySetup(models.Model):
     class Meta:
         db_table = 'tbl_company_setup'
 
+
+class ProductCategorySetup(models.Model):
+    autonum = models.BigAutoField(primary_key=True)
+    category_code = models.PositiveSmallIntegerField(default=0)
+    category_desc = models.CharField(max_length=150, default=' ')
+    acct_code = models.DecimalField(max_digits=15, decimal_places=3, default=0.000)
+    acct_title = models.CharField(max_length=150, default=' ')
+    acct_code2 = models.DecimalField(max_digits=15, decimal_places=3, default=0.000)
+    acct_title2 = models.CharField(max_length=150, default=' ')
+    iitem_code = models.PositiveIntegerField(default=0)
+    iitem_desc = models.CharField(max_length=45, default='')
+    pos_category = models.CharField(max_length=2, default='N')
+
+    class Meta:
+        db_table = 'tbl_product_category_setup'
+
 class PosExtended(models.Model):
     autonum = models.AutoField(primary_key=True)
     barcode = models.CharField(max_length=50, default='0')
@@ -402,6 +418,7 @@ class PosCashBreakdown(models.Model):
     class Meta:
         managed = False
         db_table = 'tbl_pos_cash_breakdown'
+
 
 
 class PosCashiersLogin(models.Model):
@@ -846,6 +863,8 @@ class PosSalesInvoiceListing(models.Model):
 
     class Meta:
         db_table = 'tbl_pos_sales_invoice_listing'
+
+
 
 
 class PosSalesInvoiceList(models.Model):

@@ -1,23 +1,12 @@
-' Create a FileSystemObject
-Set fso = CreateObject("Scripting.FileSystemObject")
+Set objShell = WScript.CreateObject("WScript.Shell")
 
-' Get the full path of the VBScript file
-scriptFullPath = WScript.ScriptFullName
+' Set the current directory where the script is executed
+Dim currentDirectory
+currentDirectory = objShell.CurrentDirectory
 
-' Extract the directory from the full path
-scriptDirectory = fso.GetParentFolderName(scriptFullPath)
+' Change the path to your Django project's ASGI application
+Dim asgiPath
+asgiPath = currentDirectory & "\backendD\asgi.py:application"
 
-' Set the current working directory to the directory of the VBScript file
-Set WshShell = CreateObject("WScript.Shell")
-WshShell.CurrentDirectory = scriptDirectory
-
-' Run the daphne command
-WshShell.Run "cmd /c daphne -b 0.0.0.0 -p 8001 backendD.asgi:application > output.txt && pause", 1, True
-
-If Err.Number <> 0 Then
-    MsgBox "Error: " & Err.Description
-End If
-
-' Clean up
-Set WshShell = Nothing
-Set fso = Nothing
+' Run Daphne using Python interpreter
+objShell.Run "cmd /c python -m daphne -b 0.0.0.0 -p 8001 backendD.asgi:application" , 1, True

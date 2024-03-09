@@ -1,16 +1,23 @@
-FROM python:3.11.3-slim-bullseye
+# Use an official Python runtime as the base image
+FROM python:3.10
 
-RUN apt-get update \
-    && apt-get upgrade -y \
-    && apt-get install -y gcc default-libmysqlclient-dev pkg-config \
-    && rm -rf /var/lib/apt/lists/*
+# Set environment variables
+ENV PYTHONDONTWRITEBYTECODE 1
+ENV PYTHONUNBUFFERED 1
 
-WORKDIR /usr/src/app
+# Set the working directory in the container
+WORKDIR /BackendD
 
+# Install dependencies
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy the current directory contents into the container at /BackendD
 COPY . .
 
-RUN pip install --upgrade pip \
-    && pip install mysqlclient \
-    && pip install -r requirements.txt
+# Expose port 8000 for HTTP and 8001 for WebSocket
+EXPOSE 8000
+EXPOSE 8001
 
-CMD ["python", "manage.py", "runserver", "0.0.0.0:8000"]
+# Run Daphne for WebSocket and HTTP requests
+CMD ["sh", "-c", "daphne -b 0.0.0.0 -p 8001 BackendD.asgi:application & python manage.py runserver 0.0.0.0:8000"]

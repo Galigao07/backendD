@@ -6,10 +6,11 @@ import pdb
 from django.http import JsonResponse
 from rest_framework.response import Response
 from backend.models import (Product,PosRestTable,PosSalesOrder,PosSalesTransDetails,InvRefNo,POS_Terminal,PosSalesTrans,PosSalesInvoiceList,PosSalesInvoiceListing,
-                            CompanySetup,Customer,PosWaiterList,PosPayor,SeniorCitizenDiscount,PosExtended,PosCashBreakdown)
+                            CompanySetup,Customer,PosWaiterList,PosPayor,SeniorCitizenDiscount,PosExtended,PosCashBreakdown,
+                            ProductCategorySetup)
 from backend.serializers import (ProductSerializer,ProductCategorySerializer,PosSalesOrderSerializer,PosSalesTransDetailsSerializer,PosSalesTransSerializer,
                                  PosSalesInvoiceListing,PosSalesInvoiceList,CustomerSerializer,PosWaiterListSerializer,PosPayorSerializer,PosSalesInvoiceListSerializer,
-                                 SeniorCitizenDiscountSerializer,PosExtendedSerializer,PosCashBreakdownSerializer)
+                                 SeniorCitizenDiscountSerializer,PosExtendedSerializer,PosCashBreakdownSerializer,ProductCategorySetupSerializer)
 from rest_framework.decorators import api_view
 from django.db.models import Min,Max
 from django.utils import timezone
@@ -20,12 +21,8 @@ from django.db.models import Q
 from django.utils import timezone
 import pytz
 
-import pygetwindow as gw
 import time
-import pyautogui
-from pywinauto.application import Application
-from pywinauto import Application
-from pywinauto.findwindows import ElementNotFoundError
+
 from backend.globalFunction import GetPHilippineDate,GetPHilippineDateTime
 
 
@@ -207,10 +204,12 @@ def get_product_data(request):
 @api_view(['GET'])
 def get_productCategory_data(request):
     # Assuming 'category' is a field in the Product model
+    # distinct_categories = Product.objects.values('category').distinct()
+        # serializer = ProductCategorySerializer(distinct_categories, many=True)
+    distinct_categories = ProductCategorySetup.objects.filter(pos_category='Y')
+    serializer = ProductCategorySetupSerializer(distinct_categories, many=True)
 
-    distinct_categories = Product.objects.values('category').distinct()
-
-    serializer = ProductCategorySerializer(distinct_categories, many=True)
+    # print(serializer.data)
     return Response(serializer.data)
 
 @api_view(['GET'])
@@ -752,7 +751,7 @@ def save_sales_order(request):
 @api_view(['POST'])
 def save_cash_payment(request):
     if request.method == 'POST':
-        # pdb.set_trace()
+ 
         received_data = json.loads(request.body)
         cart_items = received_data.get('data', [])
         data_from_modal = received_data.get('CustomerPaymentData')
@@ -806,6 +805,7 @@ def save_cash_payment(request):
                     customer_code = customer.id_code
                     CustomerName = customer.trade_name
                     cust_type = "C"
+                    CusAddress = customer.st_address
                 except Customer.DoesNotExist:
                     customer_code = "8888"
                     CustomerName = "Walk-IN"
@@ -959,7 +959,7 @@ def save_cash_payment(request):
         AmountDue_float = float(AmountDue_float)       
         AmountDue_formatted = f"{AmountDue_float:.3f}"
 
-
+        print('cus-address',CusAddress)
         total_disc_amt = float(total_disc_amt)
         total_desc_rate = float(total_desc_rate)
         total_vat_exempt = float(total_vat_exempt)
