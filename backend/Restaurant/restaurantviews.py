@@ -1630,7 +1630,7 @@ def save_credit_card_payment(request):
                 # Handle the case where no bank with the given description exists
                 bank_id_code = 0
 
-            bankID = bank_id_code + ',' + bankID
+            bankID = str(bank_id_code) + str(bankID)
             BankName = acquire_bank + ',' + BankName
             save_creditcardSales = SalesTransCreditCard (
                 sales_trans_id = int(float(doc_no)),
@@ -1844,6 +1844,7 @@ def save_credit_card_payment(request):
         AmountDue_formatted = f"{AmountDue_float:.3f}"
 
         print('cus-address',CusAddress)
+        # pdb.set_trace()
         total_disc_amt = float(total_disc_amt)
         total_desc_rate = float(total_desc_rate)
         total_vat_exempt = float(total_vat_exempt)
@@ -2035,8 +2036,8 @@ def save_debit_card_payment(request):
             else:
                 # Handle the case where no bank with the given description exists
                 bank_id_code = 0
-            
-            bankID = bank_id_code + ',' + bankID
+            # pdb.set_trace()
+            bankID = str(bank_id_code) + str(bankID)
             BankName = acquire_bank + ',' + BankName
             save_debitcardSales = SalesTransEPS (
                 sales_trans_id = int(float(doc_no)),
@@ -2271,8 +2272,8 @@ def save_debit_card_payment(request):
                 customer_type = cust_type,
                 salesman_id = '0',
                 salesman = '',
-                collector_id = '0',
-                collector = '',
+                collector_id = bankID,
+                collector = BankName,
                 pricing = '',
                 terms = 0,
                 remarks = '',
@@ -2407,7 +2408,8 @@ def save_multiple_payment(request):
         doctype = received_data.get('doctype')
         doc_no = get_sales_transaction_id(TerminalNo,doctype)
         # CreditCardPaymentListData = CreditCard.get("CreditCardPaymentList")
-
+        bankID = ''
+        BankName = ''
         CreditCardAmount = 0
         DebitCardAmount = 0
         credit_card_payments = ''
@@ -2453,7 +2455,8 @@ def save_multiple_payment(request):
                 else:
                     # Handle the case where no bank with the given description exists
                     bank_id_code = 0
-
+                bankID = str(bank_id_code) + str(bankID)
+                BankName = acquire_bank + ',' + BankName
                 save_creditcardSales = SalesTransCreditCard (
                     sales_trans_id = int(float(doc_no)),
                     terminal_no = TerminalNo,
@@ -2470,6 +2473,8 @@ def save_multiple_payment(request):
                 )
 
                 save_creditcardSales.save()
+
+
 
         if DebitCard:
             last_details_id = 0
@@ -2504,7 +2509,9 @@ def save_multiple_payment(request):
                 else:
                     # Handle the case where no bank with the given description exists
                     bank_id_code = 0
-
+                    
+                bankID = str(bank_id_code) + str(bankID)
+                BankName = acquire_bank + ',' + BankName
                 save_debitcardSales = SalesTransEPS (
                     sales_trans_id = int(float(doc_no)),
                     terminal_no = TerminalNo,
