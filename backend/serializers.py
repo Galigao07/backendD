@@ -1,7 +1,8 @@
 from rest_framework import serializers
 from .models import (Product, PosRestTable,PosSalesOrder,User,POS_Terminal,PosSalesTransDetails,PosSalesTrans,PosSalesInvoiceList,PosSalesInvoiceListing,
                      CompanySetup,Customer,PosWaiterList,PosPayor,Employee,SeniorCitizenDiscount,PosExtended,LeadSetup,PosClientSetup,
-                     PosCashiersLogin,PosCashBreakdown,BankCompany,TSetup,OtherAccount,ProductCategorySetup)
+                     PosCashiersLogin,PosCashBreakdown,BankCompany,TSetup,OtherAccount,ProductCategorySetup,BankCard,SalesTransCreditCard,
+                     SalesTransEPS)
 
 
 
@@ -10,6 +11,16 @@ class PosCashBreakdownSerializer(serializers.ModelSerializer):
         model =  PosCashBreakdown
         fields = '__all__'
 
+class SalesTransEPSSerializer(serializers.ModelSerializer):
+    class Meta:
+        model =  SalesTransEPS
+        fields = '__all__'
+
+
+class SalesTransCreditCardSerializer(serializers.ModelSerializer):
+    class Meta:
+        model =  SalesTransCreditCard
+        fields = '__all__'
 
 class ProductCategorySetupSerializer(serializers.ModelSerializer):
     class Meta:
@@ -35,6 +46,12 @@ class BankCompanySerializer(serializers.ModelSerializer):
     class Meta:
         model =  BankCompany
         fields = '__all__'
+     
+class BankCardSerializer(serializers.ModelSerializer):
+    class Meta:
+        model =  BankCard
+        fields = '__all__'
+
 
 class PosCashiersLoginpSerializer(serializers.ModelSerializer):
     class Meta:

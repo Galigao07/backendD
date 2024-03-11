@@ -5,7 +5,8 @@ from .Restaurant.restaurantviews import (get_product_data, get_productCategory_d
                                          get_sales_order_list,get_sales_order_listing,get_add_order_view,save_cash_payment,get_customer_list,
                                          get_waiter_list,cancel_sales_order,save_sales_order_payment,get_reprint_transaction,get_reprint_transaction_for_receipt
                                          ,get_company_details,queing_list_view,pos_extended,pos_extended_delete_all,print_electron,
-                                         cash_breakdown)
+                                         cash_breakdown,get_bank_card,get_bank_list,save_credit_card_payment,save_debit_card_payment,
+                                         save_multiple_payment)
 
 urlpatterns = [
     # Other URL patterns
@@ -36,5 +37,10 @@ urlpatterns = [
     path('extended-data-terminal/', pos_extended_delete_all, name='pos_extended_delete_all'),
     path('print/', print_electron, name='print_electron'),
     path('cash-breakdown/', cash_breakdown, name='cash_breakdown'),
+    path('bank-company/', get_bank_list, name='get_bank_list'),
+    path('bank-card/', get_bank_card, name='get_bank_card'),
+    path('save-credit-card-payment/', save_credit_card_payment, name='save_credit_card_payment'),
+    path('save-debit-card-payment/', save_debit_card_payment, name='save_debit_card_payment'),
+    path('save-multiple-payment/', save_multiple_payment, name='save_multiple_payment'),
 
 ]

@@ -358,6 +358,16 @@ class BankCompany(models.Model):
     class Meta:
         db_table = 'tbl_bank_company'
 
+
+class BankCard(models.Model):
+    autonum = models.AutoField(primary_key=True)
+    id_code = models.CharField(max_length=10, default='0')
+    card_description = models.CharField(max_length=30, default=' ')
+    active = models.CharField(max_length=1, default='Y')
+
+    class Meta:
+        db_table = 'tbl_bank_card'
+
 class TSetup(models.Model):
     autonum = models.AutoField(primary_key=True)
     event_name = models.CharField(max_length=150, default=' ')
@@ -420,6 +430,41 @@ class PosCashBreakdown(models.Model):
         db_table = 'tbl_pos_cash_breakdown'
 
 
+class SalesTransCreditCard(models.Model):
+    autonum = models.BigAutoField(primary_key=True)
+    sales_trans_id = models.IntegerField()
+    terminal_no = models.CharField(max_length=21, default='0')
+    cashier_id = models.IntegerField(default=0)
+    document_type = models.CharField(max_length=10, default=' ')
+    details_id = models.IntegerField()
+    card_no = models.CharField(max_length=20, null=True, blank=True)
+    card_name = models.CharField(max_length=50, null=True, blank=True)
+    bank = models.IntegerField(null=True, blank=True)
+    card_holder = models.CharField(max_length=100, null=True, blank=True)
+    approval_no = models.CharField(max_length=100, null=True, blank=True)
+    expiry_date = models.CharField(max_length=30, null=True, blank=True)
+    amount = models.DecimalField(max_digits=11, decimal_places=2, null=True, blank=True)
+
+    class Meta:
+        db_table = 'tbl_pos_sales_trans_creditcard'
+
+
+class SalesTransEPS(models.Model):
+    autonum = models.BigAutoField(primary_key=True)
+    sales_trans_id = models.IntegerField(default=0)
+    terminal_no = models.CharField(max_length=21, default='0')
+    cashier_id = models.IntegerField(default=0)
+    document_type = models.CharField(max_length=10, default=' ')
+    details_id = models.IntegerField(default=0)
+    card_no = models.CharField(max_length=30, null=True, blank=True)
+    bank = models.IntegerField(null=True, blank=True)
+    card_holder = models.CharField(max_length=100, null=True, blank=True)
+    approval_no = models.CharField(max_length=50, null=True, blank=True)
+    amount = models.DecimalField(max_digits=11, decimal_places=2, null=True, blank=True)
+
+    class Meta:
+        managed = False  # This prevents Django from creating a new table, assuming it already exists in your database
+        db_table = 'tbl_pos_sales_trans_eps'
 
 class PosCashiersLogin(models.Model):
     fid = models.BigAutoField(primary_key=True)
