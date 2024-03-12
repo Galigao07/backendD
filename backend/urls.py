@@ -1,6 +1,6 @@
 
 from django.urls import path
-from .views import user_login_api,get_csrf_token,verification_account,user_logout_api,user_endshift_api
+from .views import user_login_api,get_csrf_token,verification_account,user_logout_api,user_endshift_api,call_onscreen_keyboard_windows
 from .Restaurant.restaurantviews import (get_product_data, get_productCategory_data,product_list_by_category,table_list_view,save_sales_order,
                                          get_sales_order_list,get_sales_order_listing,get_add_order_view,save_cash_payment,get_customer_list,
                                          get_waiter_list,cancel_sales_order,save_sales_order_payment,get_reprint_transaction,get_reprint_transaction_for_receipt
@@ -9,6 +9,8 @@ from .Restaurant.restaurantviews import (get_product_data, get_productCategory_d
                                          save_multiple_payment)
 
 urlpatterns = [
+    path('onscreen-keyboard/',call_onscreen_keyboard_windows, name='call_onscreen_keyboard_windows'),
+
     # Other URL patterns
     path('login/', user_login_api, name='user_login_api'),
     path('logout/', user_logout_api, name='user_logout_api'),
@@ -42,5 +44,6 @@ urlpatterns = [
     path('save-credit-card-payment/', save_credit_card_payment, name='save_credit_card_payment'),
     path('save-debit-card-payment/', save_debit_card_payment, name='save_debit_card_payment'),
     path('save-multiple-payment/', save_multiple_payment, name='save_multiple_payment'),
+
 
 ]

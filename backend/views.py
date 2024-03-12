@@ -43,6 +43,7 @@ def user_login_api(request):
         day_of_month = str(current_date.day).zfill(2)
         password_with_date = password1 + day_of_month
         serial_number = get_serial_number()
+        print(serial_number)
         if (username=='Admin') & (password==password_with_date):
             print('yy',serial_number)
             if (serial_number =='PF19PSL1'):
@@ -251,10 +252,18 @@ def get_serial_number():
         system = platform.system()
         if system == 'Windows':
             # Retrieve serial number using WMIC (Windows Management Instrumentation Command-line)
-            wmic_output = subprocess.check_output('wmic bios get serialnumber').decode().strip()
+            # wmic_output = subprocess.check_output('wmic bios get serialnumber').decode().strip()
+            wmic_output = subprocess.check_output('wmic diskdrive get serialnumber').decode().strip()
+            print(wmic_output)
             lines = wmic_output.split('\n')
             if len(lines) > 1:
-                return lines[1]  # Extracting the serial number if available
+                machineInfo = POS_Terminal.objects.filter(Serial_no=lines[1]).first()
+                if machineInfo:
+                    return lines[1]
+                else: 
+                    machineInfo2 = POS_Terminal.objects.filter(Serial_no=lines[2]).first()
+                    if machineInfo2:
+                        return lines[2] # Extracting the serial number if available
             else:
                 return 'Serial number not found.'
         elif system == 'Linux':
@@ -282,3 +291,24 @@ computer_name = get_computer_name()
 def get_csrf_token(request):
     token = get_token(request)
     return JsonResponse({'csrfToken': token})
+import ctypes
+
+@api_view(["GET"])
+def call_onscreen_keyboard_windows(request):
+        try:
+            # Use ShellExecute with "runas" verb to request admin privileges
+            ctypes.windll.shell32.ShellExecuteW(None, "runas", "osk.exe", None, None, 1)
+            return True
+        except Exception as e:
+            print("Error:", e)
+            return False
+# call_onscreen_keyboard_windows()
+def call_onscreen_keyboard_linux():
+    subprocess.run(["onboard"])
+
+    call_onscreen_keyboard_linux()
+
+def call_onscreen_keyboard_macos():
+    subprocess.run(["open", "-a", "KeyboardViewer"])
+
+    call_onscreen_keyboard_macos()
