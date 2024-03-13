@@ -326,31 +326,58 @@ def get_sales_order_list(request):
 @api_view(['GET'])
 def get_sales_order_listing(request):
     # document_no = request.GET.get('document_no[]')
+    # pdb.set_trace()
     TableNo = request.GET.get('tableno')
+    so_no = request.GET.get('so_no')
+
     serial_number = get_serial_number()
     machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number).first()
     queno = request.GET.get('queno')
-    print(TableNo,queno)
+    print(TableNo,so_no)
     # pdb.set_trace()
-    if TableNo:
-        pos_sales_order_data = PosSalesOrder.objects.filter(paid = 'N',terminal_no = machineInfo.terminal_no,site_code = int(machineInfo.site_no) ,table_no =TableNo)
-        result = []
-        
-        for item in pos_sales_order_data:
-            matched_records = PosSalesTransDetails.objects.extra(
-                select={
-                    'sales_order_document_no': 'tbl_pos_sales_order.document_no',
-                    'so_no': 'tbl_pos_sales_order.SO_no'
-                },
-                tables=['tbl_pos_sales_trans_details', 'tbl_pos_sales_order'],
-                where=[
-                    'tbl_pos_sales_trans_details.sales_trans_id = tbl_pos_sales_order.document_no',
-                    'tbl_pos_sales_order.document_no = %s'
-                ],
-                params=[item.document_no]  
-            )
-            result.extend(list(matched_records.values()))
-        pos_extended_save_from_listing(result ,TableNo,queno)   
+    if TableNo is not None:
+       
+        if so_no:
+            print('pos_sales_order_data',int(machineInfo.site_no),machineInfo.terminal_no)
+            # pdb.set_trace()
+            pos_sales_order_data = PosSalesOrder.objects.filter(paid = 'N',terminal_no = machineInfo.terminal_no,site_code = int(machineInfo.site_no) ,table_no =TableNo,SO_no = so_no)
+            result = []
+            print('pos_sales_order_data',pos_sales_order_data)
+            
+            for item in pos_sales_order_data:
+                matched_records = PosSalesTransDetails.objects.extra(
+                    select={
+                        'sales_order_document_no': 'tbl_pos_sales_order.document_no',
+                        'so_no': 'tbl_pos_sales_order.SO_no'
+                    },
+                    tables=['tbl_pos_sales_trans_details', 'tbl_pos_sales_order'],
+                    where=[
+                        'tbl_pos_sales_trans_details.sales_trans_id = tbl_pos_sales_order.document_no',
+                        'tbl_pos_sales_order.document_no = %s'
+                    ],
+                    params=[item.document_no]  
+                )
+                result.extend(list(matched_records.values()))
+            pos_extended_save_from_listing(result ,TableNo,queno)   
+        else:
+            pos_sales_order_data = PosSalesOrder.objects.filter(paid = 'N',terminal_no = machineInfo.terminal_no,site_code = int(machineInfo.site_no) ,table_no =TableNo)
+            result = []
+            
+            for item in pos_sales_order_data:
+                matched_records = PosSalesTransDetails.objects.extra(
+                    select={
+                        'sales_order_document_no': 'tbl_pos_sales_order.document_no',
+                        'so_no': 'tbl_pos_sales_order.SO_no'
+                    },
+                    tables=['tbl_pos_sales_trans_details', 'tbl_pos_sales_order'],
+                    where=[
+                        'tbl_pos_sales_trans_details.sales_trans_id = tbl_pos_sales_order.document_no',
+                        'tbl_pos_sales_order.document_no = %s'
+                    ],
+                    params=[item.document_no]  
+                )
+                result.extend(list(matched_records.values()))
+            pos_extended_save_from_listing(result ,TableNo,queno)   
     else:
         pos_sales_order_data = PosSalesOrder.objects.filter(paid = 'N',terminal_no = machineInfo.terminal_no,site_code = int(machineInfo.site_no) ,q_no =queno)
         result = []
