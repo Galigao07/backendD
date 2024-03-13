@@ -257,11 +257,11 @@ def get_serial_number():
             print(wmic_output)
             lines = wmic_output.split('\n')
             if len(lines) > 1:
-                machineInfo = POS_Terminal.objects.filter(Serial_no=lines[1]).first()
+                machineInfo = POS_Terminal.objects.filter(Serial_no=lines[1].strip()).first()
                 if machineInfo:
                     return lines[1]
                 else: 
-                    machineInfo2 = POS_Terminal.objects.filter(Serial_no=lines[2]).first()
+                    machineInfo2 = POS_Terminal.objects.filter(Serial_no=lines[2].strip()).first()
                     if machineInfo2:
                         return lines[2] # Extracting the serial number if available
             else:
