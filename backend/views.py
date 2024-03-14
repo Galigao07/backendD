@@ -138,7 +138,7 @@ def user_logout_api(request):
             user = User.objects.filter(id_code=UserID).first()
 
             serial_number = get_serial_number()
-            machine = POS_Terminal.objects.filter(Serial_no=serial_number).first()
+            machine = POS_Terminal.objects.filter(Serial_no=serial_number.strip()).first()
 
             current_date_ph = GetPHilippineDate()
             current_datetime_ph = GetPHilippineDateTime()
@@ -171,7 +171,7 @@ def user_endshift_api(request):
             user = User.objects.filter(id_code=UserID).first()
 
             serial_number = get_serial_number()
-            machine = POS_Terminal.objects.filter(Serial_no=serial_number).first()
+            machine = POS_Terminal.objects.filter(Serial_no=serial_number.strip()).first()
 
             current_date_ph = GetPHilippineDate()
             current_datetime_ph = GetPHilippineDateTime()
