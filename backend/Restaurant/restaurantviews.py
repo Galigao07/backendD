@@ -56,7 +56,7 @@ def pos_extended(request):
     if request.method == 'GET':
         data = request.GET.get('data')
         serial_number = get_serial_number()
-        machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number).first()
+        machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number.strip()).first()
         data_list = PosExtended.objects.filter(serial_no = machineInfo.Serial_no)
         serialize = PosExtendedSerializer(data_list,many=True)
         return Response(serialize.data)
@@ -68,7 +68,7 @@ def pos_extended(request):
             data = json.loads(request.body)
             print(data)
             serial_number = get_serial_number()
-            machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number).first()
+            machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number.strip()).first()
             # data = data['data']
             TableNo = data['TableNo']
             orderType = data['OrderType']
@@ -129,7 +129,7 @@ def pos_extended(request):
             barcode = data['deleteData']['barcode']
             
             serial_number = get_serial_number()
-            machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number).first()
+            machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number.strip()).first()
     
 
             # Retrieve the queryset of existing records based on the specified conditions
@@ -150,7 +150,7 @@ def pos_extended_delete_all(request):
     if request.method == 'DELETE':
         try:
             serial_number = get_serial_number()
-            machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number).first()
+            machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number.strip()).first()
             data_exist_queryset = PosExtended.objects.filter(serial_no=serial_number)
             if data_exist_queryset.exists():
                 data_exist_queryset.delete()
@@ -163,7 +163,7 @@ def pos_extended_delete_all(request):
 
 def pos_extended_save_from_listing(data,TableNo,QueNO):
     serial_number = get_serial_number()
-    machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number).first()
+    machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number.strip()).first()
     check_data = PosExtended.objects.filter(serial_no=machineInfo.Serial_no)
     # pdb.set_trace()
     if not check_data:
@@ -250,7 +250,7 @@ def table_list_view(request):
             paid_list ='Y'
             
             serial_number = get_serial_number()
-            machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number).first()
+            machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number.strip()).first()
             
             paid = PosSalesOrder.objects.filter(table_no=table_count ,paid = 'N',active = 'Y',terminal_no = machineInfo.terminal_no,site_code = int(machineInfo.site_no))
             if paid.exists():
@@ -273,7 +273,7 @@ def queing_list_view(request):
 
             
     serial_number = get_serial_number()
-    machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number).first()
+    machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number.strip()).first()
     que_list=[]        
     paid = PosSalesOrder.objects.filter(
         q_no__isnull=False,  # Exclude records where q_no is null
@@ -302,21 +302,21 @@ def get_sales_order_list(request):
         if tableno is not None:
             if tableno == 0:
                 serial_number = get_serial_number()
-                machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number).first()
+                machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number.strip()).first()
                 paid = PosSalesOrder.objects.filter(paid = 'N',active='Y',terminal_no = machineInfo.terminal_no,site_code = int(machineInfo.site_no))
                 if paid.exists():
                     serializer = PosSalesOrderSerializer(paid, many=True)
                     return Response(serializer.data)
             else:
                 serial_number = get_serial_number()
-                machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number).first()
+                machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number.strip()).first()
                 paid = PosSalesOrder.objects.filter(paid = 'N',active='Y',terminal_no = machineInfo.terminal_no,site_code = int(machineInfo.site_no) ,table_no =tableno)
                 if paid.exists():
                     serializer = PosSalesOrderSerializer(paid, many=True)
                     return Response(serializer.data)
         else:
             serial_number = get_serial_number()
-            machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number).first()
+            machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number.strip()).first()
             paid = PosSalesOrder.objects.filter(paid = 'N',active='Y',terminal_no = machineInfo.terminal_no,site_code = int(machineInfo.site_no) ,q_no = queno)
             if paid.exists():
                 serializer = PosSalesOrderSerializer(paid, many=True)
@@ -331,7 +331,7 @@ def get_sales_order_listing(request):
     so_no = request.GET.get('so_no')
 
     serial_number = get_serial_number()
-    machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number).first()
+    machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number.strip()).first()
     queno = request.GET.get('queno')
     print(TableNo,so_no)
     # pdb.set_trace()
@@ -408,7 +408,7 @@ def get_add_order_view(request):
     # Query the Product model based on the category received in the URL
     tableNo = request.GET.get('tableNo')
     serial_number = get_serial_number()
-    machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number).first()
+    machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number.strip()).first()
     paid = PosSalesOrder.objects.filter(paid = 'N',active='Y',terminal_no = machineInfo.terminal_no,site_code = int(machineInfo.site_no),table_no = tableNo)
     serializer = PosSalesOrderSerializer(paid, many=True)
     return Response(serializer.data)
@@ -454,7 +454,7 @@ def get_waiter_list(request):
 def get_company_details(request):
     companyCode = getCompanyData()
     serial_number = get_serial_number()
-    machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number).first()
+    machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number.strip()).first()
     data = []
     data = {
             'CustomerCompanyName':companyCode.company_name,
@@ -524,7 +524,7 @@ def get_reprint_transaction_for_receipt(request):
         DocNo = request.GET.get('DocNo')  # Get the 'datefrom' parameter
         DocType = request.GET.get('DocType') 
         serial_number = get_serial_number()
-        machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number).first()
+        machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number.strip()).first()
         list = PosSalesTransDetails.objects.filter(sales_trans_id=DocNo,terminal_no = machineInfo.terminal_no,site_code = int(machineInfo.site_no))
         listing = PosSalesTransDetailsSerializer(list,many=True).data
         companyCode = getCompanyData()
@@ -691,7 +691,7 @@ def save_sales_order(request):
         line_no = 0 
 
         serial_number = get_serial_number()
-        machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number).first()
+        machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number.strip()).first()
         
 
         for item in cart_items:
@@ -823,7 +823,7 @@ def save_cash_payment(request):
         
         
         serial_number = get_serial_number()
-        machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number).first()
+        machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number.strip()).first()
         companyCode = getCompanyData()
         waiterName=''
  
@@ -1150,7 +1150,7 @@ def cancel_sales_order(request):
         
         print('table',tableno)
         serial_number = get_serial_number()
-        machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number).first()
+        machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number.strip()).first()
 
         if not machineInfo:
             return Response({'message': 'Machine information not found'}, status=404)
@@ -1210,7 +1210,7 @@ def save_sales_order_payment(request):
         line_no = 0 
 
         serial_number = get_serial_number()
-        machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number).first()
+        machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number.strip()).first()
         Amt_Discount = 0
         # pdb.set_trace()
         for item in cart_items:
@@ -1323,7 +1323,7 @@ def save_credit_card_payment2(request):
         current_datetime = timezone.now()
         datetime_stamp = current_datetime.strftime('%Y-%m-%d %H:%M:%S')
         serial_number = get_serial_number()
-        machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number).first()
+        machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number.strip()).first()
         companyCode = getCompanyData()
         waiterName=''
         bankID = ''
@@ -1687,7 +1687,7 @@ def save_credit_card_payment(request):
         
         
         serial_number = get_serial_number()
-        machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number).first()
+        machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number.strip()).first()
         companyCode = getCompanyData()
         waiterName=''
  
@@ -2092,7 +2092,7 @@ def save_debit_card_payment(request):
         
         
         serial_number = get_serial_number()
-        machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number).first()
+        machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number.strip()).first()
         companyCode = getCompanyData()
         waiterName=''
  
@@ -2565,7 +2565,7 @@ def save_multiple_payment(request):
         
         
         serial_number = get_serial_number()
-        machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number).first()
+        machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number.strip()).first()
         companyCode = getCompanyData()
         waiterName=''
  
