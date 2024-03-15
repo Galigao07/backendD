@@ -269,29 +269,30 @@ def table_list_view(request):
 
 @api_view(['GET'])
 def queing_list_view(request):
-    site_code = request.GET.get('site_code', None)  # Assuming site_code is passed as a query parameter
-    if site_code is None:
-        return Response({"error": "Site code is missing"}, status=400)
+    if request.method == 'GET':
+        site_code = request.GET.get('site_code', None)  # Assuming site_code is passed as a query parameter
+        if site_code is None:
+            return Response({"error": "Site code is missing"}, status=400)
 
-            
-    serial_number = get_serial_number()
-    machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number.strip()).first()
-    que_list=[]        
-    paid = PosSalesOrder.objects.filter(
-        q_no__isnull=False,  # Exclude records where q_no is null
-        paid='N',
-        active='Y',
-        terminal_no=machineInfo.terminal_no,
-        site_code=int(machineInfo.site_no)
-    ).exclude(q_no='0.000')
-    if paid.exists():
-        serializer = PosSalesOrderSerializer(paid, many=True)
-        for item in serializer.data:
-                  
-            paid_list = item['paid'] 
-            que_list.append({"q_no": item['q_no'] , "Paid": paid_list})
-    print(que_list)
-    return Response({"que": que_list})
+                
+        serial_number = get_serial_number()
+        machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number.strip()).first()
+        que_list=[]        
+        paid = PosSalesOrder.objects.filter(
+            q_no__isnull=False,  # Exclude records where q_no is null
+            paid='N',
+            active='Y',
+            terminal_no=machineInfo.terminal_no,
+            site_code=int(machineInfo.site_no)
+        ).exclude(q_no='0.000')
+        if paid.exists():
+            serializer = PosSalesOrderSerializer(paid, many=True)
+            for item in serializer.data:
+                    
+                paid_list = item['paid'] 
+                que_list.append({"q_no": item['q_no'] , "Paid": paid_list})
+        print(que_list)
+        return Response({"que": que_list})
 
 
 @api_view(['GET'])
@@ -335,8 +336,8 @@ def get_sales_order_listing(request):
     serial_number = get_serial_number()
     machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number.strip()).first()
     queno = request.GET.get('queno')
-    print(TableNo,so_no)
-    # pdb.set_trace()
+    print('queno',queno)
+    pdb.set_trace()
     if TableNo is not None:
        
         if so_no:
@@ -344,7 +345,7 @@ def get_sales_order_listing(request):
             # pdb.set_trace()
             pos_sales_order_data = PosSalesOrder.objects.filter(paid = 'N',terminal_no = machineInfo.terminal_no,site_code = int(machineInfo.site_no) ,table_no =TableNo,SO_no = so_no)
             result = []
-            print('pos_sales_order_data',pos_sales_order_data)
+           
             
             for item in pos_sales_order_data:
                 matched_records = PosSalesTransDetails.objects.extra(
@@ -364,6 +365,7 @@ def get_sales_order_listing(request):
         else:
             pos_sales_order_data = PosSalesOrder.objects.filter(paid = 'N',terminal_no = machineInfo.terminal_no,site_code = int(machineInfo.site_no) ,table_no =TableNo)
             result = []
+            print('pos_sales_order_data',pos_sales_order_data)
             
             for item in pos_sales_order_data:
                 matched_records = PosSalesTransDetails.objects.extra(
@@ -381,6 +383,7 @@ def get_sales_order_listing(request):
                 result.extend(list(matched_records.values()))
             pos_extended_save_from_listing(result ,TableNo,queno)   
     else:
+        pdb.set_trace()
         pos_sales_order_data = PosSalesOrder.objects.filter(paid = 'N',terminal_no = machineInfo.terminal_no,site_code = int(machineInfo.site_no) ,q_no =queno)
         result = []
         print('eeeeeeeeeeeeeeeeeeeee')

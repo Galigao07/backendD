@@ -5,7 +5,7 @@ from asgiref.sync import async_to_sync
 import json
 from django.core.serializers import serialize
 from backend.models import POS_Terminal, PosExtended,PosSalesOrder,PosSalesInvoiceList
-from backend.login import get_serial_number
+from backend.views import get_serial_number
 
 @receiver(post_save,sender=PosExtended)
 def model_saved(sender, instance, created, **kwargs):
@@ -33,9 +33,9 @@ def send_to_extended(instance, action, **kwargs):
         # Convert serialized data to dictionary
         data = json.loads(instance_json)[0]['fields']
         serial_number = get_serial_number()
-        machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number).first()
+        machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number.strip()).first()
         print(2)
-        pos_extended_count = PosExtended.objects.filter(serial_no=serial_number).count()
+        pos_extended_count = PosExtended.objects.filter(serial_no=machineInfo.Serial_no.strip()).count()
         # Convert model instance to JSON serializable format
         print('dataaaaaa',data)
         print('action',action)
