@@ -243,40 +243,57 @@ def decrypt_aes(encrypted_data, key):
     
     
     
-    
-    
-
-
 def get_serial_number():
     try:
-        system = platform.system()
-        if system == 'Windows':
-            # Retrieve serial number using WMIC (Windows Management Instrumentation Command-line)
-            # wmic_output = subprocess.check_output('wmic bios get serialnumber').decode().strip()
-            wmic_output = subprocess.check_output('wmic diskdrive get serialnumber').decode().strip()
-            print(wmic_output)
-            lines = wmic_output.split('\n')
-            if len(lines) > 1:
-                machineInfo = POS_Terminal.objects.filter(Serial_no=lines[1].strip()).first()
-                if machineInfo:
-                    return lines[1]
-                else: 
-                    machineInfo2 = POS_Terminal.objects.filter(Serial_no=lines[2].strip()).first()
-                    if machineInfo2:
-                        return lines[2] # Extracting the serial number if available
-            else:
-                return 'Serial number not found.'
-        elif system == 'Linux':
-            # Read product serial from the system file
-            with open('/sys/class/dmi/id/product_serial') as file:
-                return file.read().strip()
-        elif system == 'Darwin':  # macOS
-            # Retrieving serial number using system profiler
-            return platform.system_profiler().get('serial_number', 'N/A')
-        else:
-            return 'Serial number retrieval not supported on this platform.'
+        wmic_output = subprocess.check_output('wmic diskdrive get serialnumber').decode().strip()
+        lines = wmic_output.split('\n')
+        serial_numbers = []
+        for line in lines[1:]:  # Skip header line
+            serial_number = line.strip()
+            serial_numbers.append(serial_number)
+            # Optionally, you can query the database here
+            machine_info = POS_Terminal.objects.filter(Serial_no=serial_number).first()
+            if machine_info:
+                return serial_number  # Return the first serial number found
+        if serial_numbers:
+            return serial_numbers  # Return all serial numbers found
+        return 'Serial numbers not found.'
+    except subprocess.CalledProcessError as e:
+        return f'Error occurred while running subprocess: {str(e)}'
     except Exception as e:
-        return f'Error occurred: {str(e)}'
+        return f'Error occurred: {str(e)}'   
+    
+
+
+# def get_serial_number():
+#     try:
+#         system = platform.system()
+#         if system == 'Windows':
+#             # Retrieve serial number using WMIC (Windows Management Instrumentation Command-line)
+#             # wmic_output = subprocess.check_output('wmic bios get serialnumber').decode().strip()
+#             wmic_output = subprocess.check_output('wmic diskdrive get serialnumber').decode().strip()
+#             lines = wmic_output.split('\n')
+#             if len(lines) > 1:
+#                 machineInfo = POS_Terminal.objects.filter(Serial_no=lines[1].strip()).first()
+#                 if machineInfo:
+#                     return lines[1]
+#                 else: 
+#                     machineInfo2 = POS_Terminal.objects.filter(Serial_no=lines[2].strip()).first()
+#                     if machineInfo2:
+#                         return lines[2] # Extracting the serial number if available
+#             else:
+#                 return 'Serial number not found.'
+#         elif system == 'Linux':
+#             # Read product serial from the system file
+#             with open('/sys/class/dmi/id/product_serial') as file:
+#                 return file.read().strip()
+#         elif system == 'Darwin':  # macOS
+#             # Retrieving serial number using system profiler
+#             return platform.system_profiler().get('serial_number', 'N/A')
+#         else:
+#             return 'Serial number retrieval not supported on this platform.'
+#     except Exception as e:
+#         return f'Error occurred: {str(e)}'
 
 def get_computer_name():
     try:

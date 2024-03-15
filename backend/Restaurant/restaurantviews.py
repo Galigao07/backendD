@@ -148,10 +148,12 @@ def pos_extended(request):
 @api_view(['GET','POST','PUT','DELETE'])
 def pos_extended_delete_all(request):
     if request.method == 'DELETE':
+        print('delete')
         try:
+            # pdb.set_trace()
             serial_number = get_serial_number()
             machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number.strip()).first()
-            data_exist_queryset = PosExtended.objects.filter(serial_no=serial_number)
+            data_exist_queryset = PosExtended.objects.filter(serial_no=serial_number.strip())
             if data_exist_queryset.exists():
                 data_exist_queryset.delete()
                 return Response('Delete Successfully')
