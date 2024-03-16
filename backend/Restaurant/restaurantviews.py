@@ -337,7 +337,7 @@ def get_sales_order_listing(request):
     machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number.strip()).first()
     queno = request.GET.get('queno')
     print('queno',queno)
-    pdb.set_trace()
+    # pdb.set_trace()
     if TableNo is not None:
        
         if so_no:
@@ -610,6 +610,7 @@ def getCompanyData():
 @api_view(['POST'])
 def save_sales_order(request):
     if request.method == 'POST':
+        # pdb.set_trace()
         waiter = ''
         waiterID = 0
         received_data = json.loads(request.body)
@@ -1270,7 +1271,8 @@ def save_sales_order_payment(request):
             )
              
             SaveOrderToDetails.save()
-            
+            # pdb.set_trace()
+            amountT = str(AmountTendered).replace(',', '')
             SaveToPosSalesTrans = PosSalesTrans(
             login_record = 1,
             sales_trans_id = min_sales_trans_id,
@@ -1279,7 +1281,7 @@ def save_sales_order_payment(request):
             cashier_id = cashier_id,
             datetime_stamp = datetime_stamp,
             bagger = '',
-            amount_tendered = AmountTendered,
+            amount_tendered = amountT,
             document_type = 'SI',
             amount_disc = Amt_Discount,
             lvl1_disc = 0,
@@ -2016,7 +2018,7 @@ def save_credit_card_payment(request):
 @api_view(['POST'])
 def save_debit_card_payment(request):
     if request.method == 'POST':
-        
+        # pdb.set_trace()
         received_data = json.loads(request.body)
         cart_items = received_data.get('data', [])
         data_from_modal = received_data.get('CustomerPaymentData')
@@ -2420,7 +2422,7 @@ def save_debit_card_payment(request):
 @api_view(['POST'])
 def save_multiple_payment(request):
     if request.method == 'POST':
-        
+        # pdb.set_trace()
         received_data = json.loads(request.body)
         cart_items = received_data.get('data', [])
         data_from_modal = received_data.get('CustomerPaymentData')
