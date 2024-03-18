@@ -1037,9 +1037,9 @@ def save_cash_payment(request):
             AmountDue_formatted = f"{AmountDue_float:.3f}"
 
 
-            total_disc_amt = float(total_disc_amt.replace(',', ''))
-            total_desc_rate = float(total_desc_rate)
-            total_vat_exempt = float(total_vat_exempt)
+            total_disc_amt = float(str(total_disc_amt).replace(',', ''))
+            total_desc_rate = float(str(total_desc_rate).replace(',', ''))
+            total_vat_exempt = float(str(total_vat_exempt).replace(',', ''))
             SaveToPOSSalesInvoiceList = PosSalesInvoiceList (
                     company_code = f"{companyCode.autonum:0>4}",
                     ul_code = machineInfo.ul_code,
@@ -1071,8 +1071,8 @@ def save_cash_payment(request):
                     discount = float(str(total_disc_amt).replace(',', '')),
                     vat = float(str(total_vat_amt).replace(',', '')),
                     vat_exempted = float(str(vat_exempted).replace(',', '')),
-                    net_vat = float(net_vat.replace(',', '')),
-                    net_discount = float(net_discount.replace(',', '')),
+                    net_vat = float(str(net_vat).replace(',', '')),
+                    net_discount = float(str(net_discount).replace(',', '')),
                     sub_total = float(str(total_sub_total).replace(',', '')),
                     # discount =  f"{total_disc_amt:.3f}" ,
                     # vat = f"{total_vat_amt:.3f}",
