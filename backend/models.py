@@ -227,6 +227,22 @@ class CompanySetup(models.Model):
         db_table = 'tbl_company_setup'
 
 
+class PosSalesTransSeniorCitizenDiscount(models.Model):
+    autonum = models.BigAutoField(primary_key=True)
+    sales_trans_id = models.IntegerField(null=True, default=None)
+    terminal_no = models.CharField(max_length=21, default='0')
+    cashier_id = models.CharField(max_length=21, default='')
+    document_type = models.CharField(max_length=10, default=' ')
+    details_id = models.IntegerField(default=0)
+    id_no = models.CharField(max_length=100, null=True, default=None)
+    senior_member_name = models.CharField(max_length=500, null=True, default=None)
+    id = models.IntegerField(default=0)
+    tin_no = models.CharField(max_length=100, default='0')
+    so_no = models.CharField(max_length=50, default=' ')
+
+    class Meta:
+        db_table = 'tbl_pos_sales_trans_senior_citizen_discount'
+
 class ProductCategorySetup(models.Model):
     autonum = models.BigAutoField(primary_key=True)
     category_code = models.PositiveSmallIntegerField(default=0)
