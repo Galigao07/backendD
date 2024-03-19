@@ -60,13 +60,10 @@ def pos_extended(request):
         data_list = PosExtended.objects.filter(serial_no = machineInfo.Serial_no)
         serialize = PosExtendedSerializer(data_list,many=True)
         return Response(serialize.data)
-    
-    elif request.method == 'POST':
+    elif request.method == 'PUT':
         try:
-            # pdb.set_trace()
-            # Parse the JSON data sent in the request body
             data = json.loads(request.body)
-            print(data)
+            print('uPDATE')
             serial_number = get_serial_number()
             machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number.strip()).first()
             # data = data['data']
@@ -77,70 +74,111 @@ def pos_extended(request):
             price = data['data']['price']
             total_amount = data['data']['totalAmount']
             barcode = data['data']['barcode']
+            lineno = data['data']['lineno']
             if TableNo =='':
                 TableNo = 0
-            data_exist_queryset = PosExtended.objects.filter(serial_no=serial_number, barcode=barcode)
+            data_exist_queryset = PosExtended.objects.filter(serial_no=serial_number, barcode=barcode,line_no = lineno)
             # Check if any records exist in the queryset
             if data_exist_queryset.exists():
                 # Access the first instance in the queryset (assuming there's only one matching record)
                 data_exist_instance = data_exist_queryset.first()
                 
                 # Update the fields of the instance
-                data_exist_instance.qty = quantity
-                data_exist_instance.amount = total_amount
-                data_exist_instance.price = price
+                data_exist_instance.qty = float(quantity)
+                data_exist_instance.amount = float(str(total_amount).replace(',',''))
+                data_exist_instance.price =  float(str(price).replace(',',''))
                 
                 # Save the changes to the instance
                 data_exist_instance.save()
 
+                return JsonResponse({'success': True, 'message': 'Data received successfully'}, status=200)
+        except json.JSONDecodeError:
+            traceback.print_exc()
+            return JsonResponse({'success': False, 'message': 'Invalid JSON data'}, status=400)
+    elif request.method == 'POST':
+        try:
+            print('sAVE')
+            data = json.loads(request.body)
+            serial_number = get_serial_number()
+            machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number.strip()).first()
+            # data = data['data']
+            TableNo = data['TableNo']
+            orderType = data['OrderType']
+            quantity = data['data']['quantity']
+            description = data['data']['description']
+            price = data['data']['price']
+            total_amount = data['data']['totalAmount']
+            barcode = data['data']['barcode']
+            lineno = data['data']['lineno']
+            if TableNo =='':
+                TableNo = 0
+            data_exist_queryset = PosExtended.objects.filter(serial_no=serial_number, barcode=barcode)
+            # Check if any records exist in the queryset
+            # if data_exist_queryset.exists():
+            #     # Access the first instance in the queryset (assuming there's only one matching record)
+            #     data_exist_instance = data_exist_queryset.first()
+                
+            #     # Update the fields of the instance
+            #     data_exist_instance.qty = quantity
+            #     data_exist_instance.amount = total_amount
+            #     data_exist_instance.price = price
+                
+            #     # Save the changes to the instance
+            #     data_exist_instance.save()
 
-            else:
+
+            # else:
      
-                saveExtended = PosExtended(
+            saveExtended = PosExtended(
                     barcode=barcode,
                     qty=quantity,
                     description=description,
                     price=price,
-                    amount=total_amount,
+                    amount=float(str(total_amount).replace(',', '')),
                     serial_no=serial_number,
                     table_no=int(TableNo),
-                    order_type=orderType
+                    order_type=orderType,
+                    line_no = lineno
+
                 )
-                saveExtended.save()
-            # Process the data as needed
-            # For example, you can access data['data'] to get the 'data' key sent from Axios
-
-            # Optionally, save the data to the database
-            # Example: ExtendedData.objects.create(**data)
-
+            saveExtended.save()
             return JsonResponse({'success': True, 'message': 'Data received successfully'}, status=200)
         except json.JSONDecodeError:
+            traceback.print_exc()
             return JsonResponse({'success': False, 'message': 'Invalid JSON data'}, status=400)
     elif request.method == 'DELETE':
         try:
     # Parse the JSON data sent in the request body
             data = json.loads(request.body)  # Decode and load JSON data
-        
-    
-            quantity = data['deleteData']['quantity']
-            description = data['deleteData']['description']
-            price = data['deleteData']['price']
-            total_amount = data['deleteData']['totalAmount']
-            barcode = data['deleteData']['barcode']
-            
             serial_number = get_serial_number()
             machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number.strip()).first()
-    
+            if 'deleteData' in data:
+                quantity = data['deleteData']['quantity']
+                description = data['deleteData']['description']
+                price = data['deleteData']['price']
+                # total_amount = data['deleteData']['totalAmount']
+                total_amount = data['deleteData'].get('totalAmount') if 'deleteData' in data else None
+                lineno = data['deleteData'].get('lineno') if 'deleteData' in data else None
 
-            # Retrieve the queryset of existing records based on the specified conditions
-            data_exist_queryset = PosExtended.objects.filter(serial_no=serial_number, barcode=barcode)
+                barcode = data['deleteData']['barcode']
+                # lineno = data['deleteData']['lineno']
+                
+                print('total_amount',total_amount)
+                if total_amount is None:
+                    PosExtended.objects.filter(serial_no=serial_number).delete()
+                    return Response('Delete Successfully')
+                    
+                # Retrieve the queryset of existing records based on the specified conditions
+                data_exist_queryset = PosExtended.objects.filter(serial_no=serial_number, barcode=barcode,line_no = lineno)
 
-            # Check if any records exist in the queryset
-            if data_exist_queryset.exists():
-                # Delete all matching records from the database
-                data_exist_queryset.delete()
+                # Check if any records exist in the queryset
+                if data_exist_queryset.exists():
+                    # Delete all matching records from the database
+                    data_exist_queryset.delete()
+                    return Response('Delete Successfully')
+            else:
+                PosExtended.objects.filter(serial_no=serial_number).delete()
                 return Response('Delete Successfully')
-
         except Exception as e:
             # Handle exceptions here
             print("An error occurred:", e)
@@ -612,7 +650,8 @@ def getCompanyData():
 @transaction.atomic
 def save_sales_order(request):
     if request.method == 'POST':
-        try: 
+        try:
+            print('sales order save') 
             waiter = ''
             waiterID = 0
             received_data = json.loads(request.body)
@@ -1214,6 +1253,7 @@ def cancel_sales_order(request):
 def save_sales_order_payment(request):
     if request.method == 'POST':
         try:
+            print('payment sales order save') 
         # pdb.set_trace()
             received_data = json.loads(request.body)
             cart_items = received_data.get('data', [])
@@ -1223,9 +1263,10 @@ def save_sales_order_payment(request):
             AmountTendered = received_data.get('AmountTendered')
             DiscountType = received_data.get('DiscountType')
             DiscountData= received_data.get('DiscountData')
+            customer_data= received_data.get('customer')
             doctype = received_data.get('doctype')
             doc_no = get_sales_transaction_id(TerminalNo,doctype)
-            print('doc_no',doc_no) 
+            print('customer_data',customer_data) 
             current_datetime = timezone.now()
             datetime_stamp = current_datetime.strftime('%Y-%m-%d %H:%M:%S')
             # pdb.set_trace()
@@ -1235,12 +1276,21 @@ def save_sales_order_payment(request):
             # Extracting date and time separately
             formatted_date = formatted_datetime.date()  # Extracts the date
             formatted_time = formatted_datetime.time()  # Extracts the time
-            
-            min_sales_trans_id = PosSalesTransDetails.objects.aggregate(sales_trans_id=Min('sales_trans_id'))['sales_trans_id'] or 0
-            min_sales_trans_id = abs(min_sales_trans_id)
-            min_sales_trans_id += 1
-            
-            min_sales_trans_id =  min_sales_trans_id * -1
+
+            customername = ''
+            guestcount = 0
+            waiterid = 0
+            waitername = ''
+            paymenttype = ''
+
+     
+            if customer_data:
+                customername = customer_data['Customer']
+                guestcount = customer_data['GuestCount']
+                waiterid = customer_data.get('waiterID', None)  # Use get() to safely access waiterID, providing a default value of None if the key is missing
+                waitername = customer_data['Waiter']
+                paymenttype = customer_data['PaymentType']
+
             
             min_details_id = PosSalesTransDetails.objects.aggregate(details_id=Max('details_id'))['details_id'] or 0
             
@@ -1251,6 +1301,7 @@ def save_sales_order_payment(request):
             serial_number = get_serial_number()
             machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number.strip()).first()
             Amt_Discount = 0
+            so_no = ''
             # pdb.set_trace()
             for item in cart_items:
                 line_no += 1 
@@ -1262,8 +1313,15 @@ def save_sales_order_payment(request):
                 item_disc = 0
                 desc_rate = 0
                 vat_ex = 0
-    
-                
+
+                if (paymenttype == 'Sales Order'):
+                    if so_no == '':
+                        so_no =  str(item['so_no'])
+                    else:
+                        so_no = str(so_no) + ',' + str(item['so_no'])
+
+
+   
             
                 
                 if DiscountType == 'SC':
@@ -1277,7 +1335,7 @@ def save_sales_order_payment(request):
                     item_disc  = (float(totalItem) - float(vat_ex) ) * 0.2
                 
                 SaveOrderToDetails = PosSalesTransDetails(
-                    sales_trans_id = float(doc_no),
+                    sales_trans_id = int(float(doc_no)),
                     datetime_stamp = datetime_stamp,
                     document_type = 'SI',
                     terminal_no = TerminalNo,
@@ -1305,10 +1363,10 @@ def save_sales_order_payment(request):
                 
                 SaveOrderToDetails.save()
                 # pdb.set_trace()
-                amountT = str(AmountTendered).replace(',', '')
-                SaveToPosSalesTrans = PosSalesTrans(
+            amountT = str(AmountTendered).replace(',', '')
+            SaveToPosSalesTrans = PosSalesTrans(
                 login_record = 1,
-                sales_trans_id = min_sales_trans_id,
+                sales_trans_id = int(float(doc_no)),
                 terminal_no = TerminalNo,
                 site_code = int(machineInfo.site_no),
                 cashier_id = cashier_id,
@@ -1324,7 +1382,7 @@ def save_sales_order_payment(request):
                 lvl5_disc =0,
                 vat_stamp =0,
                 sales_man = '',
-                document_no = 0,
+                document_no = so_no,
                 isvoid = 'NO',
                 issuspend = 'NO',
                 isclosed = 'NO',
@@ -1873,7 +1931,7 @@ def save_credit_card_payment(request):
                     cashier_id = cashier_id,
                     doc_date = datetime_stamp,
                     doc_no = doc_no,
-                    doc_type = 'POS-CI',
+                    doc_type = 'POS-SI',
                     line_number = items['line_no'],
                     bar_code =items['barcode'],
                     alternate_code = 0,
@@ -1953,10 +2011,10 @@ def save_credit_card_payment(request):
                     company_code = f"{companyCode.autonum:0>4}",
                     ul_code = machineInfo.ul_code,
                     site_code = int(machineInfo.site_no),
-                    trans_type = 'Credit Sales',
+                    trans_type = 'Cash Sales',
                     discount_type = '',
                     doc_no = doc_no,
-                    doc_type = 'POS-CI',
+                    doc_type = 'POS-SI',
                     terminal_no = TerminalNo,
                     cashier_id = cashier_id,
                     so_no =items['sales_trans_id'],
@@ -2043,7 +2101,7 @@ def save_credit_card_payment(request):
                     
                     pass
 
-            UpdateINVRef = InvRefNo.objects.filter(description='POS CI',terminalno=TerminalNo).first()
+            UpdateINVRef = InvRefNo.objects.filter(description=doctype,terminalno=TerminalNo).first()
             UpdateINVRef.next_no = doc_no
             UpdateINVRef.save()
     
@@ -2316,7 +2374,7 @@ def save_debit_card_payment(request):
                     cashier_id = cashier_id,
                     doc_date = datetime_stamp,
                     doc_no = doc_no,
-                    doc_type = 'POS-CI',
+                    doc_type = 'POS-SI',
                     line_number = items['line_no'],
                     bar_code =items['barcode'],
                     alternate_code = 0,
@@ -2395,10 +2453,10 @@ def save_debit_card_payment(request):
                     company_code = f"{companyCode.autonum:0>4}",
                     ul_code = machineInfo.ul_code,
                     site_code = int(machineInfo.site_no),
-                    trans_type = 'Credit Sales',
+                    trans_type = 'Cash Sales',
                     discount_type = '',
                     doc_no = doc_no,
-                    doc_type = 'POS-CI',
+                    doc_type = 'POS-SI',
                     terminal_no = TerminalNo,
                     cashier_id = cashier_id,
                     so_no =items['sales_trans_id'],
@@ -2485,7 +2543,7 @@ def save_debit_card_payment(request):
                     
                     pass
 
-            UpdateINVRef = InvRefNo.objects.filter(description='POS CI',terminalno=TerminalNo).first()
+            UpdateINVRef = InvRefNo.objects.filter(description=doctype,terminalno=TerminalNo).first()
             UpdateINVRef.next_no = doc_no
             UpdateINVRef.save()
     
@@ -2827,7 +2885,7 @@ def save_multiple_payment(request):
                     cashier_id = cashier_id,
                     doc_date = datetime_stamp,
                     doc_no = doc_no,
-                    doc_type = 'POS-CI',
+                    doc_type = 'POS-SI',
                     line_number = items['line_no'],
                     bar_code =items['barcode'],
                     alternate_code = 0,
@@ -2903,10 +2961,10 @@ def save_multiple_payment(request):
                     company_code = f"{companyCode.autonum:0>4}",
                     ul_code = machineInfo.ul_code,
                     site_code = int(machineInfo.site_no),
-                    trans_type = 'Credit Sales',
+                    trans_type = 'Cash Sales',
                     discount_type = '',
                     doc_no = doc_no,
-                    doc_type = 'POS-CI',
+                    doc_type = 'POS-SI',
                     terminal_no = TerminalNo,
                     cashier_id = cashier_id,
                     so_no =items['sales_trans_id'],
@@ -2919,8 +2977,8 @@ def save_multiple_payment(request):
                     customer_type = cust_type,
                     salesman_id = '0',
                     salesman = '',
-                    collector_id = '0',
-                    collector = '',
+                    collector_id = bankID,
+                    collector = BankName,
                     pricing = '',
                     terms = 0,
                     remarks = '',
@@ -2995,7 +3053,7 @@ def save_multiple_payment(request):
                     
                     pass
 
-            UpdateINVRef = InvRefNo.objects.filter(description='POS CI',terminalno=TerminalNo).first()
+            UpdateINVRef = InvRefNo.objects.filter(description=doctype,terminalno=TerminalNo).first()
             UpdateINVRef.next_no = doc_no
             UpdateINVRef.save()
     

@@ -1,10 +1,11 @@
+import pdb
 from django.db.models.signals import post_save, post_delete
 from django.dispatch import receiver
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
 import json
 from django.core.serializers import serialize
-from backend.models import POS_Terminal, PosExtended,PosSalesOrder,PosSalesInvoiceList
+from backend.models import POS_Terminal, PosExtended,PosSalesOrder,PosSalesInvoiceList,PosSalesTrans
 from backend.views import get_serial_number
 
 @receiver(post_save,sender=PosExtended)
@@ -58,6 +59,22 @@ def send_to_extended(instance, action, **kwargs):
         # Handle any exceptions that may occur during message sending
         print(f"Error sending message to consumer: {e}")
 
+def send_to_extended2(changeData, action, **kwargs):
+    try:
+
+
+        # Send message to consumer
+        channel_layer = get_channel_layer()
+        async_to_sync(channel_layer.group_send)(
+            "extended_groupchange",  # Channel group name
+            {
+                "type": "Send_to_front_end_extendedChange",
+                "data": changeData,  # Convert instance data to JSON
+            }
+        )
+    except Exception as e:
+        # Handle any exceptions that may occur during message sending
+        print(f"Error sending message to consumer: {e}")
 
 @receiver(post_save,sender=PosSalesOrder)
 def model_savedSales(sender, instance, created, **kwargs):
@@ -77,7 +94,24 @@ def model_savedSalesInvoice(sender, instance, created, **kwargs):
         send_to_frontend_data(instance, action)
     else:
         action = "Save" 
+        # pdb.set_trace()
         send_to_frontend_data(instance, action)
+        instance_json = serialize('json', [instance])
+        data = json.loads(instance_json)[0]['fields']
+        doc_no = data['doc_no']
+        serial_number = get_serial_number()
+        machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number.strip()).first()
+        print('datainstance',data)
+        print('doc_no',doc_no)
+        tmp = PosSalesTrans.objects.filter(sales_trans_id = int(float(doc_no)),terminal_no = machineInfo.terminal_no,site_code = int(machineInfo.site_no)).first()
+        print('tmp',tmp)
+        if tmp:
+            changeData = {
+                'AmountTendered':tmp.amount_tendered,
+                'AmountDue':data['sub_total'],
+            }
+            print('changeData',changeData)
+            send_to_extended2(changeData, action)
 
 
 def send_to_frontend_data(instance, action, **kwargs):

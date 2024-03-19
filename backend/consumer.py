@@ -62,3 +62,21 @@ class POSextended(AsyncWebsocketConsumer):
         print('dataetasdad', event['data'])
         data = event['data']
         await self.send(text_data=json.dumps(data))
+
+
+class POSextendedChange(AsyncWebsocketConsumer):
+    async def connect(self):
+        # self.room_name = "extended_group"
+        self.room_group_name ="extended_groupchange"
+        # self.room_group_name = f"extended_group%_"  % self.room_name
+        await self.channel_layer.group_add(self.room_group_name, self.channel_name)
+        await self.accept()
+        await self.send(text_data=json.dumps({'message': 'Connected to WebSocket.'}))
+
+    async def disconnect(self, close_code):
+        await self.channel_layer.group_discard(self.room_group_name, self.channel_name)
+
+    async def Send_to_front_end_extendedChange(self, event):
+        print('Change Group', event['data'])
+        data = event['data']
+        await self.send(text_data=json.dumps(data))
