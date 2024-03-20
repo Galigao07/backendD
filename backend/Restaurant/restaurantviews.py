@@ -2615,7 +2615,7 @@ def save_multiple_payment(request):
             QueNo= received_data.get('QueNo')
             DebitCard = received_data.get('DebitCard')
             CreditCard = received_data.get('CreditCard')
-            CashAmount = received_data.get('CashAmount')
+            CashAmount = received_data.get('CashAmount') 
             doctype = received_data.get('doctype')
             doc_no = get_sales_transaction_id(TerminalNo,doctype)
             # CreditCardPaymentListData = CreditCard.get("CreditCardPaymentList")
