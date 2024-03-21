@@ -106,9 +106,10 @@ def model_savedSalesInvoice(sender, instance, created, **kwargs):
         tmp = PosSalesTrans.objects.filter(sales_trans_id = int(float(doc_no)),terminal_no = machineInfo.terminal_no,site_code = int(machineInfo.site_no)).first()
         print('tmp',tmp)
         if tmp:
+            total = float(data['sub_total']) - (float(data['vat_exempted']) + float(data['discount']))
             changeData = {
                 'AmountTendered':tmp.amount_tendered,
-                'AmountDue':data['sub_total'],
+                'AmountDue':total,
             }
             print('changeData',changeData)
             send_to_extended2(changeData, action)
