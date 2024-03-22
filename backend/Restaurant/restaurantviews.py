@@ -304,6 +304,23 @@ def table_list_view(request):
 
     return Response({"tables": table_list})
 
+#***************** GET WAITER NAME ************************
+@api_view(['GET'])
+def get_waiter_name(request):
+    if request.method == 'GET':
+     
+        id = request.GET.get('id')
+        # Retrieve the Waiter object with the specified ID
+        try:
+            waiter = PosWaiterList.objects.get(waiter_id=id)
+        except PosWaiterList.DoesNotExist:
+            return Response({'error': 'Waiter not found'}, status=404)
+
+        # Serialize the Waiter object
+        serializer = PosWaiterListSerializer(waiter)
+
+        # Return serialized data
+        return Response(serializer.data)
 
 @api_view(['GET'])
 def queing_list_view(request):
@@ -379,7 +396,7 @@ def get_sales_order_listing(request):
     if TableNo is not None:
        
         if so_no:
-            print('pos_sales_order_data',int(machineInfo.site_no),machineInfo.terminal_no)
+            print('pos_sales_order_dataaaa',int(machineInfo.site_no),machineInfo.terminal_no)
             # pdb.set_trace()
             pos_sales_order_data = PosSalesOrder.objects.filter(paid = 'N',terminal_no = machineInfo.terminal_no,site_code = int(machineInfo.site_no) ,table_no =TableNo,SO_no = so_no)
             result = []
@@ -401,11 +418,12 @@ def get_sales_order_listing(request):
                 result.extend(list(matched_records.values()))
             pos_extended_save_from_listing(result ,TableNo,queno)   
         else:
-            pos_sales_order_data = PosSalesOrder.objects.filter(paid = 'N',terminal_no = machineInfo.terminal_no,site_code = int(machineInfo.site_no) ,table_no =TableNo)
+            pos_sales_order_data = PosSalesOrder.objects.filter(paid = 'N',terminal_no = machineInfo.terminal_no,site_code = int(machineInfo.site_no) ,table_no =TableNo,active ='Y')
             result = []
-            print('pos_sales_order_data',pos_sales_order_data)
+            # print('pos_sales_order_data',pos_sales_order_data)
             
             for item in pos_sales_order_data:
+                print('item.document_no',item.document_no)
                 matched_records = PosSalesTransDetails.objects.extra(
                     select={
                         'sales_order_document_no': 'tbl_pos_sales_order.document_no',
@@ -442,6 +460,122 @@ def get_sales_order_listing(request):
             print('result',result)
         pos_extended_save_from_listing(result ,TableNo,queno)   
     return Response(result)
+
+## **************** CANCELLED SALES ORDER TRANSACTION *****************
+@api_view(['GET'])
+def get_sales_order_list_cancelled(request):
+    if request.method == 'GET':
+        tableno = request.GET.get('tableno')
+        queno = request.GET.get('queno')
+        print(tableno,queno)
+
+        if tableno is not None:
+            if tableno == 0:
+                serial_number = get_serial_number()
+                machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number.strip()).first()
+                paid = PosSalesOrder.objects.filter(paid = 'N',active='N',terminal_no = machineInfo.terminal_no,site_code = int(machineInfo.site_no))
+                if paid.exists():
+                    serializer = PosSalesOrderSerializer(paid, many=True)
+                    return Response(serializer.data)
+            else:
+                serial_number = get_serial_number()
+                machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number.strip()).first()
+                paid = PosSalesOrder.objects.filter(paid = 'N',active='N',terminal_no = machineInfo.terminal_no,site_code = int(machineInfo.site_no) ,table_no =tableno)
+                if paid.exists():
+                    serializer = PosSalesOrderSerializer(paid, many=True)
+                    return Response(serializer.data)
+        else:
+            serial_number = get_serial_number()
+            machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number.strip()).first()
+            paid = PosSalesOrder.objects.filter(paid = 'N',active='N',terminal_no = machineInfo.terminal_no,site_code = int(machineInfo.site_no))
+            if paid.exists():
+                serializer = PosSalesOrderSerializer(paid, many=True)
+                return Response(serializer.data)
+                  
+
+@api_view(['GET'])
+def get_sales_order_listing_cancelled(request):
+    # document_no = request.GET.get('document_no[]')
+    # pdb.set_trace()
+    TableNo = request.GET.get('tableno')
+    so_no = request.GET.get('so_no')
+
+    serial_number = get_serial_number()
+    machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number.strip()).first()
+    queno = request.GET.get('queno')
+    print('queno',queno)
+    # pdb.set_trace()
+    if TableNo is not None:
+       
+        if so_no:
+            print('pos_sales_order_dataaaa',int(machineInfo.site_no),machineInfo.terminal_no)
+            # pdb.set_trace()
+            pos_sales_order_data = PosSalesOrder.objects.filter(paid = 'N',terminal_no = machineInfo.terminal_no,site_code = int(machineInfo.site_no) ,table_no =TableNo,SO_no = so_no,active='N')
+            result = []
+           
+            
+            for item in pos_sales_order_data:
+                matched_records = PosSalesTransDetails.objects.extra(
+                    select={
+                        'sales_order_document_no': 'tbl_pos_sales_order.document_no',
+                        'so_no': 'tbl_pos_sales_order.SO_no'
+                    },
+                    tables=['tbl_pos_sales_trans_details', 'tbl_pos_sales_order'],
+                    where=[
+                        'tbl_pos_sales_trans_details.sales_trans_id = tbl_pos_sales_order.document_no',
+                        'tbl_pos_sales_order.document_no = %s'
+                    ],
+                    params=[item.document_no]  
+                )
+                result.extend(list(matched_records.values()))
+            pos_extended_save_from_listing(result ,TableNo,queno)   
+        else:
+            pos_sales_order_data = PosSalesOrder.objects.filter(paid = 'N',terminal_no = machineInfo.terminal_no,site_code = int(machineInfo.site_no) ,table_no =TableNo,active ='N')
+            result = []
+            # print('pos_sales_order_data',pos_sales_order_data)
+            
+            for item in pos_sales_order_data:
+                print('item.document_no',item.document_no)
+                matched_records = PosSalesTransDetails.objects.extra(
+                    select={
+                        'sales_order_document_no': 'tbl_pos_sales_order.document_no',
+                        'so_no': 'tbl_pos_sales_order.SO_no'
+                    },
+                    tables=['tbl_pos_sales_trans_details', 'tbl_pos_sales_order'],
+                    where=[
+                        'tbl_pos_sales_trans_details.sales_trans_id = tbl_pos_sales_order.document_no',
+                        'tbl_pos_sales_order.document_no = %s'
+                    ],
+                    params=[item.document_no]  
+                )
+                result.extend(list(matched_records.values()))
+            pos_extended_save_from_listing(result ,TableNo,queno)   
+    else:
+
+        pos_sales_order_data = PosSalesOrder.objects.filter(paid = 'N',terminal_no = machineInfo.terminal_no,site_code = int(machineInfo.site_no) ,active ='N')
+        result = []
+        print('eeeeeeeeeeeeeeeeeeeee')
+        for item in pos_sales_order_data:
+            matched_records = PosSalesTransDetails.objects.extra(
+                select={
+                    'sales_order_document_no': 'tbl_pos_sales_order.document_no',
+                    'so_no': 'tbl_pos_sales_order.SO_no'
+                },
+                tables=['tbl_pos_sales_trans_details', 'tbl_pos_sales_order'],
+                where=[
+                    'tbl_pos_sales_trans_details.sales_trans_id = tbl_pos_sales_order.document_no',
+                    'tbl_pos_sales_order.document_no = %s'
+                ],
+                params=[item.document_no]  
+            )
+            result.extend(list(matched_records.values()))
+            print('result',result)
+        pos_extended_save_from_listing(result ,TableNo,queno)   
+    return Response(result)
+#*********************** END *******************************************
+
+
+
 
 
 @api_view(['GET'])
@@ -1223,6 +1357,7 @@ def save_cash_payment(request):
 def cancel_sales_order(request):
     if request.method == 'POST':
         tableno = request.data.get('params', {}).get('tableno')
+        so_no = request.data.get('params', {}).get('so_no')
         
         print('table',tableno)
         serial_number = get_serial_number()
@@ -1234,15 +1369,66 @@ def cancel_sales_order(request):
         if not tableno:
             return Response({'message': 'Table number is required'}, status=400)
 
-        paid_orders = PosSalesOrder.objects.filter(table_no=tableno,
-            paid='N', active='Y', terminal_no=machineInfo.terminal_no, site_code=int(machineInfo.site_no)
-        )
+        if so_no:
+            paid_orders = PosSalesOrder.objects.filter(table_no=tableno,
+                paid='N', active='Y', terminal_no=machineInfo.terminal_no, site_code=int(machineInfo.site_no),SO_no =so_no
+            )
 
-        if paid_orders.exists():
-            paid_orders.update(active='N')
-            return Response({'message': 'Sales orders canceled successfully'}, status=200)
+            if paid_orders.exists():
+                paid_orders.update(active='N')
+                return Response({'message': 'Sales orders canceled successfully'}, status=200)
+            else:
+                return Response({'message': 'No active unpaid orders found'}, status=404)
         else:
-            return Response({'message': 'No active unpaid orders found'}, status=404)
+            paid_orders = PosSalesOrder.objects.filter(table_no=tableno,
+                paid='N', active='Y', terminal_no=machineInfo.terminal_no, site_code=int(machineInfo.site_no)
+            )
+
+            if paid_orders.exists():
+                paid_orders.update(active='N')
+                return Response({'message': 'Sales orders canceled successfully'}, status=200)
+            else:
+                return Response({'message': 'No active unpaid orders found'}, status=404)
+    else:
+        return Response({'message': 'Invalid request method'}, status=405)
+        
+###******************** UNCANCEL SALES ORDER    ***************************    
+@api_view(['POST'])
+def uncancelled_sales_order(request):
+    if request.method == 'POST':
+        tableno = request.data.get('params', {}).get('tableno')
+        so_no = request.data.get('params', {}).get('so_no')
+        
+        print('table',tableno)
+        serial_number = get_serial_number()
+        machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number.strip()).first()
+
+        if not machineInfo:
+            return Response({'message': 'Machine information not found'}, status=404)
+
+        if not tableno:
+            return Response({'message': 'Table number is required'}, status=400)
+
+        if so_no:
+            paid_orders = PosSalesOrder.objects.filter(table_no=tableno,
+                paid='N', active='N', terminal_no=machineInfo.terminal_no, site_code=int(machineInfo.site_no),SO_no =so_no
+            )
+
+            if paid_orders.exists():
+                paid_orders.update(active='Y')
+                return Response({'message': 'Sales orders canceled successfully'}, status=200)
+            else:
+                return Response({'message': 'No active unpaid orders found'}, status=404)
+        else:
+            paid_orders = PosSalesOrder.objects.filter(table_no=tableno,
+                paid='N', active='N', terminal_no=machineInfo.terminal_no, site_code=int(machineInfo.site_no)
+            )
+
+            if paid_orders.exists():
+                paid_orders.update(active='Y')
+                return Response({'message': 'Sales orders canceled successfully'}, status=200)
+            else:
+                return Response({'message': 'No active unpaid orders found'}, status=404)
     else:
         return Response({'message': 'Invalid request method'}, status=405)
         

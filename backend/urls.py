@@ -6,7 +6,8 @@ from .Restaurant.restaurantviews import (get_product_data, get_productCategory_d
                                          get_waiter_list,cancel_sales_order,save_sales_order_payment,get_reprint_transaction,get_reprint_transaction_for_receipt
                                          ,get_company_details,queing_list_view,pos_extended,pos_extended_delete_all,print_electron,
                                          cash_breakdown,get_bank_card,get_bank_list,save_credit_card_payment,save_debit_card_payment,
-                                         save_multiple_payment)
+                                         save_multiple_payment,get_waiter_name,get_sales_order_list_cancelled,get_sales_order_listing_cancelled,
+                                         uncancelled_sales_order)
 
 urlpatterns = [
     path('onscreen-keyboard/',call_onscreen_keyboard_windows, name='call_onscreen_keyboard_windows'),
@@ -25,11 +26,16 @@ urlpatterns = [
     path('add-sales-order/',save_sales_order,name='save_sales_order'),
     path('sales-order-list/',get_sales_order_list,name = 'get_sales_order_list'),
     path('sales-order-listing/', get_sales_order_listing, name='get_sales_order_listing'),
+    path('sales-order-list-cancelled/',get_sales_order_list_cancelled,name = 'get_sales_order_list_cancelled'),
+    path('sales-order-listing-cancelled/', get_sales_order_listing_cancelled, name='get_sales_order_listing_cancelled'),
+
     path('order/view/', get_add_order_view, name='get_add_order_view'),
     path('save-cash-payment/', save_cash_payment, name='save_cash_payment'),
     path('customer-list/', get_customer_list, name='get_customer_list'),
     path('waiter-list/', get_waiter_list, name='get_waiter_list'),
     path('cancel-sales-order/', cancel_sales_order, name='cancel_sales_order'),
+    path('uncancel-sales-order/',    uncancelled_sales_order, name='uncancelled_sales_order'),
+ 
     path('save-sales-order-payment/', save_sales_order_payment, name='save_sales_order_payment'),
     path('reprint-transaction/', get_reprint_transaction, name='get_reprint_transaction'),
     path('reprint-transacion-receipt/', get_reprint_transaction_for_receipt, name='get_reprint_transaction_for_receipt'),
@@ -44,6 +50,7 @@ urlpatterns = [
     path('save-credit-card-payment/', save_credit_card_payment, name='save_credit_card_payment'),
     path('save-debit-card-payment/', save_debit_card_payment, name='save_debit_card_payment'),
     path('save-multiple-payment/', save_multiple_payment, name='save_multiple_payment'),
+    path('waiter_name/', get_waiter_name, name='get_waiter_name'),
 
 
 ]
