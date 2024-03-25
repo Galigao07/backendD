@@ -141,7 +141,8 @@ DATABASES = {
         'USER': 'root',
         'PASSWORD': 'lsi2010',
         'HOST': 'localhost',  # Use the service name
-        'PORT': '3308'    # MySQL default port
+        'PORT': '3306'    # MySQL default port
+
     }
 }
 

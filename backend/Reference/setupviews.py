@@ -7,8 +7,8 @@ import pdb
 from django.conf import settings
 from django.http import FileResponse, JsonResponse
 from rest_framework.response import Response
-from backend.models import BankCompany,TSetup
-from backend.serializers import BankCompanySerializer,TSetupSerializer
+from backend.models import BankCompany,TSetup,AcctSubsidiary
+from backend.serializers import BankCompanySerializer,TSetupSerializer,AcctSubsidiarySerializer
 from rest_framework.decorators import api_view
 from rest_framework.views import APIView
 from django.db.models import Min,Max
@@ -23,6 +23,7 @@ from django.core.files.base import ContentFile
 from rest_framework.permissions import IsAuthenticated
 from backend.globalFunction import GetPHilippineDate,GetPHilippineDateTime
 from django.db.models import Sum
+import traceback
 
 @api_view(['GET','POST','DELETE'])
 def Setup(request):
@@ -150,3 +151,30 @@ def Setup(request):
     
     elif request.method == 'DELETE':
         return Response('Success')
+
+@api_view(['GET'])
+def get_account_title(request):
+    if request.method == 'GET':
+        try:
+            acct_title = request.query_params.get('account_title',None)
+     
+
+            if acct_title:
+                data = AcctSubsidiary.objects.filter(subsidiary_acct_title__icontain=acct_title)
+
+                serialize = AcctSubsidiarySerializer(data,many=True)
+
+                return JsonResponse(serialize.data)
+            else:
+                data = AcctSubsidiary.objects.all()
+
+                data = AcctSubsidiary.objects.all()
+                serializer = AcctSubsidiarySerializer(data, many=True)  # Set safe parameter to False
+                print(serializer.data)
+                return Response(serializer.data)
+        except Exception as e:
+            print(e)
+            traceback.print_exc()  
+            return Response({"message": "An error occurred while saving the sales order"}, status=500)
+        
+

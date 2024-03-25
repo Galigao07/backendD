@@ -926,8 +926,6 @@ class PosSalesInvoiceListing(models.Model):
         db_table = 'tbl_pos_sales_invoice_listing'
 
 
-
-
 class PosSalesInvoiceList(models.Model):
     autonum = models.BigAutoField(primary_key=True)
     company_code = models.CharField(max_length=10, default='')
@@ -994,3 +992,34 @@ class PosSalesInvoiceList(models.Model):
 
     class Meta:
         db_table = 'tbl_pos_sales_invoice_list'
+
+
+
+
+class AcctSubsidiary(models.Model):
+    autonum = models.IntegerField(primary_key=True)  # AutoField is not available in Django for composite primary keys
+    primary_code = models.FloatField(null=True, default=None)
+    secondary_code = models.FloatField(null=True, default=None)
+    acct_code = models.FloatField(null=True, default=None)
+    subsidiary_code = models.FloatField(null=True, default=None)
+    subsidiary_acct_title = models.CharField(max_length=255, null=True, default=None)
+    subsidiary_acct_desc = models.CharField(max_length=1000, default=' ')
+    SL = models.CharField(max_length=255, null=True, default=None)
+    sl_type = models.CharField(max_length=255, null=True, default=None)
+    calculation = models.FloatField(null=True, default=None)
+    alter_code = models.CharField(max_length=255, null=True, default=None)
+    alter_name = models.CharField(max_length=255, null=True, default=None)
+    category = models.TextField(null=True, default=None)
+    sub_category = models.TextField(null=True, default=None)
+    status = models.CharField(max_length=1, default='Y')
+
+    class Meta:
+        db_table = 'tbl_acct_subsidiary'
+
+
+
+
+
+
+
+
