@@ -352,6 +352,38 @@ class Employee(models.Model):
     class Meta:
         db_table = 'tbl_employee'
 
+
+class RCCDetails(models.Model):
+    autonum = models.BigAutoField(primary_key=True)
+    category = models.CharField(max_length=60, default=' ')
+    desc_code = models.IntegerField(default=0)
+    description = models.CharField(max_length=150, default=' ')
+    active = models.CharField(max_length=1, default='Y')
+    alter_code = models.CharField(max_length=50, default=' ')
+    ul_code = models.IntegerField(default=0)
+    mfg_date = models.CharField(max_length=25, default=' ')
+    created_by = models.CharField(max_length=100, default=' ')
+    date_created = models.CharField(max_length=25, default=' ')
+    mod_type = models.CharField(max_length=10, default='')
+    mod_type_dup = models.CharField(max_length=10, default='')
+
+    class Meta:
+        db_table = 'tbl_rcc_details'
+
+
+class CCCDetails(models.Model):
+    autonum = models.BigAutoField(primary_key=True)
+    category = models.CharField(max_length=60, default=' ')
+    desc_code = models.SmallIntegerField(default=0)
+    description = models.CharField(max_length=150, default=' ')
+    active = models.CharField(max_length=1, default='Y')
+    alter_code = models.CharField(max_length=50, default=' ')
+    ul_code = models.IntegerField(default=0)
+
+    class Meta:
+        db_table = 'tbl_ccc_details'
+
+
 class PosPayor(models.Model):
     autonum = models.BigAutoField(primary_key=True)
     id_code = models.IntegerField(default=0)
