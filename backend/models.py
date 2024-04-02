@@ -226,7 +226,91 @@ class CompanySetup(models.Model):
     class Meta:
         db_table = 'tbl_company_setup'
 
+class PosSetup(models.Model):
+    autonum = models.BigAutoField(primary_key=True)
+    ul_code = models.CharField(max_length=30, default=' ')
+    site_code = models.CharField(max_length=30, default=' ')
+    terminal_no = models.CharField(max_length=100, default=' ')
+    event_name = models.CharField(max_length=100, default=' ')
+    acct_code = models.PositiveBigIntegerField(default=0)
+    account_title = models.CharField(max_length=100, default=' ')
+    subsidiary_code = models.PositiveBigIntegerField(default=0)
+    subsidiary_account = models.CharField(max_length=100, default=' ')
 
+    class Meta:
+        db_table = 'tbl_pos_setup'
+
+class ProductCategorySales(models.Model):
+    autonum = models.BigAutoField(primary_key=True)
+    mod_code = models.PositiveSmallIntegerField(default=0)
+    module = models.CharField(max_length=50, default='')
+    category_desc = models.CharField(max_length=150, default='')
+    vat_code = models.DecimalField(max_digits=15, decimal_places=3, default=0.000)
+    vat_title = models.CharField(max_length=150, default='')
+    acct_code2 = models.DecimalField(max_digits=15, decimal_places=3, default=0.000)
+    acct_title2 = models.CharField(max_length=150, default='')
+    return_acct_code2 = models.DecimalField(max_digits=15, decimal_places=3, default=0.000)
+    return_acct_title2 = models.CharField(max_length=150, default='')
+    nonvat_code = models.DecimalField(max_digits=15, decimal_places=3, default=0.000)
+    nonvat_title = models.CharField(max_length=150, default='')
+    acct_code3 = models.DecimalField(max_digits=15, decimal_places=3, default=0.000)
+    acct_title3 = models.CharField(max_length=150, default='')
+    return_acct_code3 = models.DecimalField(max_digits=15, decimal_places=3, default=0.000)
+    return_acct_title3 = models.CharField(max_length=150, default='')
+    zerorated_code = models.DecimalField(max_digits=15, decimal_places=3, default=0.000)
+    zerorated_title = models.CharField(max_length=150, default='')
+    acct_code4 = models.DecimalField(max_digits=15, decimal_places=3, default=0.000)
+    acct_title4 = models.CharField(max_length=150, default='')
+    return_acct_code4 = models.DecimalField(max_digits=15, decimal_places=3, default=0.000)
+    return_acct_title4 = models.CharField(max_length=150, default='')
+    vatex_code = models.DecimalField(max_digits=15, decimal_places=3, default=0.000)
+    vatex_title = models.CharField(max_length=150, default='')
+    acct_code5 = models.DecimalField(max_digits=15, decimal_places=3, default=0.000)
+    acct_title5 = models.CharField(max_length=150, default='')
+    return_acct_code5 = models.DecimalField(max_digits=15, decimal_places=3, default=0.000)
+    return_acct_title5 = models.CharField(max_length=150, default='')
+
+    class Meta:
+        db_table = 'tbl_product_category_sales'
+
+class ProductSiteSetup(models.Model):
+    autonum = models.BigAutoField(primary_key=True)
+    ul_code = models.IntegerField(default=0)
+    site_code = models.PositiveSmallIntegerField(default=0)
+    site_desc = models.CharField(max_length=100, default=' ')
+    sys_type = models.CharField(max_length=2, default='')
+    site_address = models.CharField(max_length=150, default=' ')
+    virtual_code = models.CharField(max_length=1, default='N')
+    payor = models.CharField(max_length=20, default='')
+    payor_address = models.CharField(max_length=20, default='')
+    tin = models.CharField(max_length=20, default='000-000-000-0000')
+    zip_code = models.CharField(max_length=4, default='0000')
+    user_restrict = models.BinaryField(null=True)  # Assuming `longblob` contains binary data
+    active = models.CharField(max_length=1, default='Y')
+
+    class Meta:
+        db_table = 'tbl_product_site_setup'
+
+class PosMultiplePriceTypeSiteSetup(models.Model):
+    autonum = models.BigAutoField(primary_key=True)
+    site_code = models.CharField(max_length=30, default=' ')
+    site_name = models.CharField(max_length=100, default=' ')
+    pricetype = models.CharField(max_length=100, default=' ')
+    pricetype_name = models.CharField(max_length=100, default=' ')
+
+    class Meta:
+        db_table = 'tbl_pos_multiple_pricetype_site_setup'
+
+class PosPriceTypeSiteSetup(models.Model):
+    autonum = models.BigAutoField(primary_key=True)
+    site_code = models.CharField(max_length=30, default=' ')
+    site_name = models.CharField(max_length=100, default=' ')
+    default_pricetype = models.CharField(max_length=100, default=' ')
+    default_pricetype_name = models.CharField(max_length=100, default='')
+
+    class Meta:
+        db_table = 'tbl_pos_pricetype_site_setup'
+       
 class PosSalesTransSeniorCitizenDiscount(models.Model):
     autonum = models.BigAutoField(primary_key=True)
     sales_trans_id = models.IntegerField(null=True, default=None)
@@ -1047,6 +1131,22 @@ class AcctSubsidiary(models.Model):
 
     class Meta:
         db_table = 'tbl_acct_subsidiary'
+
+
+
+class AcctList(models.Model):
+    code = models.CharField(max_length=15, primary_key=True, default='')
+    acct_title = models.CharField(max_length=150, default='0')
+    primary_code = models.SmallIntegerField(default=0)
+    secondary_code = models.SmallIntegerField(default=0)
+    acct_code = models.SmallIntegerField(default=0)
+    subsidiary_code = models.SmallIntegerField(default=0)
+    under = models.CharField(max_length=150, default=' ')
+    status = models.CharField(max_length=1, default='Y')
+
+    class Meta:
+        db_table = 'tbl_acct_list'
+
 
 
 

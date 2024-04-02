@@ -2,13 +2,46 @@ from rest_framework import serializers
 from .models import (Product, PosRestTable,PosSalesOrder,User,POS_Terminal,PosSalesTransDetails,PosSalesTrans,PosSalesInvoiceList,PosSalesInvoiceListing,
                      CompanySetup,Customer,PosWaiterList,PosPayor,Employee,SeniorCitizenDiscount,PosExtended,LeadSetup,PosClientSetup,
                      PosCashiersLogin,PosCashBreakdown,BankCompany,TSetup,OtherAccount,ProductCategorySetup,BankCard,SalesTransCreditCard,
-                     SalesTransEPS,PosSalesTransSeniorCitizenDiscount,AcctSubsidiary,RCCDetails,CCCDetails)
+                     SalesTransEPS,PosSalesTransSeniorCitizenDiscount,AcctSubsidiary,RCCDetails,CCCDetails,ProductSiteSetup,PosPriceTypeSiteSetup,
+                     PosMultiplePriceTypeSiteSetup,ProductCategorySales,PosSetup,AcctList)
 
 
 
 class PosCashBreakdownSerializer(serializers.ModelSerializer):
     class Meta:
         model =  PosCashBreakdown
+        fields = '__all__'
+
+
+class AcctListSerializer(serializers.ModelSerializer):
+    class Meta:
+        model =  AcctList
+        fields = '__all__'
+
+class PosSetupSerializer(serializers.ModelSerializer):
+    class Meta:
+        model =  PosSetup
+        fields = '__all__'
+
+class ProductCategorySalesSerializer(serializers.ModelSerializer):
+    class Meta:
+        model =  ProductCategorySales
+        fields = '__all__'
+
+class PosMultiplePriceTypeSiteSetupSerializer(serializers.ModelSerializer):
+    class Meta:
+        model =  PosMultiplePriceTypeSiteSetup
+        fields = '__all__'
+
+
+class ProductSiteSetupSerializer(serializers.ModelSerializer):
+    class Meta:
+        model =  ProductSiteSetup
+        fields = '__all__'
+
+class PosPriceTypeSiteSetupSerializer(serializers.ModelSerializer):
+    class Meta:
+        model =  PosPriceTypeSiteSetup
         fields = '__all__'
 
 class RCCDetailsSerializer(serializers.ModelSerializer):
