@@ -3,13 +3,40 @@ from .models import (Product, PosRestTable,PosSalesOrder,User,POS_Terminal,PosSa
                      CompanySetup,Customer,PosWaiterList,PosPayor,Employee,SeniorCitizenDiscount,PosExtended,LeadSetup,PosClientSetup,
                      PosCashiersLogin,PosCashBreakdown,BankCompany,TSetup,OtherAccount,ProductCategorySetup,BankCard,SalesTransCreditCard,
                      SalesTransEPS,PosSalesTransSeniorCitizenDiscount,AcctSubsidiary,RCCDetails,CCCDetails,ProductSiteSetup,PosPriceTypeSiteSetup,
-                     PosMultiplePriceTypeSiteSetup,ProductCategorySales,PosSetup,AcctList)
+                     PosMultiplePriceTypeSiteSetup,ProductCategorySales,PosSetup,AcctList,POSSettings,SLCategory,PosSalesTransCreditSale,
+                     PosSuspendList,PosSuspendListing)
 
 
 
 class PosCashBreakdownSerializer(serializers.ModelSerializer):
     class Meta:
         model =  PosCashBreakdown
+        fields = '__all__'
+
+class PosSuspendListSerializer(serializers.ModelSerializer):
+    class Meta:
+        model =  PosSuspendList
+        fields = '__all__'
+
+
+class PosSuspendListingSerializer(serializers.ModelSerializer):
+    class Meta:
+        model =  PosSuspendListing
+        fields = '__all__'
+
+class PosSalesTransCreditSaleSerializer(serializers.ModelSerializer):
+    class Meta:
+        model =  PosSalesTransCreditSale
+        fields = '__all__'
+
+class SLCategorySerializer(serializers.ModelSerializer):
+    class Meta:
+        model =  SLCategory
+        fields = '__all__'
+
+class POSSettingsSerializer(serializers.ModelSerializer):
+    class Meta:
+        model =  POSSettings
         fields = '__all__'
 
 

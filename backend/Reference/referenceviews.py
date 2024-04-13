@@ -27,6 +27,7 @@ from django.core.files.base import ContentFile
 from rest_framework.permissions import IsAuthenticated
 from backend.globalFunction import GetPHilippineDate,GetPHilippineDateTime
 from django.db.models import Sum
+import traceback
 
 @api_view(['GET'])
 def get_employee_list(request):
@@ -343,59 +344,119 @@ def delete_table(request):
 
 
 ####* **************************** VIDEO *******************************
-@api_view(['GET','POST'])
+# @api_view(['GET','POST'])
+# def UploadVideo(request):
+#     if request.method == 'POST':
+#         video_file = request.FILES.get('video')
+#         if video_file:
+#             # Save the file to the media directory
+#             filename = video_file.name
+#             filepath = os.path.join(settings.MEDIA_ROOT, filename)
+#             with open(filepath, 'wb') as destination:
+#                 # Read the entire file content at once
+#                 file_content = video_file.read()
+#                 # Write the file content to the destination
+#                 destination.write(file_content)
+            
+#             # Return a response indicating success
+#             video_url = os.path.join(settings.MEDIA_URL, filename)
+#             return Response({'message': 'Video uploaded successfully', 'url': video_url}, status=200)
+#         else:
+#             return Response({'error': 'No video file provided'}, status=400)
+    
+#     elif request.method == 'GET':
+
+#         media_dir = os.path.join(settings.BASE_DIR, 'media')
+
+#         # Check if the videos directory exists
+#         if os.path.isdir(media_dir):
+#             # List all files in the videos directory
+#             video_files = [f for f in os.listdir(media_dir) if os.path.isfile(os.path.join(media_dir, f))]
+
+#             # Sort files by modification time (latest first)
+#             video_files.sort(key=lambda x: os.path.getmtime(os.path.join(media_dir, x)), reverse=True)
+
+#             # Get the path to the latest video file
+#             if video_files:
+#                 latest_video_file = os.path.join(media_dir, video_files[0])
+#                 with open(latest_video_file, 'rb') as file:
+#                     file_content = file.read()
+
+#                     # Encode the file content to Base64
+#                     base64_content = base64.b64encode(file_content).decode()
+#                     # print(base64_content)
+#                     # Construct the data URL
+#                     # data_url = 'data:base64,{base64_content}'
+
+#                     data_url = f'data:video/mp4;base64,{base64_content}'
+      
+#                 return JsonResponse({'data':data_url})
+#                 # Serve the latest video file
+#             else:
+#                 return Response({'error': 'No videos found in the media directory'}, status=404)
+#         else:
+#             return Response({'error': 'Media directory not found'}, status=404)
+
+
+
+@api_view(['GET', 'POST'])
 def UploadVideo(request):
     if request.method == 'POST':
-        video_file = request.FILES.get('video')
-        if video_file:
-            # Save the file to the media directory
-            filename = video_file.name
-            filepath = os.path.join(settings.MEDIA_ROOT, filename)
-            with open(filepath, 'wb') as destination:
-                # Read the entire file content at once
-                file_content = video_file.read()
-                # Write the file content to the destination
-                destination.write(file_content)
-            
-            # Return a response indicating success
-            video_url = os.path.join(settings.MEDIA_URL, filename)
-            return Response({'message': 'Video uploaded successfully', 'url': video_url}, status=200)
-        else:
-            return Response({'error': 'No video file provided'}, status=400)
-    
-    elif request.method == 'GET':
+        try:
+            video_file = request.FILES.get('video')
+            if video_file:
+                # Get the desktop path
+                username = os.getlogin()
+                desktop_path = os.path.join('C:/Users', username, 'Desktop')
 
-        media_dir = os.path.join(settings.BASE_DIR, 'media')
+                # Save the file to the desktop
+                filename = video_file.name
+                filepath = os.path.join(desktop_path, filename)
+                with open(filepath, 'wb') as destination:
+                    # Write the file content to the destination
+                    for chunk in video_file.chunks():
+                        destination.write(chunk)
 
-        # Check if the videos directory exists
-        if os.path.isdir(media_dir):
-            # List all files in the videos directory
-            video_files = [f for f in os.listdir(media_dir) if os.path.isfile(os.path.join(media_dir, f))]
-
-            # Sort files by modification time (latest first)
-            video_files.sort(key=lambda x: os.path.getmtime(os.path.join(media_dir, x)), reverse=True)
-
-            # Get the path to the latest video file
-            if video_files:
-                latest_video_file = os.path.join(media_dir, video_files[0])
-                with open(latest_video_file, 'rb') as file:
-                    file_content = file.read()
-
-                    # Encode the file content to Base64
-                    base64_content = base64.b64encode(file_content).decode()
-                    # print(base64_content)
-                    # Construct the data URL
-                    # data_url = 'data:base64,{base64_content}'
-
-                    data_url = f'data:video/mp4;base64,{base64_content}'
-      
-                return JsonResponse({'data':data_url})
-                # Serve the latest video file
+                # Return a response indicating success
+                video_url = filepath
+                return Response({'message': 'Video uploaded successfully', 'url': video_url}, status=200)
             else:
-                return Response({'error': 'No videos found in the media directory'}, status=404)
-        else:
-            return Response({'error': 'Media directory not found'}, status=404)
+                return Response({'error': 'No video file provided'}, status=400)
+        except Exception as e:
+            print(e)
+            traceback.print_exc()
+    elif request.method == 'GET':
+        try:
+            desktop_path = os.path.join('C:/Users', os.getlogin(), 'Desktop')
+            # Check if the desktop directory exists
+            if os.path.isdir(desktop_path):
+                # List all files on the desktop
+                video_files = [f for f in os.listdir(desktop_path) if os.path.isfile(os.path.join(desktop_path, f))]
 
+                # Sort files by modification time (latest first)
+                video_files.sort(key=lambda x: os.path.getmtime(os.path.join(desktop_path, x)), reverse=True)
+
+                # Get the path to the latest video file on the desktop
+                if video_files:
+                    latest_video_file = os.path.join(desktop_path, video_files[0])
+                    with open(latest_video_file, 'rb') as file:
+                        file_content = file.read()
+
+                        # Encode the file content to Base64
+                        base64_content = base64.b64encode(file_content).decode()
+
+                        # Construct the data URL
+                        data_url = f'data:video/mp4;base64,{base64_content}'
+                    # print(data_url)
+                    return JsonResponse({'data': data_url})
+                    # Serve the latest video file
+                else:
+                    return Response({'error': 'No videos found on the desktop'}, status=404)
+            else:
+                return Response({'error': 'Desktop directory not found'}, status=404)
+        except Exception as e:
+            print(e)
+            traceback.print_exc()
 
 ####* **************************** Terminal Setup *******************************
 @api_view(['GET','POST'])       

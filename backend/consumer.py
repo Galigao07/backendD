@@ -76,6 +76,20 @@ class POSextendedChange(AsyncWebsocketConsumer):
     async def disconnect(self, close_code):
         await self.channel_layer.group_discard(self.room_group_name, self.channel_name)
 
+    
+    async def receive(self, text_data):
+        data = json.loads(text_data)
+        message = data
+        print('message Change', message)
+        await self.channel_layer.group_send(
+            self.room_group_name,
+            {
+               "type": "Send_to_front_end_extendedChange",
+                "data": data,  # Convert instance data to JSON
+            }
+        )
+
+
     async def Send_to_front_end_extendedChange(self, event):
         print('Change Group', event['data'])
         data = event['data']

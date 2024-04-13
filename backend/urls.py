@@ -7,7 +7,8 @@ from .Restaurant.restaurantviews import (get_product_data, get_productCategory_d
                                          ,get_company_details,queing_list_view,pos_extended,pos_extended_delete_all,print_electron,
                                          cash_breakdown,get_bank_card,get_bank_list,save_credit_card_payment,save_debit_card_payment,
                                          save_multiple_payment,get_waiter_name,get_sales_order_list_cancelled,get_sales_order_listing_cancelled,
-                                         uncancelled_sales_order)
+                                         uncancelled_sales_order,transfer_table,get_customer_category,get_customer_with_category,save_charge_payment,
+                                         suspend_save_sales_order)
 
 urlpatterns = [
     path('onscreen-keyboard/',call_onscreen_keyboard_windows, name='call_onscreen_keyboard_windows'),
@@ -50,7 +51,11 @@ urlpatterns = [
     path('save-credit-card-payment/', save_credit_card_payment, name='save_credit_card_payment'),
     path('save-debit-card-payment/', save_debit_card_payment, name='save_debit_card_payment'),
     path('save-multiple-payment/', save_multiple_payment, name='save_multiple_payment'),
+    path('save-charge-payment/', save_charge_payment, name='save_charge_payment'),
     path('waiter_name/', get_waiter_name, name='get_waiter_name'),
-
-
+    path('transfer-table/', transfer_table, name='transfer_table'),
+    path('customer-category/', get_customer_category, name='get_customer_category'), 
+    path('customer-with-category/', get_customer_with_category, name='get_customer_with_category'), 
+    path('susppend-sales-order/', suspend_save_sales_order, name='suspend_save_sales_order'), 
+    
 ]

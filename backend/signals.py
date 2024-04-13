@@ -5,8 +5,30 @@ from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
 import json
 from django.core.serializers import serialize
-from backend.models import POS_Terminal, PosExtended,PosSalesOrder,PosSalesInvoiceList,PosSalesTrans
+from backend.models import POS_Terminal, PosExtended,PosSalesOrder,PosSalesInvoiceList,PosSalesTrans,PosSuspendList
 from backend.views import get_serial_number
+
+
+
+
+# @receiver(post_save,sender=PosSuspendList)
+# def susppend_saved(sender, instance, created, **kwargs):
+#     if not created:
+#         action = "Update"
+
+#         send_to_extended(instance, action)
+#     else:
+#         action = "Save" 
+#         send_to_extended(instance, action)
+  
+
+# @receiver(post_delete,sender=PosSuspendList)
+# def susppend_deleted(sender, instance, **kwargs):
+#     action = "Delete"
+#     send_to_extended(instance, action)
+#     send_to_frontend_data(instance, action)
+
+
 
 @receiver(post_save,sender=PosExtended)
 def model_saved(sender, instance, created, **kwargs):
@@ -110,6 +132,7 @@ def model_savedSalesInvoice(sender, instance, created, **kwargs):
             changeData = {
                 'AmountTendered':tmp.amount_tendered,
                 'AmountDue':total,
+                'Open':False,
             }
             print('changeData',changeData)
             send_to_extended2(changeData, action)
@@ -117,14 +140,11 @@ def model_savedSalesInvoice(sender, instance, created, **kwargs):
 
 def send_to_frontend_data(instance, action, **kwargs):
     try:
-       
         instance_data = {
             "data":'refresh',
             "action":action,
             "message":'',
         }
-        print('refreshxxxxx',action)
-        # Send message to consumer
         channel_layer = get_channel_layer()
         async_to_sync(channel_layer.group_send)(
             "count_group",  # Channel group name

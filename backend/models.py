@@ -1148,9 +1148,154 @@ class AcctList(models.Model):
         db_table = 'tbl_acct_list'
 
 
+class POSSettings(models.Model):
+    autonum = models.IntegerField(primary_key=True)
+    Baggers = models.CharField(max_length=5, null=True)
+    esc_mode = models.CharField(max_length=6, default='False')
+    terminal_no = models.IntegerField(null=True)
+    site_no = models.DecimalField(max_digits=15, decimal_places=3, null=True)
+    Salesman = models.CharField(max_length=5, null=True)
+    Checker = models.CharField(max_length=5, null=True)
+    EPS = models.CharField(max_length=5, null=True)
+    PO_Charge = models.CharField(max_length=5, null=True)
+    void_item = models.CharField(max_length=5, null=True)
+    void_trans = models.CharField(max_length=5, null=True)
+    price_override = models.CharField(max_length=5, null=True)
+    vat_override = models.CharField(max_length=5, null=True)
+    trade_discount = models.CharField(max_length=5, null=True)
+    senior_citizen = models.CharField(max_length=5, null=True)
+    discount = models.CharField(max_length=5, null=True)
+    product_details_decimals = models.CharField(max_length=5, null=True)
+    items_selling_price = models.CharField(max_length=5, null=True)
+    cash = models.CharField(max_length=5, null=True)
+    checks = models.CharField(max_length=5, null=True)
+    debit = models.CharField(max_length=5, null=True)
+    credit = models.CharField(max_length=5, null=True)
+    PO = models.CharField(max_length=5, null=True)
+    gift_check = models.CharField(max_length=5, null=True)
+    credit_sales = models.CharField(max_length=5, null=True)
+    stale = models.CharField(max_length=5, null=True)
+    bankcard = models.CharField(max_length=5, null=True)
+    multipleCheck = models.CharField(max_length=5, null=True)
+    multipleCharge = models.CharField(max_length=5, null=True)
+    returns = models.CharField(max_length=5, null=True)
+    cashpullout = models.CharField(max_length=5, null=True)
+    soCancel = models.CharField(max_length=5, null=True)
+    regular = models.CharField(max_length=5, null=True)
+    with_barcode = models.CharField(max_length=5, default='False')
+    order_type = models.CharField(max_length=5, default='')
+    printer_no = models.IntegerField(default=1)
+    printer_type = models.CharField(max_length=2, default='')
+    printer_name = models.CharField(max_length=50, default=' ')
+    virtual_receipt = models.CharField(max_length=4, default='1')
+    manual_or = models.CharField(max_length=6, default='False')
+    change_fund = models.CharField(max_length=6, default='False')
+    borrowed_fund = models.CharField(max_length=6, default='False')
+    multiple_printer = models.CharField(max_length=6, default='False')
+    Allow_SalesOrderReceipt = models.CharField(max_length=1, default='N')
+    Allow_WholeDay = models.CharField(max_length=6, default='false')
+    allowed_retail = models.CharField(max_length=6, default='False')
+    include_servicecharge = models.CharField(max_length=6, default='True')
+    ServiceCharge_DineIn = models.IntegerField(default=0)
+    ServiceCharge_TakeOut = models.IntegerField(default=0)
+    ServiceCharge_Room = models.IntegerField(default=0)
+    ServiceCharge_Retail = models.IntegerField(default=0)
+    allow_duplicate_copy = models.CharField(max_length=6, default='False')
+    allow_service_charge_printout = models.CharField(max_length=6, default='True')
+    allow_discount_percent = models.CharField(max_length=6, default='True')
+    xz_filter = models.CharField(max_length=5, default='False')
+    showCreditlimit = models.CharField(max_length=6, default='False')
+    ShowExtendedForm = models.CharField(max_length=6, default='False')
+    Allow_BilloutBreakDown = models.CharField(max_length=6, default='false')
+    Allow_Duplicate_SO = models.CharField(max_length=6, default='N')
+    Allow_cancel_transaction = models.CharField(max_length=1, default='N')
+    allow_LiveQty = models.CharField(max_length=6, default='N')
+    CostComputation = models.CharField(max_length=6, default='allow')
+    VisibleAmount_tendered = models.CharField(max_length=1, default='N')
+    Interchangeable_salesman = models.CharField(max_length=1, default='N')
+    weight_scale = models.CharField(max_length=6, default='False')
+    weight_scale_start = models.CharField(max_length=10, default='0.0')
+    weight_scale_last_degit_for_Qty = models.CharField(max_length=10, default='0.0')
+    BarcodeLenght = models.CharField(max_length=10, default='13')
+    DecimalPlaces = models.CharField(max_length=10, default='0')
+    RoundDigits = models.CharField(max_length=10, default='0')
+    RoundType = models.CharField(max_length=5, default='Cut')
+    InputPrimaryMethod = models.CharField(max_length=10, default='Manual')
+    item_search = models.CharField(max_length=7, default='LONG')
+    item_display = models.CharField(max_length=7, default='LONG')
+    Display_UOM = models.CharField(max_length=1, default='N')
+    Settle_order_only = models.CharField(max_length=6, default='False')
+    Allow_filter_in_supervisor_cash_count = models.CharField(max_length=7, default='False')
+    Allow_display_live_qty = models.CharField(max_length=1, default='Y')
+    Allow_crystal_report = models.CharField(max_length=6, default='False')
+    Allow_consignment_to_display = models.CharField(max_length=6, default='Y')
+    Allow_TakeOut_Direct_Pay = models.CharField(max_length=6, default='N')
+    withHotel = models.CharField(max_length=6, default='False')
+
+    class Meta:
+        db_table = 'tbl_pos_settings'
 
 
+class SLCategory(models.Model):
+    autonum = models.BigAutoField(primary_key=True)
+    code = models.SmallIntegerField(default=0)
+    category = models.CharField(max_length=60, null=True, blank=True)
+    module = models.CharField(max_length=50, default='')
+    parent_autonum_ref = models.CharField(max_length=50, default='')
+    sync_created = models.CharField(max_length=50, default='')
+    sync_status_server1 = models.CharField(max_length=4, default='NO')
+    sync_status = models.CharField(max_length=4, default='NO')
+    sync_created_server1 = models.CharField(max_length=50, default='')
 
+    class Meta:
+        db_table = 'tbl_sl_category'
+        managed = False  # To prevent Django from managing this table
+
+
+class PosSalesTransCreditSale(models.Model):
+    autonum = models.BigAutoField(primary_key=True)
+    sales_trans_id = models.IntegerField(null=True, blank=True)
+    terminal_no = models.CharField(max_length=21, default='0')
+    cashier_id = models.IntegerField(default=0)
+    document_type = models.CharField(max_length=10, default=' ')
+    id = models.IntegerField(default=0)
+    id_code = models.IntegerField(null=True, blank=True)
+    term = models.CharField(max_length=100, null=True, blank=True)
+    approved_by = models.IntegerField(null=True, blank=True)
+    amount = models.DecimalField(max_digits=11, decimal_places=2, null=True, blank=True)
+
+    class Meta:
+        db_table = 'tbl_pos_sales_trans_credit_sale'
+        managed = False  # To prevent Django from managing this table
+
+class PosSuspendList(models.Model):
+    autonum = models.BigAutoField(primary_key=True)
+    trans_id = models.BigIntegerField(default=0)
+    terminal_no = models.BigIntegerField(default=0)
+    site_no = models.BigIntegerField(default=0)
+    cashier_id = models.BigIntegerField(default=0)
+    que_no = models.BigIntegerField(default=0)
+    table_no = models.BigIntegerField(default=0)
+    customer = models.CharField(max_length=255, default='')
+    address = models.CharField(max_length=225, default='')
+
+    class Meta:
+        db_table = 'tbl_pos_suspend_list'
+
+class PosSuspendListing(models.Model):
+    autonum = models.BigAutoField(primary_key=True)
+    trans_id = models.BigIntegerField(default=0)
+    terminal_no = models.BigIntegerField(default=0)
+    que_no = models.BigIntegerField(default=0)
+    table_no = models.BigIntegerField(default=0)
+    quantity = models.DecimalField(max_digits=21, decimal_places=3, default=0.000)
+    barcode = models.CharField(max_length=50, default='')
+    description = models.CharField(max_length=225, default='')
+    price = models.DecimalField(max_digits=21, decimal_places=3, default=0.000)
+    total_amount = models.DecimalField(max_digits=21, decimal_places=3, default=0.000)
+
+    class Meta:
+        db_table = 'tbl_pos_suspend_listing'
 
 
 
