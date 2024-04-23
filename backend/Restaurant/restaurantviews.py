@@ -8,12 +8,13 @@ from rest_framework.response import Response
 from backend.models import (Product,PosRestTable,PosSalesOrder,PosSalesTransDetails,InvRefNo,POS_Terminal,PosSalesTrans,PosSalesInvoiceList,PosSalesInvoiceListing,
                             CompanySetup,Customer,PosWaiterList,PosPayor,SeniorCitizenDiscount,PosExtended,PosCashBreakdown,
                             ProductCategorySetup,BankCompany,BankCard,SalesTransCreditCard,SalesTransEPS,PosSalesTransSeniorCitizenDiscount,
-                            SLCategory,PosSalesTransCreditSale,PosSuspendList,PosSuspendListing)
+                            SLCategory,PosSalesTransCreditSale,PosSuspendList,PosSuspendListing,PosCashPullout,PosCashPulloutDetails,PosCashiersLogin)
 from backend.serializers import (ProductSerializer,ProductCategorySerializer,PosSalesOrderSerializer,PosSalesTransDetailsSerializer,PosSalesTransSerializer,
                                  PosSalesInvoiceListing,PosSalesInvoiceList,CustomerSerializer,PosWaiterListSerializer,PosPayorSerializer,PosSalesInvoiceListSerializer,
                                  SeniorCitizenDiscountSerializer,PosExtendedSerializer,PosCashBreakdownSerializer,ProductCategorySetupSerializer,
                                  BankCompanySerializer,BankCardSerializer,SalesTransCreditCardSerializer,SalesTransEPSSerializer,PosSalesTransSeniorCitizenDiscountSerializer,
-                                 SLCategorySerializer,PosSalesTransCreditSaleSerializer,PosSuspendListSerializer,PosSuspendListingSerializer)
+                                 SLCategorySerializer,PosSalesTransCreditSaleSerializer,PosSuspendListSerializer,PosSuspendListingSerializer,PosCashPulloutDetailsSerializer,
+                                 PosCashPulloutSerializer)
 from rest_framework.decorators import api_view
 from django.db.models import Min,Max
 from django.utils import timezone
@@ -240,38 +241,52 @@ def pos_extended_save_from_listing(data,TableNo,QueNO):
 ## ********************* END HERE  ************************##
 @api_view(['GET'])
 def get_product_data(request):
-    products = Product.objects.exclude(reg_price=0).exclude(long_desc='')
-    serializer = ProductSerializer(products, many=True)
-    return Response(serializer.data)
+    if request.method == 'GET':
+        try:
+            products = Product.objects.exclude(reg_price=0).exclude(long_desc='')
+            serializer = ProductSerializer(products, many=True)
+            return Response(serializer.data)
+        except Exception as e:
+            print(e)
+            traceback.print_exc()
+
 
 @api_view(['GET'])
 def get_productCategory_data(request):
     # Assuming 'category' is a field in the Product model
     # distinct_categories = Product.objects.values('category').distinct()
         # serializer = ProductCategorySerializer(distinct_categories, many=True)
-    distinct_categories = ProductCategorySetup.objects.filter(pos_category='Y')
-    serializer = ProductCategorySetupSerializer(distinct_categories, many=True)
+    try:
 
-    # print(serializer.data)
-    return Response(serializer.data)
+        distinct_categories = ProductCategorySetup.objects.filter(pos_category='Y')
+        serializer = ProductCategorySetupSerializer(distinct_categories, many=True)
 
+        # print(serializer.data)
+        return Response(serializer.data)
+    except Exception as e:
+        print(e)
+        traceback.print_exc()
 @api_view(['GET'])
 def product_list_by_category(request):
     if request.method == 'GET':
-        category = request.GET.get('category')
-    # Query the Product model based on the category received in the URL
-        if category == 'ALL':
-            products = Product.objects.exclude(reg_price='0').exclude(long_desc='')
+        try:
+            category = request.GET.get('category')
+        # Query the Product model based on the category received in the URL
+            if category == 'ALL':
+                products = Product.objects.exclude(reg_price='0').exclude(long_desc='')
 
-        # Serialize the products (convert to JSON or any desired format)
-            serializer = ProductSerializer(products, many=True)
-            return Response(serializer.data)
-        else:
-            products = Product.objects.filter(category=category).exclude(reg_price='0').exclude(long_desc='')
+            # Serialize the products (convert to JSON or any desired format)
+                serializer = ProductSerializer(products, many=True)
+                return Response(serializer.data)
+            else:
+                products = Product.objects.filter(category=category).exclude(reg_price='0').exclude(long_desc='')
 
-        # Serialize the products (convert to JSON or any desired format)
-            serializer = ProductSerializer(products, many=True)
-            return Response(serializer.data)
+            # Serialize the products (convert to JSON or any desired format)
+                serializer = ProductSerializer(products, many=True)
+                return Response(serializer.data)
+        except Exception as e:
+            print(e)
+            traceback.print_exc()
 
 @api_view(['GET'])
 def table_list_view(request):
@@ -621,9 +636,9 @@ def get_customer_category(request):
 def get_customer_with_category(request):
     if request.method == 'GET':
         try:
-            category = request.GET.get('category')
-            print('category',category)
-            customer_list = Customer.objects.filter(sl_category=category)
+            name = request.GET.get('name')
+            print('name',name)
+            customer_list = Customer.objects.filter(trade_name__icontains=name)
             serialize = CustomerSerializer(customer_list,many=True)
 
             return Response(serialize.data)
@@ -1183,6 +1198,7 @@ def save_cash_payment(request):
             DiscountDataList = received_data.get('DiscountDataList')
             DiscountType = received_data.get('DiscountType')
             DiscountData= received_data.get('DiscountData')
+            Discounted_by= received_data.get('Discounted_by')
             QueNo= received_data.get('QueNo')
             doctype = received_data.get('doctype')
             doc_no = get_sales_transaction_id(TerminalNo,doctype)
@@ -1253,6 +1269,7 @@ def save_cash_payment(request):
             totalQty = 0
             desc_rate = 0
             unit_cost = 0
+            Vatable_Amount = 0
 
                 
             
@@ -1268,15 +1285,29 @@ def save_cash_payment(request):
                     total_sub_total = total_sub_total + (quantity * price)
                     
                     if DiscountType == 'SC':
+                        print(DiscountData)
+                        print(DiscountData.get('SAmountCovered'))
+                        SCAmmountCovered = float(DiscountData.get('SAmountCovered'))
+                        SLess20SCDiscount = float(DiscountData.get('SLess20SCDiscount'))
+                        SLessVat12 =  float(DiscountData.get('SLessVat12'))
+                        SNetOfVat =  float(DiscountData.get('SNetOfVat'))
+                        SVatSales =  float(DiscountData.get('SVatSales'))
                         vatable = 'Es'
                         desc_rate = 20
                         totalItem = quantity * price
-                        
+                            
                         NetSale =  totalItem / (0.12 + 1 )
-                        vat_exempt =  totalItem - NetSale
-                        disc_amt  = (totalItem - vat_exempt ) * 0.2
-                        net_total = (quantity * price) - (disc_amt + vat_exempt)
-                        
+                        vat_exempt =  (totalItem / (0.12 + 1 ) * 0.12) * (SCAmmountCovered / SVatSales)
+                        disc_amt  = (totalItem / (0.12 + 1 ) * 0.2) * (SCAmmountCovered / SVatSales)
+                        net_total = (totalItem) - (disc_amt + vat_exempt)
+                        vat_amt =(totalItem / (0.12 + 1 ) * 0.12) * (SVatSales -SCAmmountCovered) / SVatSales
+                        Vatable_Amount = SVatSales - SCAmmountCovered
+                        # NetSale =  totalItem / (0.12 + 1 )
+                        # vat_exempt = (SCAmmountCovered - SLess20SCDiscount) - SLessVat12
+                        # disc_amt  = SLess20SCDiscount
+                        # net_total = (quantity * price) - (disc_amt + vat_exempt)
+                        # vat_amt = ((SVatSales - SCAmmountCovered) * 12) / 112
+                        # Vatable_Amount = (SVatSales - SCAmmountCovered) - vat_amt
                         print('NetSale',NetSale)
                         print('vat_exempt',vat_exempt)
                         print('disc_amt',disc_amt)
@@ -1292,18 +1323,39 @@ def save_cash_payment(request):
                                 totalItem = quantity * price
                                 item_disc = float(dis['D1'])
                                 NetSale =  float(dis['DiscountedPrice'])
-                                vat_exempt =  totalItem - NetSale
+                                vat_exempt =  0
                                 disc_amt  = float(dis['ByAmount'])
-                                net_total = (quantity * price) - (disc_amt + vat_exempt)
-                                vat_amt = (((quantity * price) - disc_amt) / 1.12) * 0.12
-                                unit_cost = (quantity * price) 
+                                net_total = (totalItem - disc_amt)
+                                vat_amt = ((totalItem - disc_amt) / 1.12) * 0.12
+                                unit_cost = (totalItem) 
+                                Vatable_Amount = (totalItem + Vatable_Amount) - disc_amt
+                                print('vat_amt',vat_amt)
+                    elif DiscountType =='TRANSACTION':
+                        for dis in DiscountData:
+                            print('TRANSACTION')
+                            if dis['barcode'] == items['barcode'] and dis['line_no'] == items['line_no']:
+                                desc_rate = float(dis['desc_rate'])
+                                vatable = 'V'
+                                totalItem = quantity * price
+                                item_disc = float(dis['desc_rate'])
+                                vat_exempt =  0
+                                disc_amt  = float(dis['Discount'])
+                                net_total = (totalItem - disc_amt)
+                                vat_amt = ((totalItem - disc_amt) / 1.12) * 0.12
+                                unit_cost = (totalItem) 
+                                Vatable_Amount = (totalItem + Vatable_Amount) - disc_amt
 
                     else:
                         if productInfo.tax_code == 'VAT':
+                            DiscountType = ''
                             vatable = 'V'
-                            desc_rate = item_disc / (quantity * price) * 100
-                            vat_amt = (((quantity * price) - item_disc) / 1.12) * 0.12
-                            net_total = (quantity * price) - item_disc - vat_amt
+                            totalItem = quantity * price
+                            desc_rate = item_disc / (totalItem) * 100
+                            vat_amt = ((totalItem - item_disc) / 1.12) * 0.12
+                            disc_amt = item_disc
+                            net_total = (totalItem - item_disc)
+                            Vatable_Amount = (totalItem + Vatable_Amount)
+                            unit_cost = totalItem
                         else:
                             vatable = 'N'
                             vat_amt = 0
@@ -1314,15 +1366,21 @@ def save_cash_payment(request):
                     pass  # You might want to log this or handle it according to your logic
                     
 
-                total_disc_amt = total_disc_amt + float(disc_amt)
-                total_desc_rate= total_desc_rate + desc_rate
-                total_vat_amt = total_vat_amt + vat_amt
+                # total_disc_amt = total_disc_amt + float(disc_amt)
+                # total_desc_rate= total_desc_rate + desc_rate
+                # total_vat_amt = total_vat_amt + vat_amt
 
                 if DiscountType == 'SC':
-                    total_vat_exempt = total_vat_exempt + net_total
-                    print('total_vat_exempt',total_vat_exempt)
+                    total_vat_exempt = vat_exempt + total_vat_exempt
+                    total_disc_amt = float(disc_amt) +float(total_disc_amt)
+                    total_desc_rate= desc_rate 
+                    total_vat_amt = vat_amt + total_vat_amt
                 else:
                     total_net_total = total_net_total + net_total
+                    total_vat_exempt = vat_exempt + total_vat_exempt
+                    total_disc_amt = float(disc_amt) + float(total_disc_amt)
+                    total_desc_rate= desc_rate 
+                    total_vat_amt = vat_amt + total_vat_amt
                 
                 # pdb.set_trace()
                 totalQty = totalQty + float(items['quantity'])
@@ -1367,12 +1425,12 @@ def save_cash_payment(request):
                     so_no =items['sales_trans_id'],
                     so_doc_no =items['sales_trans_id'],
                     sn_bc = '',
-                    discounted_by = '',
+                    discounted_by = Discounted_by,
                     
                 )
                 SaveToPOSSalesInvoiceListing.save()
 
-
+            Vatable_Amount = float(Vatable_Amount) - float(total_vat_amt)
             net_vat = 0
             net_discount = 0
             vat_exempted = 0
@@ -1399,10 +1457,17 @@ def save_cash_payment(request):
                             so_no=so_no
                         )
                     saveSeniorData.save()
-                
-                
-                
-                
+            elif DiscountType == 'ITEM':
+                net_vat = total_sub_total - (total_disc_amt + total_vat_amt + total_vat_exempt)
+                net_discount = total_sub_total - (total_disc_amt + total_vat_exempt)
+            elif DiscountType == 'TRANSACTION':
+                DiscountType='TRSD'
+                net_vat = total_sub_total - (total_disc_amt + total_vat_amt + total_vat_exempt)
+                net_discount = total_sub_total - (total_disc_amt + total_vat_exempt)
+            elif DiscountType == 'TRADE':
+                DiscountType='TRD'
+                net_vat = total_sub_total - (total_disc_amt + total_vat_amt + total_vat_exempt)
+                net_discount = total_sub_total - (total_disc_amt + total_vat_exempt)
             else:   
                 net_vat = total_sub_total - (total_disc_amt + total_vat_amt + total_vat_exempt)
                 net_discount = total_sub_total - (total_disc_amt + total_vat_exempt)
@@ -1423,7 +1488,7 @@ def save_cash_payment(request):
                     ul_code = machineInfo.ul_code,
                     site_code = int(machineInfo.site_no),
                     trans_type = 'Cash Sales',
-                    discount_type = '',
+                    discount_type = DiscountType,
                     doc_no = doc_no,
                     doc_type = 'POS-SI',
                     terminal_no = TerminalNo,
@@ -1531,7 +1596,7 @@ def save_cash_payment(request):
                 'TelNo':'TEL NOS:785-462',
                 'OR':doc_no,
                 'VAT': '{:,.2f}'.format(total_vat_amt),
-                'VATable': '{:,.2f}'.format(total_net_total),
+                'VATable': '{:,.2f}'.format(Vatable_Amount),
                 'Discount': '{:,.2f}'.format(total_disc_amt),
                 'Discount_Rate': '{:,.2f}'.format(total_desc_rate),
                 'VatExempt': '{:,.2f}'.format(total_vat_exempt),
@@ -3916,6 +3981,9 @@ def cash_breakdown(request):
             data_recieve = json.loads(request.body)
             TransID = data_recieve.get('TransID')
             data = data_recieve.get('data')
+            Type = data_recieve.get('Type')
+            CashierID = data_recieve.get('CashierID')
+            FullName = data_recieve.get('FullName')
             dinomination = data.get('dinomination')
             Totaldenominations = data.get('Totaldenominations')
             current_date_ph = GetPHilippineDate()
@@ -3935,24 +4003,144 @@ def cash_breakdown(request):
             }
 
             # Iterate over the keys in dinomination
-            for denomination, quantity in dinomination.items():
-                if int(quantity) > 0:
-                    value = conversion_rates[denomination]
-                    print((float(value) * int(quantity)))
-                    breakdown_instance = PosCashBreakdown(
-                            login_record=TransID,  # Provide appropriate value
-                            date_stamp=current_date_ph,  # Provide appropriate value
-                            quantity=quantity,
-                            denomination= value,
-                            total=float(value) * int(quantity),  # Get the total amount by multiplying quantity with value
-                            reviewed_by=0,  # Provide appropriate value
-                        )
-                    breakdown_instance.save()
+            if Type == 'END SHIFT':
+                # Create a new instance of the PosCashBreakdown model for each key-value pair
+                for denomination, quantity in dinomination.items():
+                    if int(quantity) > 0:
+                        value = conversion_rates[denomination]
+                        print((float(value) * int(quantity)))
+                        breakdown_instance = PosCashBreakdown(
+                                login_record=TransID,  # Provide appropriate value
+                                date_stamp=current_date_ph,  # Provide appropriate value
+                                quantity=quantity,
+                                denomination= value,
+                                total=float(value) * int(quantity),  # Get the total amount by multiplying quantity with value
+                                reviewed_by=0,  # Provide appropriate value
+                            )
+                        breakdown_instance.save()
+            elif Type == 'CASH PULL OUT':
+                trans_id = 0
+                login_record = 0
+                pullout_by = ''
+                pullout_name = ''
+                verify_by = ''
+                serial_number = get_serial_number()
+                machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number.strip()).first()
+                date_stamp = GetPHilippineDateTime()
+                try:
+                    last_record = PosCashiersLogin.objects.latest('trans_id')
+                    login_record = last_record.trans_id
+                except PosCashPullout.DoesNotExist:
+                    trans_id = 1
+                try:
+                    last_record = PosCashPullout.objects.latest('trans_id')
+                    trans_id = last_record.trans_id + 1
+                except PosCashPullout.DoesNotExist:
+                    trans_id = 1
+                for denomination, quantity in dinomination.items():
+                    if int(quantity) > 0:
+                        value = conversion_rates[denomination]
+                        print((float(value) * int(quantity)))
+                        details_id = 0
+                        try:
+                            last_record = PosCashPulloutDetails.objects.latest('details_id')
+                            details_id = last_record.details_id + 1
+                        except PosCashPulloutDetails.DoesNotExist:
+                            details_id = 1  # Return None if no records exist in the table
+
+                        save_cash_pullout_details = PosCashPulloutDetails(
+                                trans_id=trans_id,  # Provide appropriate value
+                                details_id=details_id,  # Provide appropriate value
+                                quantity=quantity,
+                                denomination= value,
+                                total=float(value) * int(quantity),  # Get the total amount by multiplying quantity with value
+                            )
+                        save_cash_pullout_details.save()
+                save_cash_pullout = PosCashPullout(
+                    trans_id = trans_id,
+                    login_record = login_record,
+                    terminal_no = machineInfo.terminal_no,
+                    datetime_stamp = date_stamp,
+                    pullout_by = CashierID,
+                    pullout_name = FullName,
+                    verified_by = verify_by,
+                )
+                save_cash_pullout.save()
+
                     # transaction.commit()
             return JsonResponse({'message':"This endpoint is for POST requests only."},status=200)      
         except Exception as e:
+            print(e)
+            traceback.print_exc()
             # If any error occurs during the save operations, rollback the transaction
             transaction.rollback()  
             # Optionally, log the error or handle it in some way
             return Response({"message": "An error occurred while saving the sales order"}, status=500)
+        
+@api_view(['GET','POST'])
+def get_sales_list_of_transaction(request):
+    if request.method =='GET':
+        try:
+
+            DateFrom = request.GET.get('DateFrom')
+            DateTo = request.GET.get('DateTo')
+            DocType = request.GET.get('DocType')
+            DocNo = request.GET.get('DocNo')
+            print(DateFrom)
+            print(DateTo)
+
+            sales_list=[]
+            if DateFrom and DateTo:
+                DateFrom1 = datetime.strptime(DateFrom, '%Y-%m-%d')  # Example start date
+                DateTo1 = datetime.strptime(DateTo, '%Y-%m-%d')    # Example end date
+
+                DateTo_datetime = DateTo1.replace(hour=23, minute=59, second=59)
+
+            
+                if DocNo and DateFrom and DocType:
+                    sales_list = PosSalesInvoiceList.objects.filter(doc_date__range=(DateFrom1,DateTo_datetime),doc_type =DocType,doc_no=DocNo)
+                else:
+                    sales_list = PosSalesInvoiceList.objects.filter(doc_date__range=(DateFrom1,DateTo_datetime),doc_type =DocType)
+
+                serialize = PosSalesInvoiceListSerializer(sales_list,many=True)
+                print('List',serialize.data)
+                return Response(serialize.data)
+        except Exception as e:
+            print(e)
+            traceback.print_exc()
+    elif request.method == 'POST':
+        try:
+            receive_data = json.loads(request.body)
+            data = receive_data.get('data')
+            verify_data = receive_data.get('verify')
+
+            verify_id = verify_data.get('Veriusername')
+            verify_name = verify_data.get('VeriFullname')
+            currentDate = GetPHilippineDateTime()
+
+            if data:
+                doc_no = data.get('doc_no')
+                terminal_no = data.get('terminal_no')
+                site_code =  data.get('site_code')
+                doc_type =  data.get('doc_type')
+
+                print(doc_no)
+
+                sales_list = PosSalesInvoiceList.objects.filter(
+                    doc_no=doc_no,
+                    terminal_no=terminal_no,
+                    site_code=site_code,
+                    doc_type=doc_type,
+                    status = 'S',
+                ).first()
+
+                if sales_list:
+                    sales_list.status = 'N'
+                    sales_list.cancel_by= verify_name
+                    sales_list.cancel_date = currentDate
+                    sales_list.save()
+            return Response('Success')
+        except Exception as e:
+            print(e)
+            traceback.print_exc()
    

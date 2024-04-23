@@ -137,7 +137,7 @@ CORS_ALLOW_HEADERS = [
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.mysql',
-        'NAME': 'db_restaurant',
+        'NAME': 'db_gerry_bels_pos',
         'USER': 'root',
         'PASSWORD': 'lsi2010',
         'HOST': 'localhost',  # Use the service name

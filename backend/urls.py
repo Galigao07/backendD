@@ -1,6 +1,6 @@
 
 from django.urls import path
-from .views import user_login_api,get_csrf_token,verification_account,user_logout_api,user_endshift_api,call_onscreen_keyboard_windows
+from .views import user_login_api,get_csrf_token,verification_account,user_logout_api,user_endshift_api,call_onscreen_keyboard_windows,unlock_terminal
 from .Restaurant.restaurantviews import (get_product_data, get_productCategory_data,product_list_by_category,table_list_view,save_sales_order,
                                          get_sales_order_list,get_sales_order_listing,get_add_order_view,save_cash_payment,get_customer_list,
                                          get_waiter_list,cancel_sales_order,save_sales_order_payment,get_reprint_transaction,get_reprint_transaction_for_receipt
@@ -8,7 +8,7 @@ from .Restaurant.restaurantviews import (get_product_data, get_productCategory_d
                                          cash_breakdown,get_bank_card,get_bank_list,save_credit_card_payment,save_debit_card_payment,
                                          save_multiple_payment,get_waiter_name,get_sales_order_list_cancelled,get_sales_order_listing_cancelled,
                                          uncancelled_sales_order,transfer_table,get_customer_category,get_customer_with_category,save_charge_payment,
-                                         suspend_save_sales_order)
+                                         suspend_save_sales_order,get_sales_list_of_transaction)
 
 urlpatterns = [
     path('onscreen-keyboard/',call_onscreen_keyboard_windows, name='call_onscreen_keyboard_windows'),
@@ -18,6 +18,8 @@ urlpatterns = [
     path('logout/', user_logout_api, name='user_logout_api'),
     path('end-shift/', user_endshift_api, name='user_endshift_api'),
     path('verification/', verification_account, name='verification_account'),
+    path('unlock-terminal/', unlock_terminal, name='unlock_terminal'),
+
     
     path('product/', get_product_data, name='get_product_data'),
     path('product/category/', get_productCategory_data, name='get_productCategory_data'),
@@ -57,5 +59,6 @@ urlpatterns = [
     path('customer-category/', get_customer_category, name='get_customer_category'), 
     path('customer-with-category/', get_customer_with_category, name='get_customer_with_category'), 
     path('susppend-sales-order/', suspend_save_sales_order, name='suspend_save_sales_order'), 
+    path('sales-list-of-transaction/', get_sales_list_of_transaction, name='get_sales_list_of_transaction'), 
     
 ]

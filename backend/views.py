@@ -43,10 +43,10 @@ def user_login_api(request):
         day_of_month = str(current_date.day).zfill(2)
         password_with_date = password1 + day_of_month
         serial_number = get_serial_number()
-        print(serial_number)
+
         if (username=='Admin') & (password==password_with_date):
             print('yy',serial_number)
-            if (serial_number =='PF19PSL1'):
+            if (serial_number =='N9YC13A28A07691'):
                     infolist ={
                         'UserRank': 'Admin',
                         'FullName':'Admin',
@@ -62,6 +62,7 @@ def user_login_api(request):
                     return JsonResponse({'Info':infolist}, status=200)
         user = User.objects.filter(user_name=username).first()
         stored_hashed_password = user.password
+        # pdb.set_trace()
         if user is not None:
             if check_password(password, stored_hashed_password):
                 # pdb.set_trace()
@@ -226,7 +227,30 @@ def verification_account(request):
 
     return JsonResponse({'message': 'Method not allowed'}, status=405)
 
-    
+
+def unlock_terminal(request):
+    if request.method == 'GET':
+        # body_unicode = request.body
+        # body_data = json.loads(body_unicode)
+        username = request.GET.get('username')
+        password = request.GET.get('password')
+        hashed_password = make_password(password)
+
+        user = User.objects.filter(user_name=username).first()
+        stored_hashed_password = user.password
+        if user is not None:
+            if check_password(password, stored_hashed_password):
+        
+                
+                return JsonResponse({'Message':'Success'}, status=200)
+            else:
+                return JsonResponse({'message': 'Invalid credentials'}, status=401)  
+        else:
+            # Login failed
+            return JsonResponse({'message': 'Invalid credentials'}, status=401)
+
+    return JsonResponse({'message': 'Method not allowed'}, status=405)
+
 
 def decrypt_aes(encrypted_data, key):
     try:

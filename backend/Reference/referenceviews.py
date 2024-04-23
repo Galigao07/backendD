@@ -74,10 +74,14 @@ def add_user(request):
 @api_view(['GET'])
 def view_user(request):
     if request.method == 'GET':
-        data = User.objects.filter(sys_type ='POS').order_by('-autonum')
-        userList = UserSerializer(data, many=True).data
-        return JsonResponse({'userList': userList}, status=200)
-    
+        try:
+            data = User.objects.filter(sys_type ='POS').order_by('-autonum')
+            userList = UserSerializer(data, many=True).data
+            return JsonResponse({'userList': userList}, status=200)
+        except Exception as e:
+            print(e)
+            traceback.print_exc()
+        
     
 @api_view(['POST'])
 def update_user(request):
