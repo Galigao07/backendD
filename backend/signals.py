@@ -33,8 +33,6 @@ from backend.views import get_serial_number
 @receiver(post_save,sender=PosExtended)
 def model_saved(sender, instance, created, **kwargs):
     if not created:
-        print('0')
-        print('0',instance)
         action = "Update"
 
         send_to_extended(instance, action)
@@ -51,17 +49,13 @@ def model_deleted(sender, instance, **kwargs):
 
 def send_to_extended(instance, action, **kwargs):
     try:
-        print(1)
         instance_json = serialize('json', [instance])
         # Convert serialized data to dictionary
         data = json.loads(instance_json)[0]['fields']
         serial_number = get_serial_number()
         machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number.strip()).first()
-        print(2)
         pos_extended_count = PosExtended.objects.filter(serial_no=machineInfo.Serial_no.strip()).count()
         # Convert model instance to JSON serializable format
-        print('dataaaaaa',data)
-        print('action',action)
         instance_data = {
             "data":data,
             "action": action,
@@ -123,10 +117,7 @@ def model_savedSalesInvoice(sender, instance, created, **kwargs):
         doc_no = data['doc_no']
         serial_number = get_serial_number()
         machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number.strip()).first()
-        print('datainstance',data)
-        print('doc_no',doc_no)
         tmp = PosSalesTrans.objects.filter(sales_trans_id = int(float(doc_no)),terminal_no = machineInfo.terminal_no,site_code = int(machineInfo.site_no)).first()
-        print('tmp',tmp)
         if tmp:
             total = float(data['sub_total']) - (float(data['vat_exempted']) + float(data['discount']))
             changeData = {
@@ -134,7 +125,6 @@ def model_savedSalesInvoice(sender, instance, created, **kwargs):
                 'AmountDue':total,
                 'Open':False,
             }
-            print('changeData',changeData)
             send_to_extended2(changeData, action)
 
 

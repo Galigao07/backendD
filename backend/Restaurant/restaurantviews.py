@@ -970,7 +970,11 @@ def save_sales_order(request):
             
 
             for item in cart_items:
-                line_no += 1 
+                if item.get('line_no') is None:
+                    line_no = item.get('lineno', 0)  # Use 'lineno' with a default value of 0 if 'line_no' is None
+                else:
+                    line_no = item['line_no']
+                # line_no = item['lineno']
                 quantity = item['quantity']
                 description = item['description']
                 price = item['price']
@@ -1273,10 +1277,10 @@ def save_cash_payment(request):
 
                 
             
-     
+            tmp_cart_item_discount = cart_items
             for items in cart_items:
                 productInfo = Product.objects.filter(bar_code=items['barcode']).first()
-                print(items['barcode'],items['line_no'])
+                
 
                 if productInfo is not None:
                     quantity = float(items['quantity'])
@@ -1286,12 +1290,12 @@ def save_cash_payment(request):
                     
                     if DiscountType == 'SC':
                         print(DiscountData)
-                        print(DiscountData.get('SAmountCovered'))
-                        SCAmmountCovered = float(DiscountData.get('SAmountCovered'))
-                        SLess20SCDiscount = float(DiscountData.get('SLess20SCDiscount'))
-                        SLessVat12 =  float(DiscountData.get('SLessVat12'))
-                        SNetOfVat =  float(DiscountData.get('SNetOfVat'))
-                        SVatSales =  float(DiscountData.get('SVatSales'))
+                        print(DiscountData.get('SAmountCovered').replace(',',''))
+                        SCAmmountCovered = float(DiscountData.get('SAmountCovered').replace(',',''))
+                        SLess20SCDiscount = float(DiscountData.get('SLess20SCDiscount').replace(',',''))
+                        SLessVat12 =  float(DiscountData.get('SLessVat12').replace(',',''))
+                        SNetOfVat =  float(DiscountData.get('SNetOfVat').replace(',',''))
+                        SVatSales =  float(DiscountData.get('SVatSales').replace(',',''))
                         vatable = 'Es'
                         desc_rate = 20
                         totalItem = quantity * price
@@ -1315,9 +1319,18 @@ def save_cash_payment(request):
                     
                     elif DiscountType =='ITEM':
                         for dis in DiscountData:
-                            print(dis['Barcode'],dis['LineNo'])
-                            if dis['Barcode'] == items['barcode'] and dis['LineNo'] == items['line_no']:
-                                print('yes',items['description'],)
+
+                            lineNO = 0
+                            if dis.get('line_no') is None:
+                                lineNO = dis.get('LineNo', 0)  # Use 'lineno' with a default value of 0 if 'line_no' is None
+                            else:
+                                lineNO = dis['line_no']
+
+                            if dis['Barcode'] == items['barcode'] and lineNO == items['line_no']:
+                                
+                                for x in tmp_cart_item_discount:
+                                    if x['barcode'] == items['barcode'] and x['line_no'] == items['line_no']:
+                                        tmp_cart_item_discount.remove(x)
                                 vatable = 'V'
                                 desc_rate = float(dis['D1'])
                                 totalItem = quantity * price
@@ -1329,11 +1342,16 @@ def save_cash_payment(request):
                                 vat_amt = ((totalItem - disc_amt) / 1.12) * 0.12
                                 unit_cost = (totalItem) 
                                 Vatable_Amount = (totalItem + Vatable_Amount) - disc_amt
-                                print('vat_amt',vat_amt)
                     elif DiscountType =='TRANSACTION':
+                        print(DiscountData)
                         for dis in DiscountData:
-                            print('TRANSACTION')
-                            if dis['barcode'] == items['barcode'] and dis['line_no'] == items['line_no']:
+                            lineNO = 0
+                            if dis.get('line_no') is None:
+                                lineNO = dis.get('lineno', 0)  # Use 'lineno' with a default value of 0 if 'line_no' is None
+                            else:
+                                lineNO = dis['line_no']
+
+                            if dis['barcode'] == items['barcode'] and lineNO == items['line_no']:
                                 desc_rate = float(dis['desc_rate'])
                                 vatable = 'V'
                                 totalItem = quantity * price
@@ -1369,7 +1387,7 @@ def save_cash_payment(request):
                 # total_disc_amt = total_disc_amt + float(disc_amt)
                 # total_desc_rate= total_desc_rate + desc_rate
                 # total_vat_amt = total_vat_amt + vat_amt
-
+                print('tmp_cart_item_discount',tmp_cart_item_discount)
                 if DiscountType == 'SC':
                     total_vat_exempt = vat_exempt + total_vat_exempt
                     total_disc_amt = float(disc_amt) +float(total_disc_amt)
@@ -1430,11 +1448,94 @@ def save_cash_payment(request):
                 )
                 SaveToPOSSalesInvoiceListing.save()
 
+
+            if DiscountType == 'ITEM' or DiscountType == 'TRANSACTION':
+                for items in tmp_cart_item_discount:
+                    productInfo = Product.objects.filter(bar_code=items['barcode']).first()
+                    if productInfo is not None:
+                        quantity = float(items['quantity'])
+                        price = float(items['price'])
+                        item_disc = float(items['item_disc'])
+                        total_sub_total = total_sub_total + (quantity * price)
+                        if productInfo.tax_code == 'VAT':
+                                DiscountType = ''
+                                vatable = 'V'
+                                totalItem = quantity * price
+                                desc_rate = item_disc / (totalItem) * 100
+                                vat_amt = ((totalItem - item_disc) / 1.12) * 0.12
+                                disc_amt = item_disc
+                                net_total = (totalItem - item_disc)
+                                Vatable_Amount = (totalItem + Vatable_Amount)
+                                unit_cost = totalItem
+                        else:
+                                vatable = 'N'
+                                vat_amt = 0
+                                disc_amt = item_disc
+                                net_total = (quantity * price) - disc_amt
+                    else:
+                        # Handle case where productInfo is None (no product found for the barcode)
+                        pass  # You might want to log this or handle it according to your logic
+                        
+
+                    total_net_total = total_net_total + net_total
+                    total_vat_exempt = vat_exempt + total_vat_exempt
+                    total_disc_amt = float(disc_amt) + float(total_disc_amt)
+                    total_desc_rate= desc_rate 
+                    total_vat_amt = vat_amt + total_vat_amt
+                    
+                    # pdb.set_trace()
+                    totalQty = totalQty + float(items['quantity'])
+                    if so_no == '':
+                        so_no = items['sales_trans_id']
+                    else:
+                        if so_no == items['sales_trans_id']:
+                            so_no = so_no
+                        else:
+                            so_no = so_no + ', ' + items['sales_trans_id']
+
+                    so_doc_no = so_no
+                    SaveToPOSSalesInvoiceListing = PosSalesInvoiceListing(
+                        company_code = f"{companyCode.autonum:0>4}",
+                        ul_code = machineInfo.ul_code,
+                        terminal_no = TerminalNo,
+                        site_code = int(machineInfo.site_no),
+                        cashier_id = cashier_id,
+                        doc_date = datetime_stamp,
+                        doc_no = doc_no,
+                        doc_type = 'POS-SI',
+                        line_number = items['line_no'],
+                        bar_code =items['barcode'],
+                        alternate_code = 0,
+                        item_code = items['barcode'],
+                        rec_qty = items['quantity'],
+                        rec_uom = productInfo.uom,
+                        description = items['description'],
+                        unit_price = items['price'],
+                        sub_total = float(items['quantity']) * float(items['price']),
+                        pc_price =  items['price'],
+                        qtyperuom = 1,
+                        disc_amt = f"{disc_amt:.3f}",
+                        desc_rate =f"{desc_rate:.3f}",
+                        vat_amt =  f"{vat_amt:.3f}",
+                        vat_exempt = f"{vat_exempt:.3f}",
+                        net_total =  f"{net_total:.3f}",
+                        isvoid = 'NO',
+                        unit_cost = unit_cost,
+                        vatable = vatable,
+                        status = 'A',
+                        so_no =items['sales_trans_id'],
+                        so_doc_no =items['sales_trans_id'],
+                        sn_bc = '',
+                        discounted_by = Discounted_by,
+                        
+                    )
+                    SaveToPOSSalesInvoiceListing.save()
+
+
             Vatable_Amount = float(Vatable_Amount) - float(total_vat_amt)
             net_vat = 0
             net_discount = 0
             vat_exempted = 0
-            print('DiscountDataList',DiscountDataList)
             #### Take note of computation of net_vat and net_discount
             # pdb.set_trace()
             if DiscountType == 'SC':
@@ -1460,6 +1561,7 @@ def save_cash_payment(request):
             elif DiscountType == 'ITEM':
                 net_vat = total_sub_total - (total_disc_amt + total_vat_amt + total_vat_exempt)
                 net_discount = total_sub_total - (total_disc_amt + total_vat_exempt)
+
             elif DiscountType == 'TRANSACTION':
                 DiscountType='TRSD'
                 net_vat = total_sub_total - (total_disc_amt + total_vat_amt + total_vat_exempt)
@@ -1758,9 +1860,14 @@ def save_sales_order_payment(request):
             machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number.strip()).first()
             Amt_Discount = 0
             so_no = ''
-            # pdb.set_trace()
             for item in cart_items:
-                line_no += 1 
+                # line_no += 1              
+                if item.get('line_no') is None:
+                    line_no = item.get('lineno', 0)  # Use 'lineno' with a default value of 0 if 'line_no' is None
+                else:
+                    line_no = item['line_no']
+                    
+
                 quantity = item['quantity']
                 description = item['description']
                 price = item['price']
@@ -1783,10 +1890,10 @@ def save_sales_order_payment(request):
                 if DiscountType == 'SC':
                     Amt_Discount = DiscountData['SLess20SCDiscount']
                     desc_rate = 20
-                    totalItem = quantity * price
+                    totalItem = float(quantity) * float(price)
                     # print('price',price,'totalItem',totalItem,)
                     # pdb.set_trace()
-                    NetSale =  float(totalItem) / (0.12 + 1 )
+                    NetSale =  float(totalItem) / float(0.12 + 1)
                     vat_ex =  float(totalItem) - float(NetSale)
                     item_disc  = (float(totalItem) - float(vat_ex) ) * 0.2
                 
@@ -2167,6 +2274,7 @@ def save_credit_card_payment(request):
             AmountDue = received_data.get('AmountDue')
             CashierName =  received_data.get('CashierName')
             OrderType =  received_data.get('OrderType')
+            Discounted_by= received_data.get('Discounted_by')
             # doc_no = get_sales_transaction_id(TerminalNo,'POS CI')
             DiscountDataList = received_data.get('DiscountDataList')
             DiscountType = received_data.get('DiscountType')
@@ -2176,10 +2284,18 @@ def save_credit_card_payment(request):
             doctype = received_data.get('doctype')
             doc_no = get_sales_transaction_id(TerminalNo,doctype)
             # CreditCardPaymentListData = CreditCard.get("CreditCardPaymentList")
-
+            # pdb.set_trace()
             bankID = ''
             BankName = ''
-
+            if table_no =='':
+                table_no = 0
+        
+            current_datetime = timezone.now()
+            datetime_stamp = current_datetime.strftime('%Y-%m-%d %H:%M:%S')
+            serial_number = get_serial_number()
+            machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number.strip()).first()
+            companyCode = getCompanyData()
+            waiterName=''
 
             last_details_id = 0
             try:
@@ -2312,12 +2428,14 @@ def save_credit_card_payment(request):
             vatable = ''
             totalQty = 0
             desc_rate = 0
+            unit_cost = 0
+            Vatable_Amount = 0
 
                 
-            
-            print('cart_items',cart_items)
+            tmp_cart_item_discount = cart_items
             for items in cart_items:
                 productInfo = Product.objects.filter(bar_code=items['barcode']).first()
+                
 
                 if productInfo is not None:
                     quantity = float(items['quantity'])
@@ -2326,27 +2444,91 @@ def save_credit_card_payment(request):
                     total_sub_total = total_sub_total + (quantity * price)
                     
                     if DiscountType == 'SC':
+                        print(DiscountData)
+                        print(DiscountData.get('SAmountCovered'))
+                        SCAmmountCovered = float(DiscountData.get('SAmountCovered').replace(',',''))
+                        SLess20SCDiscount = float(DiscountData.get('SLess20SCDiscount').replace(',',''))
+                        SLessVat12 =  float(DiscountData.get('SLessVat12').replace(',',''))
+                        SNetOfVat =  float(DiscountData.get('SNetOfVat').replace(',',''))
+                        SVatSales =  float(DiscountData.get('SVatSales').replace(',',''))
                         vatable = 'Es'
                         desc_rate = 20
                         totalItem = quantity * price
-                        
+                            
                         NetSale =  totalItem / (0.12 + 1 )
-                        vat_exempt =  totalItem - NetSale
-                        disc_amt  = (totalItem - vat_exempt ) * 0.2
-                        net_total = (quantity * price) - (disc_amt + vat_exempt)
-                        
+                        vat_exempt =  (totalItem / (0.12 + 1 ) * 0.12) * (SCAmmountCovered / SVatSales)
+                        disc_amt  = (totalItem / (0.12 + 1 ) * 0.2) * (SCAmmountCovered / SVatSales)
+                        net_total = (totalItem) - (disc_amt + vat_exempt)
+                        vat_amt =(totalItem / (0.12 + 1 ) * 0.12) * (SVatSales -SCAmmountCovered) / SVatSales
+                        Vatable_Amount = SVatSales - SCAmmountCovered
+                        # NetSale =  totalItem / (0.12 + 1 )
+                        # vat_exempt = (SCAmmountCovered - SLess20SCDiscount) - SLessVat12
+                        # disc_amt  = SLess20SCDiscount
+                        # net_total = (quantity * price) - (disc_amt + vat_exempt)
+                        # vat_amt = ((SVatSales - SCAmmountCovered) * 12) / 112
+                        # Vatable_Amount = (SVatSales - SCAmmountCovered) - vat_amt
                         print('NetSale',NetSale)
                         print('vat_exempt',vat_exempt)
                         print('disc_amt',disc_amt)
                         print('net_total',net_total)
                     
-                        
+                    elif DiscountType =='ITEM':
+                        for dis in DiscountData:
+
+                            lineNO = 0
+                            if dis.get('line_no') is None:
+                                lineNO = dis.get('LineNo', 0)  # Use 'lineno' with a default value of 0 if 'line_no' is None
+                            else:
+                                lineNO = dis['line_no']
+
+                            if dis['Barcode'] == items['barcode'] and lineNO == items['line_no']:
+                                
+                                for x in tmp_cart_item_discount:
+                                    if x['barcode'] == items['barcode'] and x['line_no'] == items['line_no']:
+                                        tmp_cart_item_discount.remove(x)
+                                vatable = 'V'
+                                desc_rate = float(dis['D1'])
+                                totalItem = quantity * price
+                                item_disc = float(dis['D1'])
+                                NetSale =  float(dis['DiscountedPrice'])
+                                vat_exempt =  0
+                                disc_amt  = float(dis['ByAmount'])
+                                net_total = (totalItem - disc_amt)
+                                vat_amt = ((totalItem - disc_amt) / 1.12) * 0.12
+                                unit_cost = (totalItem) 
+                                Vatable_Amount = (totalItem + Vatable_Amount) - disc_amt
+                    elif DiscountType =='TRANSACTION':
+                        print(DiscountData)
+                        for dis in DiscountData:
+                            lineNO = 0
+                            if dis.get('line_no') is None:
+                                lineNO = dis.get('lineno', 0)  # Use 'lineno' with a default value of 0 if 'line_no' is None
+                            else:
+                                lineNO = dis['line_no']
+
+                            if dis['barcode'] == items['barcode'] and lineNO == items['line_no']:
+                                desc_rate = float(dis['desc_rate'])
+                                vatable = 'V'
+                                totalItem = quantity * price
+                                item_disc = float(dis['desc_rate'])
+                                vat_exempt =  0
+                                disc_amt  = float(dis['Discount'])
+                                net_total = (totalItem - disc_amt)
+                                vat_amt = ((totalItem - disc_amt) / 1.12) * 0.12
+                                unit_cost = (totalItem) 
+                                Vatable_Amount = (totalItem + Vatable_Amount) - disc_amt
+
                     else:
                         if productInfo.tax_code == 'VAT':
+                            DiscountType = ''
                             vatable = 'V'
-                            desc_rate = item_disc / (quantity * price) * 100
-                            vat_amt = (((quantity * price) - item_disc) / 1.12) * 0.12
-                            net_total = (quantity * price) - item_disc - vat_amt
+                            totalItem = quantity * price
+                            desc_rate = item_disc / (totalItem) * 100
+                            vat_amt = ((totalItem - item_disc) / 1.12) * 0.12
+                            disc_amt = item_disc
+                            net_total = (totalItem - item_disc)
+                            Vatable_Amount = (totalItem + Vatable_Amount)
+                            unit_cost = totalItem
                         else:
                             vatable = 'N'
                             vat_amt = 0
@@ -2357,15 +2539,21 @@ def save_credit_card_payment(request):
                     pass  # You might want to log this or handle it according to your logic
                     
 
-                total_disc_amt = total_disc_amt + desc_rate
-                total_desc_rate= total_desc_rate + desc_rate
-                total_vat_amt = total_vat_amt + vat_amt
-
+                # total_disc_amt = total_disc_amt + float(disc_amt)
+                # total_desc_rate= total_desc_rate + desc_rate
+                # total_vat_amt = total_vat_amt + vat_amt
+                print('tmp_cart_item_discount',tmp_cart_item_discount)
                 if DiscountType == 'SC':
-                    total_vat_exempt = total_vat_exempt + net_total
-                    print('total_vat_exempt',total_vat_exempt)
+                    total_vat_exempt = vat_exempt + total_vat_exempt
+                    total_disc_amt = float(disc_amt) +float(total_disc_amt)
+                    total_desc_rate= desc_rate 
+                    total_vat_amt = vat_amt + total_vat_amt
                 else:
                     total_net_total = total_net_total + net_total
+                    total_vat_exempt = vat_exempt + total_vat_exempt
+                    total_disc_amt = float(disc_amt) + float(total_disc_amt)
+                    total_desc_rate= desc_rate 
+                    total_vat_amt = vat_amt + total_vat_amt
                 
                 # pdb.set_trace()
                 totalQty = totalQty + float(items['quantity'])
@@ -2378,7 +2566,6 @@ def save_credit_card_payment(request):
                         so_no = so_no + ', ' + items['sales_trans_id']
 
                 so_doc_no = so_no
-                
                 SaveToPOSSalesInvoiceListing = PosSalesInvoiceListing(
                     company_code = f"{companyCode.autonum:0>4}",
                     ul_code = machineInfo.ul_code,
@@ -2404,19 +2591,103 @@ def save_credit_card_payment(request):
                     vat_amt =  f"{vat_amt:.3f}",
                     vat_exempt = f"{vat_exempt:.3f}",
                     net_total =  f"{net_total:.3f}",
-                    isvoid = 'No',
-                    unit_cost = '0',
+                    isvoid = 'NO',
+                    unit_cost = unit_cost,
                     vatable = vatable,
                     status = 'A',
                     so_no =items['sales_trans_id'],
                     so_doc_no =items['sales_trans_id'],
                     sn_bc = '',
-                    discounted_by = '',
+                    discounted_by = Discounted_by,
                     
                 )
                 SaveToPOSSalesInvoiceListing.save()
 
-    
+
+            if DiscountType == 'ITEM' or DiscountType == 'TRANSACTION':
+                for items in tmp_cart_item_discount:
+                    productInfo = Product.objects.filter(bar_code=items['barcode']).first()
+                    if productInfo is not None:
+                        quantity = float(items['quantity'])
+                        price = float(items['price'])
+                        item_disc = float(items['item_disc'])
+                        total_sub_total = total_sub_total + (quantity * price)
+                        if productInfo.tax_code == 'VAT':
+                                DiscountType = ''
+                                vatable = 'V'
+                                totalItem = quantity * price
+                                desc_rate = item_disc / (totalItem) * 100
+                                vat_amt = ((totalItem - item_disc) / 1.12) * 0.12
+                                disc_amt = item_disc
+                                net_total = (totalItem - item_disc)
+                                Vatable_Amount = (totalItem + Vatable_Amount)
+                                unit_cost = totalItem
+                        else:
+                                vatable = 'N'
+                                vat_amt = 0
+                                disc_amt = item_disc
+                                net_total = (quantity * price) - disc_amt
+                    else:
+                        # Handle case where productInfo is None (no product found for the barcode)
+                        pass  # You might want to log this or handle it according to your logic
+                        
+
+                    total_net_total = total_net_total + net_total
+                    total_vat_exempt = vat_exempt + total_vat_exempt
+                    total_disc_amt = float(disc_amt) + float(total_disc_amt)
+                    total_desc_rate= desc_rate 
+                    total_vat_amt = vat_amt + total_vat_amt
+                    
+                    # pdb.set_trace()
+                    totalQty = totalQty + float(items['quantity'])
+                    if so_no == '':
+                        so_no = items['sales_trans_id']
+                    else:
+                        if so_no == items['sales_trans_id']:
+                            so_no = so_no
+                        else:
+                            so_no = so_no + ', ' + items['sales_trans_id']
+
+                    so_doc_no = so_no
+                    SaveToPOSSalesInvoiceListing = PosSalesInvoiceListing(
+                        company_code = f"{companyCode.autonum:0>4}",
+                        ul_code = machineInfo.ul_code,
+                        terminal_no = TerminalNo,
+                        site_code = int(machineInfo.site_no),
+                        cashier_id = cashier_id,
+                        doc_date = datetime_stamp,
+                        doc_no = doc_no,
+                        doc_type = 'POS-SI',
+                        line_number = items['line_no'],
+                        bar_code =items['barcode'],
+                        alternate_code = 0,
+                        item_code = items['barcode'],
+                        rec_qty = items['quantity'],
+                        rec_uom = productInfo.uom,
+                        description = items['description'],
+                        unit_price = items['price'],
+                        sub_total = float(items['quantity']) * float(items['price']),
+                        pc_price =  items['price'],
+                        qtyperuom = 1,
+                        disc_amt = f"{disc_amt:.3f}",
+                        desc_rate =f"{desc_rate:.3f}",
+                        vat_amt =  f"{vat_amt:.3f}",
+                        vat_exempt = f"{vat_exempt:.3f}",
+                        net_total =  f"{net_total:.3f}",
+                        isvoid = 'NO',
+                        unit_cost = unit_cost,
+                        vatable = vatable,
+                        status = 'A',
+                        so_no =items['sales_trans_id'],
+                        so_doc_no =items['sales_trans_id'],
+                        sn_bc = '',
+                        discounted_by = Discounted_by,
+                        
+                    )
+                    SaveToPOSSalesInvoiceListing.save()
+
+
+            Vatable_Amount = float(Vatable_Amount) - float(total_vat_amt)
             net_vat = 0
             net_discount = 0
             vat_exempted = 0
@@ -2443,12 +2714,26 @@ def save_credit_card_payment(request):
                         )
                     saveSeniorData.save()
                 
-                
-                
-                
+            elif DiscountType == 'ITEM':
+                net_vat = total_sub_total - (total_disc_amt + total_vat_amt + total_vat_exempt)
+                net_discount = total_sub_total - (total_disc_amt + total_vat_exempt)
+
+            elif DiscountType == 'TRANSACTION':
+                DiscountType='TRSD'
+                net_vat = total_sub_total - (total_disc_amt + total_vat_amt + total_vat_exempt)
+                net_discount = total_sub_total - (total_disc_amt + total_vat_exempt)
+            elif DiscountType == 'TRADE':
+                DiscountType='TRD'
+                net_vat = total_sub_total - (total_disc_amt + total_vat_amt + total_vat_exempt)
+                net_discount = total_sub_total - (total_disc_amt + total_vat_exempt)
             else:   
                 net_vat = total_sub_total - (total_disc_amt + total_vat_amt + total_vat_exempt)
                 net_discount = total_sub_total - (total_disc_amt + total_vat_exempt)
+                
+                
+            # else:   
+            #     net_vat = total_sub_total - (total_disc_amt + total_vat_amt + total_vat_exempt)
+            #     net_discount = total_sub_total - (total_disc_amt + total_vat_exempt)
             
             
             AmountDue_without_comma = AmountDue.replace(',', '')
@@ -2460,15 +2745,15 @@ def save_credit_card_payment(request):
 
             print('cus-address',CusAddress)
             # pdb.set_trace()
-            total_disc_amt = float(total_disc_amt)
-            total_desc_rate = float(total_desc_rate)
-            total_vat_exempt = float(total_vat_exempt)
+            total_disc_amt = float(str(total_disc_amt).replace(',', ''))
+            total_desc_rate = float(str(total_desc_rate).replace(',', ''))
+            total_vat_exempt = float(str(total_vat_exempt).replace(',', ''))
             SaveToPOSSalesInvoiceList = PosSalesInvoiceList (
                     company_code = f"{companyCode.autonum:0>4}",
                     ul_code = machineInfo.ul_code,
                     site_code = int(machineInfo.site_no),
                     trans_type = 'Cash Sales',
-                    discount_type = '',
+                    discount_type = DiscountType,
                     doc_no = doc_no,
                     doc_type = 'POS-SI',
                     terminal_no = TerminalNo,
@@ -2491,12 +2776,12 @@ def save_credit_card_payment(request):
                     ServiceCharge_TotalAmount = 0 ,
                     total_credit_card =  AmountDue_formatted,
                     total_qty = totalQty,
-                    discount = float(total_disc_amt),
-                    vat = float(total_vat_amt),
-                    vat_exempted = float(vat_exempted),
-                    net_vat = float(net_vat),
-                    net_discount = float(net_discount),
-                    sub_total = float(total_sub_total),
+                    discount = float(str(total_disc_amt).replace(',', '')),
+                    vat = float(str(total_vat_amt).replace(',', '')),
+                    vat_exempted = float(str(vat_exempted).replace(',', '')),
+                    net_vat = float(str(net_vat).replace(',', '')),
+                    net_discount = float(str(net_discount).replace(',', '')),
+                    sub_total = float(str(total_sub_total).replace(',', '')),
                     # discount =  f"{total_disc_amt:.3f}" ,
                     # vat = f"{total_vat_amt:.3f}",
                     # vat_exempted =  f"{total_vat_exempt:.3f}",
@@ -2576,7 +2861,7 @@ def save_credit_card_payment(request):
                 'TelNo':'TEL NOS:785-462',
                 'OR':doc_no,
                 'VAT': '{:,.2f}'.format(total_vat_amt),
-                'VATable': '{:,.2f}'.format(total_net_total),
+                'VATable': '{:,.2f}'.format(Vatable_Amount),
                 'Discount': '{:,.2f}'.format(total_disc_amt),
                 'Discount_Rate': '{:,.2f}'.format(total_desc_rate),
                 'VatExempt': '{:,.2f}'.format(total_vat_exempt),
@@ -2622,6 +2907,7 @@ def save_debit_card_payment(request):
             AmountDue = received_data.get('AmountDue')
             CashierName =  received_data.get('CashierName')
             OrderType =  received_data.get('OrderType')
+            Discounted_by= received_data.get('Discounted_by')
             DiscountDataList = received_data.get('DiscountDataList')
             # doc_no = get_sales_transaction_id(TerminalNo,'POS CI')
             DiscountType = received_data.get('DiscountType')
@@ -2756,12 +3042,116 @@ def save_debit_card_payment(request):
             vatable = ''
             totalQty = 0
             desc_rate = 0
+            unit_cost = 0
+            Vatable_Amount = 0
 
                 
             
 
+            # for items in cart_items:
+            #     productInfo = Product.objects.filter(bar_code=items['barcode']).first()
+
+            #     if productInfo is not None:
+            #         quantity = float(items['quantity'])
+            #         price = float(items['price'])
+            #         item_disc = float(items['item_disc'])
+            #         total_sub_total = total_sub_total + (quantity * price)
+                    
+            #         if DiscountType == 'SC':
+            #             vatable = 'Es'
+            #             desc_rate = 20
+            #             totalItem = quantity * price
+                        
+            #             NetSale =  totalItem / (0.12 + 1 )
+            #             vat_exempt =  totalItem - NetSale
+            #             disc_amt  = (totalItem - vat_exempt ) * 0.2
+            #             net_total = (quantity * price) - (disc_amt + vat_exempt)
+                        
+            #             print('NetSale',NetSale)
+            #             print('vat_exempt',vat_exempt)
+            #             print('disc_amt',disc_amt)
+            #             print('net_total',net_total)
+                    
+                        
+            #         else:
+            #             if productInfo.tax_code == 'VAT':
+            #                 vatable = 'V'
+            #                 desc_rate = item_disc / (quantity * price) * 100
+            #                 vat_amt = (((quantity * price) - item_disc) / 1.12) * 0.12
+            #                 net_total = (quantity * price) - item_disc - vat_amt
+            #             else:
+            #                 vatable = 'N'
+            #                 vat_amt = 0
+            #                 disc_amt = item_disc
+            #                 net_total = (quantity * price) - disc_amt
+            #     else:
+            #         # Handle case where productInfo is None (no product found for the barcode)
+            #         pass  # You might want to log this or handle it according to your logic
+                    
+
+            #     total_disc_amt = total_disc_amt + desc_rate
+            #     total_desc_rate= total_desc_rate + desc_rate
+            #     total_vat_amt = total_vat_amt + vat_amt
+
+            #     if DiscountType == 'SC':
+            #         total_vat_exempt = total_vat_exempt + net_total
+            #         print('total_vat_exempt',total_vat_exempt)
+            #     else:
+            #         total_net_total = total_net_total + net_total
+                
+            #     # pdb.set_trace()
+            #     totalQty = totalQty + float(items['quantity'])
+            #     if so_no == '':
+            #         so_no = items['sales_trans_id']
+            #     else:
+            #         if so_no == items['sales_trans_id']:
+            #             so_no = so_no
+            #         else:
+            #             so_no = so_no + ', ' + items['sales_trans_id']
+            #     so_doc_no = so_no
+
+            #     SaveToPOSSalesInvoiceListing = PosSalesInvoiceListing(
+            #         company_code = f"{companyCode.autonum:0>4}",
+            #         ul_code = machineInfo.ul_code,
+            #         terminal_no = TerminalNo,
+            #         site_code = int(machineInfo.site_no),
+            #         cashier_id = cashier_id,
+            #         doc_date = datetime_stamp,
+            #         doc_no = doc_no,
+            #         doc_type = 'POS-SI',
+            #         line_number = items['line_no'],
+            #         bar_code =items['barcode'],
+            #         alternate_code = 0,
+            #         item_code = items['barcode'],
+            #         rec_qty = items['quantity'],
+            #         rec_uom = productInfo.uom,
+            #         description = items['description'],
+            #         unit_price = items['price'],
+            #         sub_total = float(items['quantity']) * float(items['price']),
+            #         pc_price =  items['price'],
+            #         qtyperuom = 1,
+            #         disc_amt = f"{disc_amt:.3f}",
+            #         desc_rate =f"{desc_rate:.3f}",
+            #         vat_amt =  f"{vat_amt:.3f}",
+            #         vat_exempt = f"{vat_exempt:.3f}",
+            #         net_total =  f"{net_total:.3f}",
+            #         isvoid = 'No',
+            #         unit_cost = '0',
+            #         vatable = vatable,
+            #         status = 'A',
+            #         so_no =items['sales_trans_id'],
+            #         so_doc_no =items['sales_trans_id'],
+            #         sn_bc = '',
+            #         discounted_by = '',
+                    
+            #     )
+            #     SaveToPOSSalesInvoiceListing.save()
+
+
+            tmp_cart_item_discount = cart_items
             for items in cart_items:
                 productInfo = Product.objects.filter(bar_code=items['barcode']).first()
+                
 
                 if productInfo is not None:
                     quantity = float(items['quantity'])
@@ -2770,27 +3160,91 @@ def save_debit_card_payment(request):
                     total_sub_total = total_sub_total + (quantity * price)
                     
                     if DiscountType == 'SC':
+                        print(DiscountData)
+                        print(DiscountData.get('SAmountCovered'))
+                        SCAmmountCovered = float(DiscountData.get('SAmountCovered').replace(',',''))
+                        SLess20SCDiscount = float(DiscountData.get('SLess20SCDiscount').replace(',',''))
+                        SLessVat12 =  float(DiscountData.get('SLessVat12').replace(',',''))
+                        SNetOfVat =  float(DiscountData.get('SNetOfVat').replace(',',''))
+                        SVatSales =  float(DiscountData.get('SVatSales').replace(',',''))
                         vatable = 'Es'
                         desc_rate = 20
                         totalItem = quantity * price
-                        
+                            
                         NetSale =  totalItem / (0.12 + 1 )
-                        vat_exempt =  totalItem - NetSale
-                        disc_amt  = (totalItem - vat_exempt ) * 0.2
-                        net_total = (quantity * price) - (disc_amt + vat_exempt)
-                        
+                        vat_exempt =  (totalItem / (0.12 + 1 ) * 0.12) * (SCAmmountCovered / SVatSales)
+                        disc_amt  = (totalItem / (0.12 + 1 ) * 0.2) * (SCAmmountCovered / SVatSales)
+                        net_total = (totalItem) - (disc_amt + vat_exempt)
+                        vat_amt =(totalItem / (0.12 + 1 ) * 0.12) * (SVatSales -SCAmmountCovered) / SVatSales
+                        Vatable_Amount = SVatSales - SCAmmountCovered
+                        # NetSale =  totalItem / (0.12 + 1 )
+                        # vat_exempt = (SCAmmountCovered - SLess20SCDiscount) - SLessVat12
+                        # disc_amt  = SLess20SCDiscount
+                        # net_total = (quantity * price) - (disc_amt + vat_exempt)
+                        # vat_amt = ((SVatSales - SCAmmountCovered) * 12) / 112
+                        # Vatable_Amount = (SVatSales - SCAmmountCovered) - vat_amt
                         print('NetSale',NetSale)
                         print('vat_exempt',vat_exempt)
                         print('disc_amt',disc_amt)
                         print('net_total',net_total)
                     
-                        
+                    elif DiscountType =='ITEM':
+                        for dis in DiscountData:
+
+                            lineNO = 0
+                            if dis.get('line_no') is None:
+                                lineNO = dis.get('LineNo', 0)  # Use 'lineno' with a default value of 0 if 'line_no' is None
+                            else:
+                                lineNO = dis['line_no']
+
+                            if dis['Barcode'] == items['barcode'] and lineNO == items['line_no']:
+                                
+                                for x in tmp_cart_item_discount:
+                                    if x['barcode'] == items['barcode'] and x['line_no'] == items['line_no']:
+                                        tmp_cart_item_discount.remove(x)
+                                vatable = 'V'
+                                desc_rate = float(dis['D1'])
+                                totalItem = quantity * price
+                                item_disc = float(dis['D1'])
+                                NetSale =  float(dis['DiscountedPrice'])
+                                vat_exempt =  0
+                                disc_amt  = float(dis['ByAmount'])
+                                net_total = (totalItem - disc_amt)
+                                vat_amt = ((totalItem - disc_amt) / 1.12) * 0.12
+                                unit_cost = (totalItem) 
+                                Vatable_Amount = (totalItem + Vatable_Amount) - disc_amt
+                    elif DiscountType =='TRANSACTION':
+                        print(DiscountData)
+                        for dis in DiscountData:
+                            lineNO = 0
+                            if dis.get('line_no') is None:
+                                lineNO = dis.get('lineno', 0)  # Use 'lineno' with a default value of 0 if 'line_no' is None
+                            else:
+                                lineNO = dis['line_no']
+
+                            if dis['barcode'] == items['barcode'] and lineNO == items['line_no']:
+                                desc_rate = float(dis['desc_rate'])
+                                vatable = 'V'
+                                totalItem = quantity * price
+                                item_disc = float(dis['desc_rate'])
+                                vat_exempt =  0
+                                disc_amt  = float(dis['Discount'])
+                                net_total = (totalItem - disc_amt)
+                                vat_amt = ((totalItem - disc_amt) / 1.12) * 0.12
+                                unit_cost = (totalItem) 
+                                Vatable_Amount = (totalItem + Vatable_Amount) - disc_amt
+
                     else:
                         if productInfo.tax_code == 'VAT':
+                            DiscountType = ''
                             vatable = 'V'
-                            desc_rate = item_disc / (quantity * price) * 100
-                            vat_amt = (((quantity * price) - item_disc) / 1.12) * 0.12
-                            net_total = (quantity * price) - item_disc - vat_amt
+                            totalItem = quantity * price
+                            desc_rate = item_disc / (totalItem) * 100
+                            vat_amt = ((totalItem - item_disc) / 1.12) * 0.12
+                            disc_amt = item_disc
+                            net_total = (totalItem - item_disc)
+                            Vatable_Amount = (totalItem + Vatable_Amount)
+                            unit_cost = totalItem
                         else:
                             vatable = 'N'
                             vat_amt = 0
@@ -2801,15 +3255,21 @@ def save_debit_card_payment(request):
                     pass  # You might want to log this or handle it according to your logic
                     
 
-                total_disc_amt = total_disc_amt + desc_rate
-                total_desc_rate= total_desc_rate + desc_rate
-                total_vat_amt = total_vat_amt + vat_amt
-
+                # total_disc_amt = total_disc_amt + float(disc_amt)
+                # total_desc_rate= total_desc_rate + desc_rate
+                # total_vat_amt = total_vat_amt + vat_amt
+                print('tmp_cart_item_discount',tmp_cart_item_discount)
                 if DiscountType == 'SC':
-                    total_vat_exempt = total_vat_exempt + net_total
-                    print('total_vat_exempt',total_vat_exempt)
+                    total_vat_exempt = vat_exempt + total_vat_exempt
+                    total_disc_amt = float(disc_amt) +float(total_disc_amt)
+                    total_desc_rate= desc_rate 
+                    total_vat_amt = vat_amt + total_vat_amt
                 else:
                     total_net_total = total_net_total + net_total
+                    total_vat_exempt = vat_exempt + total_vat_exempt
+                    total_disc_amt = float(disc_amt) + float(total_disc_amt)
+                    total_desc_rate= desc_rate 
+                    total_vat_amt = vat_amt + total_vat_amt
                 
                 # pdb.set_trace()
                 totalQty = totalQty + float(items['quantity'])
@@ -2820,8 +3280,8 @@ def save_debit_card_payment(request):
                         so_no = so_no
                     else:
                         so_no = so_no + ', ' + items['sales_trans_id']
-                so_doc_no = so_no
 
+                so_doc_no = so_no
                 SaveToPOSSalesInvoiceListing = PosSalesInvoiceListing(
                     company_code = f"{companyCode.autonum:0>4}",
                     ul_code = machineInfo.ul_code,
@@ -2847,19 +3307,103 @@ def save_debit_card_payment(request):
                     vat_amt =  f"{vat_amt:.3f}",
                     vat_exempt = f"{vat_exempt:.3f}",
                     net_total =  f"{net_total:.3f}",
-                    isvoid = 'No',
-                    unit_cost = '0',
+                    isvoid = 'NO',
+                    unit_cost = unit_cost,
                     vatable = vatable,
                     status = 'A',
                     so_no =items['sales_trans_id'],
                     so_doc_no =items['sales_trans_id'],
                     sn_bc = '',
-                    discounted_by = '',
+                    discounted_by = Discounted_by,
                     
                 )
                 SaveToPOSSalesInvoiceListing.save()
 
-    
+
+            if DiscountType == 'ITEM' or DiscountType == 'TRANSACTION':
+                for items in tmp_cart_item_discount:
+                    productInfo = Product.objects.filter(bar_code=items['barcode']).first()
+                    if productInfo is not None:
+                        quantity = float(items['quantity'])
+                        price = float(items['price'])
+                        item_disc = float(items['item_disc'])
+                        total_sub_total = total_sub_total + (quantity * price)
+                        if productInfo.tax_code == 'VAT':
+                                DiscountType = ''
+                                vatable = 'V'
+                                totalItem = quantity * price
+                                desc_rate = item_disc / (totalItem) * 100
+                                vat_amt = ((totalItem - item_disc) / 1.12) * 0.12
+                                disc_amt = item_disc
+                                net_total = (totalItem - item_disc)
+                                Vatable_Amount = (totalItem + Vatable_Amount)
+                                unit_cost = totalItem
+                        else:
+                                vatable = 'N'
+                                vat_amt = 0
+                                disc_amt = item_disc
+                                net_total = (quantity * price) - disc_amt
+                    else:
+                        # Handle case where productInfo is None (no product found for the barcode)
+                        pass  # You might want to log this or handle it according to your logic
+                        
+
+                    total_net_total = total_net_total + net_total
+                    total_vat_exempt = vat_exempt + total_vat_exempt
+                    total_disc_amt = float(disc_amt) + float(total_disc_amt)
+                    total_desc_rate= desc_rate 
+                    total_vat_amt = vat_amt + total_vat_amt
+                    
+                    # pdb.set_trace()
+                    totalQty = totalQty + float(items['quantity'])
+                    if so_no == '':
+                        so_no = items['sales_trans_id']
+                    else:
+                        if so_no == items['sales_trans_id']:
+                            so_no = so_no
+                        else:
+                            so_no = so_no + ', ' + items['sales_trans_id']
+
+                    so_doc_no = so_no
+                    SaveToPOSSalesInvoiceListing = PosSalesInvoiceListing(
+                        company_code = f"{companyCode.autonum:0>4}",
+                        ul_code = machineInfo.ul_code,
+                        terminal_no = TerminalNo,
+                        site_code = int(machineInfo.site_no),
+                        cashier_id = cashier_id,
+                        doc_date = datetime_stamp,
+                        doc_no = doc_no,
+                        doc_type = 'POS-SI',
+                        line_number = items['line_no'],
+                        bar_code =items['barcode'],
+                        alternate_code = 0,
+                        item_code = items['barcode'],
+                        rec_qty = items['quantity'],
+                        rec_uom = productInfo.uom,
+                        description = items['description'],
+                        unit_price = items['price'],
+                        sub_total = float(items['quantity']) * float(items['price']),
+                        pc_price =  items['price'],
+                        qtyperuom = 1,
+                        disc_amt = f"{disc_amt:.3f}",
+                        desc_rate =f"{desc_rate:.3f}",
+                        vat_amt =  f"{vat_amt:.3f}",
+                        vat_exempt = f"{vat_exempt:.3f}",
+                        net_total =  f"{net_total:.3f}",
+                        isvoid = 'NO',
+                        unit_cost = unit_cost,
+                        vatable = vatable,
+                        status = 'A',
+                        so_no =items['sales_trans_id'],
+                        so_doc_no =items['sales_trans_id'],
+                        sn_bc = '',
+                        discounted_by = Discounted_by,
+                        
+                    )
+                    SaveToPOSSalesInvoiceListing.save()
+
+            Vatable_Amount = float(Vatable_Amount) - float(total_vat_amt)
+        
             net_vat = 0
             net_discount = 0
             vat_exempted = 0
@@ -2885,10 +3429,20 @@ def save_debit_card_payment(request):
                             so_no=so_no
                         )
                     saveSeniorData.save()
-                
-                
-                
-                
+            
+            elif DiscountType == 'ITEM':
+                net_vat = total_sub_total - (total_disc_amt + total_vat_amt + total_vat_exempt)
+                net_discount = total_sub_total - (total_disc_amt + total_vat_exempt)
+
+            elif DiscountType == 'TRANSACTION':
+                DiscountType='TRSD'
+                net_vat = total_sub_total - (total_disc_amt + total_vat_amt + total_vat_exempt)
+                net_discount = total_sub_total - (total_disc_amt + total_vat_exempt)
+            elif DiscountType == 'TRADE':
+                DiscountType='TRD'
+                net_vat = total_sub_total - (total_disc_amt + total_vat_amt + total_vat_exempt)
+                net_discount = total_sub_total - (total_disc_amt + total_vat_exempt)
+
             else:   
                 net_vat = total_sub_total - (total_disc_amt + total_vat_amt + total_vat_exempt)
                 net_discount = total_sub_total - (total_disc_amt + total_vat_exempt)
@@ -2910,7 +3464,7 @@ def save_debit_card_payment(request):
                     ul_code = machineInfo.ul_code,
                     site_code = int(machineInfo.site_no),
                     trans_type = 'Cash Sales',
-                    discount_type = '',
+                    discount_type = DiscountType,
                     doc_no = doc_no,
                     doc_type = 'POS-SI',
                     terminal_no = TerminalNo,
@@ -2933,12 +3487,13 @@ def save_debit_card_payment(request):
                     ServiceCharge_TotalAmount = 0 ,
                     total_eps =  AmountDue_formatted,
                     total_qty = totalQty,
-                    discount = float(total_disc_amt),
-                    vat = float(total_vat_amt),
-                    vat_exempted = float(vat_exempted),
-                    net_vat = float(net_vat),
-                    net_discount = float(net_discount),
-                    sub_total = float(total_sub_total),
+                    discount = float(str(total_disc_amt).replace(',', '')),
+                    vat = float(str(total_vat_amt).replace(',', '')),
+                    vat_exempted = float(str(vat_exempted).replace(',', '')),
+                    net_vat = float(str(net_vat).replace(',', '')),
+                    net_discount = float(str(net_discount).replace(',', '')),
+                    sub_total = float(str(total_sub_total).replace(',', '')),
+                   
                     # discount =  f"{total_disc_amt:.3f}" ,
                     # vat = f"{total_vat_amt:.3f}",
                     # vat_exempted =  f"{total_vat_exempt:.3f}",
@@ -3018,7 +3573,7 @@ def save_debit_card_payment(request):
                 'TelNo':'TEL NOS:785-462',
                 'OR':doc_no,
                 'VAT': '{:,.2f}'.format(total_vat_amt),
-                'VATable': '{:,.2f}'.format(total_net_total),
+                'VATable': '{:,.2f}'.format(Vatable_Amount),
                 'Discount': '{:,.2f}'.format(total_disc_amt),
                 'Discount_Rate': '{:,.2f}'.format(total_desc_rate),
                 'VatExempt': '{:,.2f}'.format(total_vat_exempt),
@@ -3064,6 +3619,8 @@ def save_multiple_payment(request):
             AmountDue = received_data.get('AmountDue')
             CashierName =  received_data.get('CashierName')
             OrderType =  received_data.get('OrderType')
+            OrderType =  received_data.get('OrderType')
+            Discounted_by= received_data.get('Discounted_by')
             doc_no = get_sales_transaction_id(TerminalNo,'POS CI')
             DiscountDataList = received_data.get('DiscountDataList')
             DiscountType = received_data.get('DiscountType')
@@ -3267,41 +3824,202 @@ def save_multiple_payment(request):
             vatable = ''
             totalQty = 0
             desc_rate = 0
-
+            unit_cost = 0
+            Vatable_Amount = 0
                 
             
             
+            # for items in cart_items:
+            #     productInfo = Product.objects.filter(bar_code=items['barcode']).first()
+
+            #     if productInfo is not None:
+            #         quantity = float(items['quantity'])
+            #         price = float(items['price'])
+            #         item_disc = float(items['item_disc'])
+            #         total_sub_total = total_sub_total + (quantity * price)
+                    
+            #         if DiscountType == 'SC':
+            #             vatable = 'Es'
+            #             desc_rate = 20
+            #             totalItem = quantity * price
+                        
+            #             NetSale =  totalItem / (0.12 + 1 )
+            #             vat_exempt =  totalItem - NetSale
+            #             disc_amt  = (totalItem - vat_exempt ) * 0.2
+            #             net_total = (quantity * price) - (disc_amt + vat_exempt)
+                        
+            #             print('NetSale',NetSale)
+            #             print('vat_exempt',vat_exempt)
+            #             print('disc_amt',disc_amt)
+            #             print('net_total',net_total)
+                    
+                        
+            #         else:
+            #             if productInfo.tax_code == 'VAT':
+            #                 vatable = 'V'
+            #                 desc_rate = item_disc / (quantity * price) * 100
+            #                 vat_amt = (((quantity * price) - item_disc) / 1.12) * 0.12
+            #                 net_total = (quantity * price) - item_disc - vat_amt
+            #             else:
+            #                 vatable = 'N'
+            #                 vat_amt = 0
+            #                 disc_amt = item_disc
+            #                 net_total = (quantity * price) - disc_amt
+            #     else:
+            #         # Handle case where productInfo is None (no product found for the barcode)
+            #         pass  # You might want to log this or handle it according to your logic
+                    
+
+            #     total_disc_amt = total_disc_amt + desc_rate
+            #     total_desc_rate= total_desc_rate + desc_rate
+            #     total_vat_amt = total_vat_amt + vat_amt
+
+            #     if DiscountType == 'SC':
+            #         total_vat_exempt = total_vat_exempt + net_total
+            #         print('total_vat_exempt',total_vat_exempt)
+            #     else:
+            #         total_net_total = total_net_total + net_total
+                
+            #     # pdb.set_trace()
+            #     totalQty = totalQty + float(items['quantity'])
+            #     if so_no == '':
+            #         so_no = items['sales_trans_id']
+            #     else:
+            #         if so_no == items['sales_trans_id']:
+            #             so_no = so_no
+            #         else:
+            #             so_no = so_no + ', ' + items['sales_trans_id']
+
+            #     so_doc_no = so_no
+            #     SaveToPOSSalesInvoiceListing = PosSalesInvoiceListing(
+            #         company_code = f"{companyCode.autonum:0>4}",
+            #         ul_code = machineInfo.ul_code,
+            #         terminal_no = TerminalNo,
+            #         site_code = int(machineInfo.site_no),
+            #         cashier_id = cashier_id,
+            #         doc_date = datetime_stamp,
+            #         doc_no = doc_no,
+            #         doc_type = 'POS-SI',
+            #         line_number = items['line_no'],
+            #         bar_code =items['barcode'],
+            #         alternate_code = 0,
+            #         item_code = items['barcode'],
+            #         rec_qty = items['quantity'],
+            #         rec_uom = productInfo.uom,
+            #         description = items['description'],
+            #         unit_price = items['price'],
+            #         sub_total = float(items['quantity']) * float(items['price']),
+            #         pc_price =  items['price'],
+            #         qtyperuom = 1,
+            #         disc_amt = f"{disc_amt:.3f}",
+            #         desc_rate =f"{desc_rate:.3f}",
+            #         vat_amt =  f"{vat_amt:.3f}",
+            #         vat_exempt = f"{vat_exempt:.3f}",
+            #         net_total =  f"{net_total:.3f}",
+            #         isvoid = 'No',
+            #         unit_cost = '0',
+            #         vatable = vatable,
+            #         status = 'A',
+            #         so_no =items['sales_trans_id'],
+            #         so_doc_no =items['sales_trans_id'],
+            #         sn_bc = '',
+            #         discounted_by = '',
+                    
+            #     )
+            #     SaveToPOSSalesInvoiceListing.save()
+
+            tmp_cart_item_discount = cart_items
             for items in cart_items:
                 productInfo = Product.objects.filter(bar_code=items['barcode']).first()
+                
 
                 if productInfo is not None:
                     quantity = float(items['quantity'])
                     price = float(items['price'])
                     item_disc = float(items['item_disc'])
                     total_sub_total = total_sub_total + (quantity * price)
-                    
+                    # pdb.set_trace()
                     if DiscountType == 'SC':
+                        SCAmmountCovered = float(DiscountData.get('SAmountCovered').replace(',',''))
+                        SLess20SCDiscount = float(DiscountData.get('SLess20SCDiscount').replace(',',''))
+                        SLessVat12 =  float(DiscountData.get('SLessVat12').replace(',',''))
+                        SNetOfVat =  float(DiscountData.get('SNetOfVat').replace(',',''))
+                        SVatSales =  float(DiscountData.get('SVatSales').replace(',',''))
                         vatable = 'Es'
                         desc_rate = 20
                         totalItem = quantity * price
-                        
+                            
                         NetSale =  totalItem / (0.12 + 1 )
-                        vat_exempt =  totalItem - NetSale
-                        disc_amt  = (totalItem - vat_exempt ) * 0.2
-                        net_total = (quantity * price) - (disc_amt + vat_exempt)
-                        
+                        vat_exempt =  (totalItem / (0.12 + 1 ) * 0.12) * (SCAmmountCovered / SVatSales)
+                        disc_amt  = (totalItem / (0.12 + 1 ) * 0.2) * (SCAmmountCovered / SVatSales)
+                        net_total = (totalItem) - (disc_amt + vat_exempt)
+                        vat_amt =(totalItem / (0.12 + 1 ) * 0.12) * (SVatSales -SCAmmountCovered) / SVatSales
+                        Vatable_Amount = SVatSales - SCAmmountCovered
+
                         print('NetSale',NetSale)
                         print('vat_exempt',vat_exempt)
                         print('disc_amt',disc_amt)
                         print('net_total',net_total)
-                    
-                        
+                        print('vat_amt',vat_amt)
+                        print('Vatable_Amount',Vatable_Amount)
+
+                    elif DiscountType =='ITEM':
+                        for dis in DiscountData:
+
+                            lineNO = 0
+                            if dis.get('line_no') is None:
+                                lineNO = dis.get('LineNo', 0)  # Use 'lineno' with a default value of 0 if 'line_no' is None
+                            else:
+                                lineNO = dis['line_no']
+
+                            if dis['Barcode'] == items['barcode'] and lineNO == items['line_no']:
+                                
+                                for x in tmp_cart_item_discount:
+                                    if x['barcode'] == items['barcode'] and x['line_no'] == items['line_no']:
+                                        tmp_cart_item_discount.remove(x)
+                                vatable = 'V'
+                                desc_rate = float(dis['D1'])
+                                totalItem = quantity * price
+                                item_disc = float(dis['D1'])
+                                NetSale =  float(dis['DiscountedPrice'])
+                                vat_exempt =  0
+                                disc_amt  = float(dis['ByAmount'])
+                                net_total = (totalItem - disc_amt)
+                                vat_amt = ((totalItem - disc_amt) / 1.12) * 0.12
+                                unit_cost = (totalItem) 
+                                Vatable_Amount = (totalItem + Vatable_Amount) - disc_amt
+                    elif DiscountType =='TRANSACTION':
+                        print(DiscountData)
+                        for dis in DiscountData:
+                            lineNO = 0
+                            if dis.get('line_no') is None:
+                                lineNO = dis.get('lineno', 0)  # Use 'lineno' with a default value of 0 if 'line_no' is None
+                            else:
+                                lineNO = dis['line_no']
+
+                            if dis['barcode'] == items['barcode'] and lineNO == items['line_no']:
+                                desc_rate = float(dis['desc_rate'])
+                                vatable = 'V'
+                                totalItem = quantity * price
+                                item_disc = float(dis['desc_rate'])
+                                vat_exempt =  0
+                                disc_amt  = float(dis['Discount'])
+                                net_total = (totalItem - disc_amt)
+                                vat_amt = ((totalItem - disc_amt) / 1.12) * 0.12
+                                unit_cost = (totalItem) 
+                                Vatable_Amount = (totalItem + Vatable_Amount) - disc_amt
+
                     else:
                         if productInfo.tax_code == 'VAT':
+                            DiscountType = ''
                             vatable = 'V'
-                            desc_rate = item_disc / (quantity * price) * 100
-                            vat_amt = (((quantity * price) - item_disc) / 1.12) * 0.12
-                            net_total = (quantity * price) - item_disc - vat_amt
+                            totalItem = quantity * price
+                            desc_rate = item_disc / (totalItem) * 100
+                            vat_amt = ((totalItem - item_disc) / 1.12) * 0.12
+                            disc_amt = item_disc
+                            net_total = (totalItem - item_disc)
+                            Vatable_Amount = (totalItem + Vatable_Amount)
+                            unit_cost = totalItem
                         else:
                             vatable = 'N'
                             vat_amt = 0
@@ -3312,15 +4030,21 @@ def save_multiple_payment(request):
                     pass  # You might want to log this or handle it according to your logic
                     
 
-                total_disc_amt = total_disc_amt + desc_rate
-                total_desc_rate= total_desc_rate + desc_rate
-                total_vat_amt = total_vat_amt + vat_amt
-
+                # total_disc_amt = total_disc_amt + float(disc_amt)
+                # total_desc_rate= total_desc_rate + desc_rate
+                # total_vat_amt = total_vat_amt + vat_amt
+                print('tmp_cart_item_discount',tmp_cart_item_discount)
                 if DiscountType == 'SC':
-                    total_vat_exempt = total_vat_exempt + net_total
-                    print('total_vat_exempt',total_vat_exempt)
+                    total_vat_exempt = vat_exempt + total_vat_exempt
+                    total_disc_amt = float(disc_amt) +float(total_disc_amt)
+                    total_desc_rate= desc_rate 
+                    total_vat_amt = vat_amt + total_vat_amt
                 else:
                     total_net_total = total_net_total + net_total
+                    total_vat_exempt = vat_exempt + total_vat_exempt
+                    total_disc_amt = float(disc_amt) + float(total_disc_amt)
+                    total_desc_rate= desc_rate 
+                    total_vat_amt = vat_amt + total_vat_amt
                 
                 # pdb.set_trace()
                 totalQty = totalQty + float(items['quantity'])
@@ -3358,18 +4082,104 @@ def save_multiple_payment(request):
                     vat_amt =  f"{vat_amt:.3f}",
                     vat_exempt = f"{vat_exempt:.3f}",
                     net_total =  f"{net_total:.3f}",
-                    isvoid = 'No',
-                    unit_cost = '0',
+                    isvoid = 'NO',
+                    unit_cost = unit_cost,
                     vatable = vatable,
                     status = 'A',
                     so_no =items['sales_trans_id'],
                     so_doc_no =items['sales_trans_id'],
                     sn_bc = '',
-                    discounted_by = '',
+                    discounted_by = Discounted_by,
                     
                 )
                 SaveToPOSSalesInvoiceListing.save()
 
+
+            if DiscountType == 'ITEM' or DiscountType == 'TRANSACTION':
+                for items in tmp_cart_item_discount:
+                    productInfo = Product.objects.filter(bar_code=items['barcode']).first()
+                    if productInfo is not None:
+                        quantity = float(items['quantity'])
+                        price = float(items['price'])
+                        item_disc = float(items['item_disc'])
+                        total_sub_total = total_sub_total + (quantity * price)
+                        if productInfo.tax_code == 'VAT':
+                                DiscountType = ''
+                                vatable = 'V'
+                                totalItem = quantity * price
+                                desc_rate = item_disc / (totalItem) * 100
+                                vat_amt = ((totalItem - item_disc) / 1.12) * 0.12
+                                disc_amt = item_disc
+                                net_total = (totalItem - item_disc)
+                                Vatable_Amount = (totalItem + Vatable_Amount)
+                                unit_cost = totalItem
+                        else:
+                                vatable = 'N'
+                                vat_amt = 0
+                                disc_amt = item_disc
+                                net_total = (quantity * price) - disc_amt
+                    else:
+                        # Handle case where productInfo is None (no product found for the barcode)
+                        pass  # You might want to log this or handle it according to your logic
+                        
+
+                    total_net_total = total_net_total + net_total
+                    total_vat_exempt = vat_exempt + total_vat_exempt
+                    total_disc_amt = float(disc_amt) + float(total_disc_amt)
+                    total_desc_rate= desc_rate 
+                    total_vat_amt = vat_amt + total_vat_amt
+                    
+                    # pdb.set_trace()
+                    totalQty = totalQty + float(items['quantity'])
+                    if so_no == '':
+                        so_no = items['sales_trans_id']
+                    else:
+                        if so_no == items['sales_trans_id']:
+                            so_no = so_no
+                        else:
+                            so_no = so_no + ', ' + items['sales_trans_id']
+
+                    so_doc_no = so_no
+                    SaveToPOSSalesInvoiceListing = PosSalesInvoiceListing(
+                        company_code = f"{companyCode.autonum:0>4}",
+                        ul_code = machineInfo.ul_code,
+                        terminal_no = TerminalNo,
+                        site_code = int(machineInfo.site_no),
+                        cashier_id = cashier_id,
+                        doc_date = datetime_stamp,
+                        doc_no = doc_no,
+                        doc_type = 'POS-SI',
+                        line_number = items['line_no'],
+                        bar_code =items['barcode'],
+                        alternate_code = 0,
+                        item_code = items['barcode'],
+                        rec_qty = items['quantity'],
+                        rec_uom = productInfo.uom,
+                        description = items['description'],
+                        unit_price = items['price'],
+                        sub_total = float(items['quantity']) * float(items['price']),
+                        pc_price =  items['price'],
+                        qtyperuom = 1,
+                        disc_amt = f"{disc_amt:.3f}",
+                        desc_rate =f"{desc_rate:.3f}",
+                        vat_amt =  f"{vat_amt:.3f}",
+                        vat_exempt = f"{vat_exempt:.3f}",
+                        net_total =  f"{net_total:.3f}",
+                        isvoid = 'NO',
+                        unit_cost = unit_cost,
+                        vatable = vatable,
+                        status = 'A',
+                        so_no =items['sales_trans_id'],
+                        so_doc_no =items['sales_trans_id'],
+                        sn_bc = '',
+                        discounted_by = Discounted_by,
+                        
+                    )
+                    SaveToPOSSalesInvoiceListing.save()
+
+
+            Vatable_Amount = float(Vatable_Amount) - float(total_vat_amt)
+            
     
             net_vat = 0
             net_discount = 0
@@ -3396,7 +4206,19 @@ def save_multiple_payment(request):
                             so_no=so_no
                         )
                     saveSeniorData.save()
-                
+            
+            elif DiscountType == 'ITEM':
+                net_vat = total_sub_total - (total_disc_amt + total_vat_amt + total_vat_exempt)
+                net_discount = total_sub_total - (total_disc_amt + total_vat_exempt)
+
+            elif DiscountType == 'TRANSACTION':
+                DiscountType='TRSD'
+                net_vat = total_sub_total - (total_disc_amt + total_vat_amt + total_vat_exempt)
+                net_discount = total_sub_total - (total_disc_amt + total_vat_exempt)
+            elif DiscountType == 'TRADE':
+                DiscountType='TRD'
+                net_vat = total_sub_total - (total_disc_amt + total_vat_amt + total_vat_exempt)
+                net_discount = total_sub_total - (total_disc_amt + total_vat_exempt)
                 
             else:   
                 net_vat = total_sub_total - (total_disc_amt + total_vat_amt + total_vat_exempt)
@@ -3418,7 +4240,7 @@ def save_multiple_payment(request):
                     ul_code = machineInfo.ul_code,
                     site_code = int(machineInfo.site_no),
                     trans_type = 'Cash Sales',
-                    discount_type = '',
+                    discount_type = DiscountType,
                     doc_no = doc_no,
                     doc_type = 'POS-SI',
                     terminal_no = TerminalNo,
@@ -3443,18 +4265,12 @@ def save_multiple_payment(request):
                     total_eps =  "{:.3}".format(float(DebitCardAmount)),
                     total_credit_card = "{:.3f}".format(float(CreditCardAmount)),
                     total_qty = totalQty,
-                    discount = float(total_disc_amt),
-                    vat = float(total_vat_amt),
-                    vat_exempted = float(vat_exempted),
-                    net_vat = float(net_vat),
-                    net_discount = float(net_discount),
-                    sub_total = float(total_sub_total),
-                    # discount =  f"{total_disc_amt:.3f}" ,
-                    # vat = f"{total_vat_amt:.3f}",
-                    # vat_exempted =  f"{total_vat_exempt:.3f}",
-                    # net_vat = f"{net_vat:.3f}",
-                    # net_discount = f"{net_discount:.3f}",
-                    # sub_total = f"{total_sub_total:.3f}",
+                    discount = float(str(total_disc_amt).replace(',', '')),
+                    vat = float(str(total_vat_amt).replace(',', '')),
+                    vat_exempted = float(str(vat_exempted).replace(',', '')),
+                    net_vat = float(str(net_vat).replace(',', '')),
+                    net_discount = float(str(net_discount).replace(',', '')),
+                    sub_total = float(str(total_sub_total).replace(',', '')),
                     lvl1_disc = '0',
                     lvl2_disc = '0',
                     lvl3_disc = '0',
@@ -3528,7 +4344,7 @@ def save_multiple_payment(request):
                 'TelNo':'TEL NOS:785-462',
                 'OR':doc_no,
                 'VAT': '{:,.2f}'.format(total_vat_amt),
-                'VATable': '{:,.2f}'.format(total_net_total),
+                'VATable': '{:,.2f}'.format(Vatable_Amount),
                 'Discount': '{:,.2f}'.format(total_disc_amt),
                 'Discount_Rate': '{:,.2f}'.format(total_desc_rate),
                 'VatExempt': '{:,.2f}'.format(total_vat_exempt),
@@ -3580,11 +4396,16 @@ def save_charge_payment(request):
             # doc_no = get_sales_transaction_id(TerminalNo,'POS CI')
             DiscountType = received_data.get('DiscountType')
             DiscountData= received_data.get('DiscountData')
+            Discounted_by= received_data.get('Discounted_by')
             QueNo= received_data.get('QueNo')
             Charge = received_data.get('Charge')
             doctype = received_data.get('doctype')
             doc_no = get_sales_transaction_id(TerminalNo,doctype)
             # CreditCardPaymentListData = CreditCard.get("CreditCardPaymentList")
+            
+
+            waiterName=''
+            
             CategoryID = '0'
             CustomerID ='0'
             CustomerName = ''
@@ -3608,7 +4429,7 @@ def save_charge_payment(request):
             # Generate a new details_id for the next record
             new_details_id = last_details_id + 1
             Charge_payments = Charge.get('ChargeCustomerAccount', [])
-            print('Charge_payments',Charge_payments)
+        
             if Charge_payments:
                 CategoryID = Charge_payments.get('CategoryID')
                 Category = Charge_payments.get('Category')
@@ -3617,7 +4438,6 @@ def save_charge_payment(request):
                 Terms = Charge_payments.get('Terms')
                 CreditLimit = Charge_payments.get('CreditLimit')
                 Amountdue = Charge_payments.get('Amountdue')
-                print('CategoryID',CategoryID)
 
                 save_Charge = PosSalesTransCreditSale (
                     sales_trans_id = int(float(doc_no)),
@@ -3673,12 +4493,116 @@ def save_charge_payment(request):
             vatable = ''
             totalQty = 0
             desc_rate = 0
+            unit_cost = 0
+            Vatable_Amount = 0
 
                 
             
 
+            # for items in cart_items:
+            #     productInfo = Product.objects.filter(bar_code=items['barcode']).first()
+
+            #     if productInfo is not None:
+            #         quantity = float(items['quantity'])
+            #         price = float(items['price'])
+            #         item_disc = float(items['item_disc'])
+            #         total_sub_total = total_sub_total + (quantity * price)
+                    
+            #         if DiscountType == 'SC':
+            #             vatable = 'Es'
+            #             desc_rate = 20
+            #             totalItem = quantity * price
+                        
+            #             NetSale =  totalItem / (0.12 + 1 )
+            #             vat_exempt =  totalItem - NetSale
+            #             disc_amt  = (totalItem - vat_exempt ) * 0.2
+            #             net_total = (quantity * price) - (disc_amt + vat_exempt)
+                        
+            #             print('NetSale',NetSale)
+            #             print('vat_exempt',vat_exempt)
+            #             print('disc_amt',disc_amt)
+            #             print('net_total',net_total)
+                    
+                        
+            #         else:
+            #             if productInfo.tax_code == 'VAT':
+            #                 vatable = 'V'
+            #                 desc_rate = item_disc / (quantity * price) * 100
+            #                 vat_amt = (((quantity * price) - item_disc) / 1.12) * 0.12
+            #                 net_total = (quantity * price) - item_disc - vat_amt
+            #             else:
+            #                 vatable = 'N'
+            #                 vat_amt = 0
+            #                 disc_amt = item_disc
+            #                 net_total = (quantity * price) - disc_amt
+            #     else:
+            #         # Handle case where productInfo is None (no product found for the barcode)
+            #         pass  # You might want to log this or handle it according to your logic
+                    
+
+            #     total_disc_amt = total_disc_amt + desc_rate
+            #     total_desc_rate= total_desc_rate + desc_rate
+            #     total_vat_amt = total_vat_amt + vat_amt
+
+            #     if DiscountType == 'SC':
+            #         total_vat_exempt = total_vat_exempt + net_total
+            #         print('total_vat_exempt',total_vat_exempt)
+            #     else:
+            #         total_net_total = total_net_total + net_total
+                
+            #     # pdb.set_trace()
+            #     totalQty = totalQty + float(items['quantity'])
+            #     if so_no == '':
+            #         so_no = items['sales_trans_id']
+            #     else:
+            #         if so_no == items['sales_trans_id']:
+            #             so_no = so_no
+            #         else:
+            #             so_no = so_no + ', ' + items['sales_trans_id']
+            #     so_doc_no = so_no
+
+            #     SaveToPOSSalesInvoiceListing = PosSalesInvoiceListing(
+            #         company_code = f"{companyCode.autonum:0>4}",
+            #         ul_code = machineInfo.ul_code,
+            #         terminal_no = TerminalNo,
+            #         site_code = int(machineInfo.site_no),
+            #         cashier_id = cashier_id,
+            #         doc_date = datetime_stamp,
+            #         doc_no = doc_no,
+            #         doc_type = 'POS-CI',
+            #         line_number = items['line_no'],
+            #         bar_code =items['barcode'],
+            #         alternate_code = 0,
+            #         item_code = items['barcode'],
+            #         rec_qty = items['quantity'],
+            #         rec_uom = productInfo.uom,
+            #         description = items['description'],
+            #         unit_price = items['price'],
+            #         sub_total = float(items['quantity']) * float(items['price']),
+            #         pc_price =  items['price'],
+            #         qtyperuom = 1,
+            #         disc_amt = f"{disc_amt:.3f}",
+            #         desc_rate =f"{desc_rate:.3f}",
+            #         vat_amt =  f"{vat_amt:.3f}",
+            #         vat_exempt = f"{vat_exempt:.3f}",
+            #         net_total =  f"{net_total:.3f}",
+            #         isvoid = 'No',
+            #         unit_cost = '0',
+            #         vatable = vatable,
+            #         status = 'A',
+            #         so_no =items['sales_trans_id'],
+            #         so_doc_no =items['sales_trans_id'],
+            #         sn_bc = '',
+            #         discounted_by = '',
+                    
+            #     )
+            #     SaveToPOSSalesInvoiceListing.save()
+
+    
+            tmp_cart_item_discount = cart_items
             for items in cart_items:
                 productInfo = Product.objects.filter(bar_code=items['barcode']).first()
+                
 
                 if productInfo is not None:
                     quantity = float(items['quantity'])
@@ -3687,27 +4611,91 @@ def save_charge_payment(request):
                     total_sub_total = total_sub_total + (quantity * price)
                     
                     if DiscountType == 'SC':
+                        print(DiscountData)
+                        print(DiscountData.get('SAmountCovered').replace(',',''))
+                        SCAmmountCovered = float(DiscountData.get('SAmountCovered').replace(',',''))
+                        SLess20SCDiscount = float(DiscountData.get('SLess20SCDiscount').replace(',',''))
+                        SLessVat12 =  float(DiscountData.get('SLessVat12').replace(',',''))
+                        SNetOfVat =  float(DiscountData.get('SNetOfVat').replace(',',''))
+                        SVatSales =  float(DiscountData.get('SVatSales').replace(',',''))
                         vatable = 'Es'
                         desc_rate = 20
                         totalItem = quantity * price
-                        
+                            
                         NetSale =  totalItem / (0.12 + 1 )
-                        vat_exempt =  totalItem - NetSale
-                        disc_amt  = (totalItem - vat_exempt ) * 0.2
-                        net_total = (quantity * price) - (disc_amt + vat_exempt)
-                        
+                        vat_exempt =  (totalItem / (0.12 + 1 ) * 0.12) * (SCAmmountCovered / SVatSales)
+                        disc_amt  = (totalItem / (0.12 + 1 ) * 0.2) * (SCAmmountCovered / SVatSales)
+                        net_total = (totalItem) - (disc_amt + vat_exempt)
+                        vat_amt =(totalItem / (0.12 + 1 ) * 0.12) * (SVatSales -SCAmmountCovered) / SVatSales
+                        Vatable_Amount = SVatSales - SCAmmountCovered
+                        # NetSale =  totalItem / (0.12 + 1 )
+                        # vat_exempt = (SCAmmountCovered - SLess20SCDiscount) - SLessVat12
+                        # disc_amt  = SLess20SCDiscount
+                        # net_total = (quantity * price) - (disc_amt + vat_exempt)
+                        # vat_amt = ((SVatSales - SCAmmountCovered) * 12) / 112
+                        # Vatable_Amount = (SVatSales - SCAmmountCovered) - vat_amt
                         print('NetSale',NetSale)
                         print('vat_exempt',vat_exempt)
                         print('disc_amt',disc_amt)
                         print('net_total',net_total)
                     
-                        
+                    elif DiscountType =='ITEM':
+                        for dis in DiscountData:
+
+                            lineNO = 0
+                            if dis.get('line_no') is None:
+                                lineNO = dis.get('LineNo', 0)  # Use 'lineno' with a default value of 0 if 'line_no' is None
+                            else:
+                                lineNO = dis['line_no']
+
+                            if dis['Barcode'] == items['barcode'] and lineNO == items['line_no']:
+                                
+                                for x in tmp_cart_item_discount:
+                                    if x['barcode'] == items['barcode'] and x['line_no'] == items['line_no']:
+                                        tmp_cart_item_discount.remove(x)
+                                vatable = 'V'
+                                desc_rate = float(dis['D1'])
+                                totalItem = quantity * price
+                                item_disc = float(dis['D1'])
+                                NetSale =  float(dis['DiscountedPrice'])
+                                vat_exempt =  0
+                                disc_amt  = float(dis['ByAmount'])
+                                net_total = (totalItem - disc_amt)
+                                vat_amt = ((totalItem - disc_amt) / 1.12) * 0.12
+                                unit_cost = (totalItem) 
+                                Vatable_Amount = (totalItem + Vatable_Amount) - disc_amt
+                    elif DiscountType =='TRANSACTION':
+                        print(DiscountData)
+                        for dis in DiscountData:
+                            lineNO = 0
+                            if dis.get('line_no') is None:
+                                lineNO = dis.get('lineno', 0)  # Use 'lineno' with a default value of 0 if 'line_no' is None
+                            else:
+                                lineNO = dis['line_no']
+
+                            if dis['barcode'] == items['barcode'] and lineNO == items['line_no']:
+                                desc_rate = float(dis['desc_rate'])
+                                vatable = 'V'
+                                totalItem = quantity * price
+                                item_disc = float(dis['desc_rate'])
+                                vat_exempt =  0
+                                disc_amt  = float(dis['Discount'])
+                                net_total = (totalItem - disc_amt)
+                                vat_amt = ((totalItem - disc_amt) / 1.12) * 0.12
+                                unit_cost = (totalItem) 
+                                Vatable_Amount = (totalItem + Vatable_Amount) - disc_amt
+
                     else:
                         if productInfo.tax_code == 'VAT':
+                            DiscountType = ''
                             vatable = 'V'
-                            desc_rate = item_disc / (quantity * price) * 100
-                            vat_amt = (((quantity * price) - item_disc) / 1.12) * 0.12
-                            net_total = (quantity * price) - item_disc - vat_amt
+                            totalItem = quantity * price
+                            desc_rate = item_disc / (totalItem) * 100
+                            vat_amt = ((totalItem - item_disc) / 1.12) * 0.12
+                            disc_amt = item_disc
+                            net_total = (totalItem - item_disc)
+                            Vatable_Amount = (totalItem + Vatable_Amount)
+                            unit_cost = totalItem
                         else:
                             vatable = 'N'
                             vat_amt = 0
@@ -3718,15 +4706,21 @@ def save_charge_payment(request):
                     pass  # You might want to log this or handle it according to your logic
                     
 
-                total_disc_amt = total_disc_amt + desc_rate
-                total_desc_rate= total_desc_rate + desc_rate
-                total_vat_amt = total_vat_amt + vat_amt
-
+                # total_disc_amt = total_disc_amt + float(disc_amt)
+                # total_desc_rate= total_desc_rate + desc_rate
+                # total_vat_amt = total_vat_amt + vat_amt
+                print('tmp_cart_item_discount',tmp_cart_item_discount)
                 if DiscountType == 'SC':
-                    total_vat_exempt = total_vat_exempt + net_total
-                    print('total_vat_exempt',total_vat_exempt)
+                    total_vat_exempt = vat_exempt + total_vat_exempt
+                    total_disc_amt = float(disc_amt) +float(total_disc_amt)
+                    total_desc_rate= desc_rate 
+                    total_vat_amt = vat_amt + total_vat_amt
                 else:
                     total_net_total = total_net_total + net_total
+                    total_vat_exempt = vat_exempt + total_vat_exempt
+                    total_disc_amt = float(disc_amt) + float(total_disc_amt)
+                    total_desc_rate= desc_rate 
+                    total_vat_amt = vat_amt + total_vat_amt
                 
                 # pdb.set_trace()
                 totalQty = totalQty + float(items['quantity'])
@@ -3737,8 +4731,8 @@ def save_charge_payment(request):
                         so_no = so_no
                     else:
                         so_no = so_no + ', ' + items['sales_trans_id']
-                so_doc_no = so_no
 
+                so_doc_no = so_no
                 SaveToPOSSalesInvoiceListing = PosSalesInvoiceListing(
                     company_code = f"{companyCode.autonum:0>4}",
                     ul_code = machineInfo.ul_code,
@@ -3747,7 +4741,7 @@ def save_charge_payment(request):
                     cashier_id = cashier_id,
                     doc_date = datetime_stamp,
                     doc_no = doc_no,
-                    doc_type = 'POS-CI',
+                    doc_type = 'POS-SI',
                     line_number = items['line_no'],
                     bar_code =items['barcode'],
                     alternate_code = 0,
@@ -3764,19 +4758,104 @@ def save_charge_payment(request):
                     vat_amt =  f"{vat_amt:.3f}",
                     vat_exempt = f"{vat_exempt:.3f}",
                     net_total =  f"{net_total:.3f}",
-                    isvoid = 'No',
-                    unit_cost = '0',
+                    isvoid = 'NO',
+                    unit_cost = unit_cost,
                     vatable = vatable,
                     status = 'A',
                     so_no =items['sales_trans_id'],
                     so_doc_no =items['sales_trans_id'],
                     sn_bc = '',
-                    discounted_by = '',
+                    discounted_by = Discounted_by,
                     
                 )
                 SaveToPOSSalesInvoiceListing.save()
 
-    
+
+            if DiscountType == 'ITEM' or DiscountType == 'TRANSACTION':
+                for items in tmp_cart_item_discount:
+                    productInfo = Product.objects.filter(bar_code=items['barcode']).first()
+                    if productInfo is not None:
+                        quantity = float(items['quantity'])
+                        price = float(items['price'])
+                        item_disc = float(items['item_disc'])
+                        total_sub_total = total_sub_total + (quantity * price)
+                        if productInfo.tax_code == 'VAT':
+                                DiscountType = ''
+                                vatable = 'V'
+                                totalItem = quantity * price
+                                desc_rate = item_disc / (totalItem) * 100
+                                vat_amt = ((totalItem - item_disc) / 1.12) * 0.12
+                                disc_amt = item_disc
+                                net_total = (totalItem - item_disc)
+                                Vatable_Amount = (totalItem + Vatable_Amount)
+                                unit_cost = totalItem
+                        else:
+                                vatable = 'N'
+                                vat_amt = 0
+                                disc_amt = item_disc
+                                net_total = (quantity * price) - disc_amt
+                    else:
+                        # Handle case where productInfo is None (no product found for the barcode)
+                        pass  # You might want to log this or handle it according to your logic
+                        
+
+                    total_net_total = total_net_total + net_total
+                    total_vat_exempt = vat_exempt + total_vat_exempt
+                    total_disc_amt = float(disc_amt) + float(total_disc_amt)
+                    total_desc_rate= desc_rate 
+                    total_vat_amt = vat_amt + total_vat_amt
+                    
+                    # pdb.set_trace()
+                    totalQty = totalQty + float(items['quantity'])
+                    if so_no == '':
+                        so_no = items['sales_trans_id']
+                    else:
+                        if so_no == items['sales_trans_id']:
+                            so_no = so_no
+                        else:
+                            so_no = so_no + ', ' + items['sales_trans_id']
+
+                    so_doc_no = so_no
+                    SaveToPOSSalesInvoiceListing = PosSalesInvoiceListing(
+                        company_code = f"{companyCode.autonum:0>4}",
+                        ul_code = machineInfo.ul_code,
+                        terminal_no = TerminalNo,
+                        site_code = int(machineInfo.site_no),
+                        cashier_id = cashier_id,
+                        doc_date = datetime_stamp,
+                        doc_no = doc_no,
+                        doc_type = 'POS-SI',
+                        line_number = items['line_no'],
+                        bar_code =items['barcode'],
+                        alternate_code = 0,
+                        item_code = items['barcode'],
+                        rec_qty = items['quantity'],
+                        rec_uom = productInfo.uom,
+                        description = items['description'],
+                        unit_price = items['price'],
+                        sub_total = float(items['quantity']) * float(items['price']),
+                        pc_price =  items['price'],
+                        qtyperuom = 1,
+                        disc_amt = f"{disc_amt:.3f}",
+                        desc_rate =f"{desc_rate:.3f}",
+                        vat_amt =  f"{vat_amt:.3f}",
+                        vat_exempt = f"{vat_exempt:.3f}",
+                        net_total =  f"{net_total:.3f}",
+                        isvoid = 'NO',
+                        unit_cost = unit_cost,
+                        vatable = vatable,
+                        status = 'A',
+                        so_no =items['sales_trans_id'],
+                        so_doc_no =items['sales_trans_id'],
+                        sn_bc = '',
+                        discounted_by = Discounted_by,
+                        
+                    )
+                    SaveToPOSSalesInvoiceListing.save()
+
+
+            Vatable_Amount = float(Vatable_Amount) - float(total_vat_amt)
+           
             net_vat = 0
             net_discount = 0
             vat_exempted = 0
@@ -3803,9 +4882,18 @@ def save_charge_payment(request):
                         )
                     saveSeniorData.save()
                 
-                
-                
-                
+            elif DiscountType == 'ITEM':
+                net_vat = total_sub_total - (total_disc_amt + total_vat_amt + total_vat_exempt)
+                net_discount = total_sub_total - (total_disc_amt + total_vat_exempt)
+
+            elif DiscountType == 'TRANSACTION':
+                DiscountType='TRSD'
+                net_vat = total_sub_total - (total_disc_amt + total_vat_amt + total_vat_exempt)
+                net_discount = total_sub_total - (total_disc_amt + total_vat_exempt)
+            elif DiscountType == 'TRADE':
+                DiscountType='TRD'
+                net_vat = total_sub_total - (total_disc_amt + total_vat_amt + total_vat_exempt)
+                net_discount = total_sub_total - (total_disc_amt + total_vat_exempt)
             else:   
                 net_vat = total_sub_total - (total_disc_amt + total_vat_amt + total_vat_exempt)
                 net_discount = total_sub_total - (total_disc_amt + total_vat_exempt)
@@ -3818,16 +4906,15 @@ def save_charge_payment(request):
             AmountDue_float = float(AmountDue_float)       
             AmountDue_formatted = f"{AmountDue_float:.3f}"
 
-            print('cus-address',CusAddress)
-            total_disc_amt = float(total_disc_amt)
-            total_desc_rate = float(total_desc_rate)
-            total_vat_exempt = float(total_vat_exempt)
+            total_disc_amt = float(str(total_disc_amt).replace(',', ''))
+            total_desc_rate = float(str(total_desc_rate).replace(',', ''))
+            total_vat_exempt = float(str(total_vat_exempt).replace(',', ''))
             SaveToPOSSalesInvoiceList = PosSalesInvoiceList (
                     company_code = f"{companyCode.autonum:0>4}",
                     ul_code = machineInfo.ul_code,
                     site_code = int(machineInfo.site_no),
                     trans_type = 'Credit Sales',
-                    discount_type = '',
+                    discount_type = DiscountType,
                     doc_no = doc_no,
                     doc_type = 'POS-CI',
                     terminal_no = TerminalNo,
@@ -3850,12 +4937,12 @@ def save_charge_payment(request):
                     ServiceCharge_TotalAmount = 0 ,
                     total_eps =  AmountDue_formatted,
                     total_qty = totalQty,
-                    discount = float(total_disc_amt),
-                    vat = float(total_vat_amt),
-                    vat_exempted = float(vat_exempted),
-                    net_vat = float(net_vat),
-                    net_discount = float(net_discount),
-                    sub_total = float(total_sub_total),
+                    discount = float(str(total_disc_amt).replace(',', '')),
+                    vat = float(str(total_vat_amt).replace(',', '')),
+                    vat_exempted = float(str(vat_exempted).replace(',', '')),
+                    net_vat = float(str(net_vat).replace(',', '')),
+                    net_discount = float(str(net_discount).replace(',', '')),
+                    sub_total = float(str(total_sub_total).replace(',', '')),
                     # discount =  f"{total_disc_amt:.3f}" ,
                     # vat = f"{total_vat_amt:.3f}",
                     # vat_exempted =  f"{total_vat_exempt:.3f}",
@@ -3935,7 +5022,7 @@ def save_charge_payment(request):
                 'TelNo':'TEL NOS:785-462',
                 'OR':doc_no,
                 'VAT': '{:,.2f}'.format(total_vat_amt),
-                'VATable': '{:,.2f}'.format(total_net_total),
+                'VATable': '{:,.2f}'.format(Vatable_Amount),
                 'Discount': '{:,.2f}'.format(total_disc_amt),
                 'Discount_Rate': '{:,.2f}'.format(total_desc_rate),
                 'VatExempt': '{:,.2f}'.format(total_vat_exempt),

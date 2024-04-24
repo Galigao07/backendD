@@ -23,7 +23,7 @@ from datetime import date
 from django.db.models import Max
 # Get current date
 from backend.globalFunction import GetPHilippineDate,GetPHilippineDateTime
-
+from django.db.models import Q
 from django.core.exceptions import PermissionDenied
 from django.db import IntegrityError
 
@@ -207,7 +207,7 @@ def verification_account(request):
         password = request.GET.get('password')
         hashed_password = make_password(password)
 
-        user = User.objects.filter(user_name=username).first()
+        user = User.objects.filter(user_name=username, user_rank__in=['Supervisor', 'Administrator']).first()
         stored_hashed_password = user.password
         if user is not None:
             if check_password(password, stored_hashed_password):

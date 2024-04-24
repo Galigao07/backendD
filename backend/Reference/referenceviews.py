@@ -8,11 +8,11 @@ from django.conf import settings
 from django.http import FileResponse, JsonResponse
 from rest_framework.response import Response
 from backend.models import (Product,PosRestTable,PosSalesOrder,PosSalesTransDetails,InvRefNo,POS_Terminal,PosSalesTrans,PosSalesInvoiceList,PosSalesInvoiceListing,
-                            CompanySetup,Customer,PosWaiterList,PosPayor,User,Employee,LeadSetup,PosClientSetup,PosCashiersLogin,PosCashBreakdown)
+                            CompanySetup,Customer,PosWaiterList,PosPayor,User,Employee,LeadSetup,PosClientSetup,PosCashiersLogin,PosCashBreakdown,PosVideo)
 from backend.serializers import (ProductSerializer,ProductCategorySerializer,PosSalesOrderSerializer,PosSalesTransDetailsSerializer,PosSalesTransSerializer,
                                  PosSalesInvoiceListing,PosSalesInvoiceList,CustomerSerializer,PosWaiterListSerializer,PosPayorSerializer,PosSalesInvoiceListSerializer,
                                  UserSerializer,EmployeeSetupSerializer,PosRestTableSerializer,POS_TerminalSerializer,LeadSetupSerializer,PosClientSetupSerializer,
-                                 PosCashiersLoginpSerializer,PosCashBreakdownSerializer)
+                                 PosCashiersLoginpSerializer,PosCashBreakdownSerializer,PosVideoSerializer)
 from rest_framework.decorators import api_view
 from rest_framework.views import APIView
 from django.db.models import Min,Max
@@ -412,10 +412,18 @@ def UploadVideo(request):
                 # Get the desktop path
                 username = os.getlogin()
                 desktop_path = os.path.join('C:/Users', username, 'Desktop')
-
+                serial_number = get_serial_number()
+                machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number.strip()).first()
                 # Save the file to the desktop
                 filename = video_file.name
                 filepath = os.path.join(desktop_path, filename)
+                SaveVideo = PosVideo(
+                    filepath = desktop_path,
+                    filename = filename,
+                    serial_no = machineInfo.Serial_no,
+                )
+                SaveVideo.save()
+
                 with open(filepath, 'wb') as destination:
                     # Write the file content to the destination
                     for chunk in video_file.chunks():
@@ -431,33 +439,44 @@ def UploadVideo(request):
             traceback.print_exc()
     elif request.method == 'GET':
         try:
-            desktop_path = os.path.join('C:/Users', os.getlogin(), 'Desktop')
-            # Check if the desktop directory exists
-            if os.path.isdir(desktop_path):
-                # List all files on the desktop
-                video_files = [f for f in os.listdir(desktop_path) if os.path.isfile(os.path.join(desktop_path, f))]
-
-                # Sort files by modification time (latest first)
-                video_files.sort(key=lambda x: os.path.getmtime(os.path.join(desktop_path, x)), reverse=True)
-
-                # Get the path to the latest video file on the desktop
-                if video_files:
-                    latest_video_file = os.path.join(desktop_path, video_files[0])
-                    with open(latest_video_file, 'rb') as file:
-                        file_content = file.read()
-
-                        # Encode the file content to Base64
-                        base64_content = base64.b64encode(file_content).decode()
-
-                        # Construct the data URL
-                        data_url = f'data:video/mp4;base64,{base64_content}'
-                    # print(data_url)
-                    return JsonResponse({'data': data_url})
-                    # Serve the latest video file
-                else:
-                    return Response({'error': 'No videos found on the desktop'}, status=404)
-            else:
-                return Response({'error': 'Desktop directory not found'}, status=404)
+            # desktop_path = os.path.join('C:/Users', os.getlogin(), 'Desktop')
+            serial_number = get_serial_number()  # Ensure this function is implemented correctly
+            machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number.strip()).first()
+            
+            if machineInfo:
+                path = PosVideo.objects.filter(serial_no=machineInfo.Serial_no).first()
+                
+                if path and path.filepath:
+                    # pdb.set_trace()
+                    desktop_path = path.filepath
+                    desktop_path = os.path.normpath(desktop_path)
+                    filename = path.filename  # Assuming filename is a field in PosVideo model
+                    
+                    if os.path.isdir(desktop_path):
+                        # List all files on the desktop
+                        video_files = [f for f in os.listdir(desktop_path) if os.path.isfile(os.path.join(desktop_path, f))]
+                        
+                        # Filter video files by filename (if specified)
+                        if filename:
+                            video_files = [f for f in video_files if f.lower() == filename.lower()]
+                        
+                        # Sort files by modification time (latest first)
+                        video_files.sort(key=lambda x: os.path.getmtime(os.path.join(desktop_path, x)), reverse=True)
+                        
+                        # Get the path to the latest video file on the desktop
+                        if video_files:
+                            latest_video_file = os.path.join(desktop_path, video_files[0])
+                            
+                            with open(latest_video_file, 'rb') as file:
+                                file_content = file.read()
+                                
+                                # Encode the file content to Base64
+                                base64_content = base64.b64encode(file_content).decode()
+                                
+                                # Construct the data URL
+                                data_url = f'data:video/mp4;base64,{base64_content}'
+                                
+                                return JsonResponse({'data': data_url})
         except Exception as e:
             print(e)
             traceback.print_exc()
@@ -665,40 +684,45 @@ def CustomerDetails(request):
                 customers = Customer.objects.filter(trade_name__icontains=trade_name).values('id_code', 'trade_name')
                 return JsonResponse(list(customers), safe=False)
         elif request.method == 'POST':
-            data = request.data
-            base64_image = data.get('image')
-            if base64_image:
-                image = base64.b64decode(base64_image.split(',')[1])
-            
-            SaveCustomer = Customer(
-                id_code = data['ID_Code'],
-                trade_name = data['Tradename'],
-                last_name = data['Lname'],
-                first_name = data['Fname'],
-                middle_name = data['MI'],
-                business_phone_no = data['Phone'],
-                mobile_no = data['Mobile'],
-                fax_no = data['Fax'],
-                st_address = data['Address'],
-                city_address = data['City'],
-                # address = data['Address'],
-                # city_municipality = data['City'],
-                province = data['Province'],
-                zip_code = data['ZipCode'],
-                vat = data['Vat'],
-                                # vat_registration_type = data['Vat'],
-                tax_id_no = data['Tax'],
-                group_name = data['Group'],
-                area_name = data['Area'],
-                agent_name = data['Agent'],
-                collector_name = data['Collector'],
-                kob_name = data['KOB'],
-                sl_sub_category_description = data['sl'],
-                remarks = data['Remarks'],
-                customer_image = image,
-            )
-            SaveCustomer.save()
-            return Response({'mesage':'Customer Successfully Added'})
+            try:
+                data = request.data
+                # pdb.set_trace()
+                base64_image = data.get('image')
+                if base64_image:
+                    image = base64.b64decode(base64_image.split(',')[1])
+                
+                SaveCustomer = Customer(
+                    id_code = data['ID_Code'],
+                    trade_name = data['Tradename'],
+                    last_name = data['Lname'],
+                    first_name = data['Fname'],
+                    middle_name = data['MI'],
+                    business_phone_no = data['Phone'],
+                    mobile_no = data['Mobile'],
+                    fax_no = data['Fax'],
+                    st_address = data['Address'],
+                    city_address = data['City'],
+                    # address = data['Address'],
+                    # city_municipality = data['City'],
+                    province = data['Province'],
+                    zip_code = data['ZipCode'],
+                    vat = data['Vat'],
+                                    # vat_registration_type = data['Vat'],
+                    tax_id_no = data['Tax'],
+                    group_name = data['Group'],
+                    area_name = data['Area'],
+                    agent_name = data['Agent'],
+                    collector_name = data['Collector'],
+                    kob_name = data['KOB'],
+                    # sl_sub_category_description = data['sl'],
+                    remarks = data['Remarks'],
+                    customer_image = image,
+                )
+                SaveCustomer.save()
+                return Response({'mesage':'Customer Successfully Added'})
+            except Exception as e:
+                print(e)
+                traceback.print_exc()
     
         elif request.method == 'PUT':
             data = request.data

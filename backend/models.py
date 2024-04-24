@@ -672,11 +672,11 @@ class Customer(models.Model):
     date_entered = models.DateField(default='1900-01-01')
     ul_code = models.IntegerField(default=0)
     Concessionare = models.CharField(max_length=10, default='')
-    sys_type = models.CharField(max_length=11, default='')
-    joblot_no_ref = models.BigIntegerField(default=0)
+    # sys_type = models.CharField(max_length=11, default='')
+    # joblot_no_ref = models.BigIntegerField(default=0)
     sl_category = models.CharField(max_length=50, default='')
-    sl_sub_category_id = models.IntegerField(default=0)
-    sl_sub_category_description = models.CharField(max_length=50, default='')
+    # sl_sub_category_id = models.IntegerField(default=0)
+    # sl_sub_category_description = models.CharField(max_length=50, default='')
     class Meta:
         db_table = 'tbl_customer'
 
@@ -1332,6 +1332,15 @@ class PosCashPulloutDetails(models.Model):
         db_table = 'tbl_pos_cash_pullout_details'
         managed = False
 
+class PosVideo(models.Model):
+    autonum = models.BigAutoField(primary_key=True)
+    filepath = models.CharField(max_length=225, default='')
+    filename = models.CharField(max_length=225, default='')
+    serial_no = models.CharField(max_length=225, default='')
 
+    class Meta:
+        # Define the table name explicitly (optional)
+        db_table = 'tbl_pos_video'
+        managed = False
 
 
