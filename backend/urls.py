@@ -8,7 +8,7 @@ from .Restaurant.restaurantviews import (get_product_data, get_productCategory_d
                                          cash_breakdown,get_bank_card,get_bank_list,save_credit_card_payment,save_debit_card_payment,
                                          save_multiple_payment,get_waiter_name,get_sales_order_list_cancelled,get_sales_order_listing_cancelled,
                                          uncancelled_sales_order,transfer_table,get_customer_category,get_customer_with_category,save_charge_payment,
-                                         suspend_save_sales_order,get_sales_list_of_transaction)
+                                         suspend_save_sales_order,get_sales_list_of_transaction,cleared_table_dinein_order_and_pay)
 
 urlpatterns = [
     path('onscreen-keyboard/',call_onscreen_keyboard_windows, name='call_onscreen_keyboard_windows'),
@@ -60,5 +60,6 @@ urlpatterns = [
     path('customer-with-category/', get_customer_with_category, name='get_customer_with_category'), 
     path('susppend-sales-order/', suspend_save_sales_order, name='suspend_save_sales_order'), 
     path('sales-list-of-transaction/', get_sales_list_of_transaction, name='get_sales_list_of_transaction'), 
+    path('cleared-table/', cleared_table_dinein_order_and_pay, name='cleared_table_dinein_order_and_pay'), 
     
 ]

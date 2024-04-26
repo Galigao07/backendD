@@ -862,6 +862,7 @@ class PosSalesOrder(models.Model):
     table_no = models.IntegerField(null=True, default=None)
     q_no = models.DecimalField(max_digits=15, decimal_places=3, default=0.000)
     dinein_takeout = models.CharField(max_length=15, default=' ')
+    dinein_order_and_pay =models.CharField(max_length=6, default=None)
     guest_count = models.IntegerField(null=True, default=None)
     waiter_id = models.IntegerField(null=True, default=None)
     cashier_id = models.IntegerField(null=True, default=None)

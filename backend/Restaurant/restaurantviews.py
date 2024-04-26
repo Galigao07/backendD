@@ -307,6 +307,7 @@ def table_list_view(request):
             while table_count <= table.table_no + table.table_start:
                 paid_list ='Y'
                 susppend ='NO'
+                dinein_order_and_payData = ''
                 
                 serial_number = get_serial_number()
                 machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number.strip()).first()
@@ -314,14 +315,23 @@ def table_list_view(request):
                 susppend_list = PosSuspendList.objects.filter(table_no=table_count ,terminal_no = machineInfo.terminal_no,site_no = int(machineInfo.site_no))
                 if susppend_list.exists():
                     susppend = 'YES'
-
+                    
                 paid = PosSalesOrder.objects.filter(table_no=table_count ,paid = 'N',active = 'Y',terminal_no = machineInfo.terminal_no,site_code = int(machineInfo.site_no))
                 if paid.exists():
                     serializer = PosSalesOrderSerializer(paid, many=True)
                     for item in serializer.data:
                     
                         paid_list = item['paid']  # Assuming 'paid' is the correct field name
-                table_list.append({"table_count": table_count, "Paid": paid_list,"Susppend":susppend})
+                        # table_list.append({"table_count": table_count, "Paid": paid_list,"Susppend":susppend,'dinein_order_and_pay':''})
+               
+                dinein_orderpay = PosSalesOrder.objects.filter(table_no=table_count ,paid = 'Y',active = 'Y',dinein_order_and_pay = 'Y',
+                                                                    terminal_no = machineInfo.terminal_no,site_code = int(machineInfo.site_no))
+                if dinein_orderpay.exists():
+                    serializer1 = PosSalesOrderSerializer(dinein_orderpay, many=True)
+                    for item1 in serializer1.data:
+                        dinein_order_and_payData = item1['dinein_order_and_pay']  # Assuming 'paid' is the correct field name
+                    
+                table_list.append({"table_count": table_count, "Paid": paid_list,"Susppend":susppend,'dinein_order_and_pay':dinein_order_and_payData})
                 # print(table_list)
                 table_count += 1
 
@@ -329,6 +339,30 @@ def table_list_view(request):
     except Exception as e:
         print(e)
         traceback.print_exc()
+
+@api_view(['POST'])
+def cleared_table_dinein_order_and_pay(request):
+        try:
+            recieve_data = json.loads(request.body)
+            table_no = recieve_data.get('TableNo')
+            print('table_no',table_no)
+         
+            serial_number = get_serial_number()
+            machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number.strip()).first()
+            if table_no:
+                clear_table_data = PosSalesOrder.objects.filter(table_no = table_no,paid = 'Y',active = 'Y' ,dinein_order_and_pay = 'Y',
+                                                                terminal_no = machineInfo.terminal_no,site_code = int(machineInfo.site_no)).first()
+                if clear_table_data:
+                    clear_table_data.dinein_order_and_pay = None
+                    clear_table_data.save()
+                    return Response({"message": "Table Cleared"})
+
+        except Exception as e:
+            print(e)
+            traceback.print_exc(0)
+
+        
+
 
 #***************** GET WAITER NAME ************************
 @api_view(['GET'])
@@ -896,6 +930,7 @@ def save_sales_order(request):
             waiterID = data_from_modal.get('waiterID')
             payment_type = data_from_modal.get('PaymentType')
             QueNo = data_from_modal.get('QueNO')
+            print('Order And Pay',payment_type)
 
             if table_no == '':
                 table_no = 0
@@ -1010,28 +1045,36 @@ def save_sales_order(request):
                 SaveOrderToDetails.save()
                 
             # pdb.set_trace()
-            SaveToSalesOrder = PosSalesOrder(
-                SO_no = so_no,
-                document_no = min_sales_trans_id,
-                customer_type = 'W',
-                customer_name = customer,
-                table_no = table_no,
-                q_no = QueNo,
-                dinein_takeout = 'Dine In',
-                guest_count = guest_count,
-                waiter_id = int(waiterID),
-                cashier_id = cashier_id,
-                terminal_no = TerminalNo,
-                site_code = int(machineInfo.site_no),
-                date_trans = formatted_date ,
-                time_trans = formatted_time ,
-                paid = 'N',
-                active = 'Y',
-                
-            )
-            
+            # Common fields for both payment_type conditions
+            common_fields = {
+                'SO_no': so_no,
+                'document_no': min_sales_trans_id,
+                'customer_type': 'W',
+                'customer_name': customer,
+                'table_no': table_no,
+                'q_no': QueNo,
+                'dinein_takeout': 'Dine In',
+                'guest_count': guest_count,
+                'waiter_id': int(waiterID),
+                'cashier_id': cashier_id,
+                'terminal_no': TerminalNo,
+                'site_code': int(machineInfo.site_no),
+                'date_trans': formatted_date,
+                'time_trans': formatted_time,
+                'paid': 'N',
+                'active': 'Y',
+            }
+
+            # Check payment_type to determine additional fields
+            if payment_type == 'Order and Pay':
+                # Additional fields for payment_type 'Order And Pay'
+                common_fields['dinein_order_and_pay'] = 'Y'
+
+            # Create and save PosSalesOrder instance with common and conditional fields
+            SaveToSalesOrder = PosSalesOrder(**common_fields)
             SaveToSalesOrder.save()
-            
+
+           
             SaveToPosSalesTrans = PosSalesTrans(
                 login_record = 1,
                 sales_trans_id = min_sales_trans_id,
