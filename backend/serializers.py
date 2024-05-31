@@ -207,7 +207,12 @@ class PosWaiterListSerializer(serializers.ModelSerializer):
 class ProductSerializer(serializers.ModelSerializer):
     class Meta:
         model = Product
-        fields = ['bar_code', 'long_desc', 'reg_price','category']
+        fields = ['bar_code', 'long_desc', 'reg_price','category','prod_img']
+
+class Product2Serializer(serializers.ModelSerializer):
+    class Meta:
+        model = Product
+        fields = '__all__'
         
 class ProductCategorySerializer(serializers.ModelSerializer):
     class Meta:

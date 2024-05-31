@@ -549,13 +549,13 @@ class PosCashBreakdown(models.Model):
     total = models.DecimalField(max_digits=20, decimal_places=3, null=True, default=None)
     reviewed_by = models.IntegerField()
     parent_autonum_ref = models.CharField(max_length=50, default='')
-    sync_created = models.CharField(max_length=50, default='')
-    sync_status_server2 = models.CharField(max_length=4, default='NO')
-    sync_status_server1 = models.CharField(max_length=4, default='NO')
-    sync_status = models.CharField(max_length=4, default='NO')
-    sync_terminal_no = models.IntegerField(default=0)
-    sync_created_server1 = models.CharField(max_length=50, default='')
-    sync_created_server2 = models.CharField(max_length=50, default='')
+    # sync_created = models.CharField(max_length=50, default='')
+    # sync_status_server2 = models.CharField(max_length=4, default='NO')
+    # sync_status_server1 = models.CharField(max_length=4, default='NO')
+    # sync_status = models.CharField(max_length=4, default='NO')
+    # sync_terminal_no = models.IntegerField(default=0)
+    # sync_created_server1 = models.CharField(max_length=50, default='')
+    # sync_created_server2 = models.CharField(max_length=50, default='')
 
     class Meta:
         managed = False
@@ -1232,6 +1232,9 @@ class POSSettings(models.Model):
     Allow_consignment_to_display = models.CharField(max_length=6, default='Y')
     Allow_TakeOut_Direct_Pay = models.CharField(max_length=6, default='N')
     withHotel = models.CharField(max_length=6, default='False')
+    ProductColPerRows = models.IntegerField(default=6)
+    TableColPerRows = models.IntegerField(default=6)
+    ShowArrowUpAndDown = models.CharField(max_length=6, default='False')
 
     class Meta:
         db_table = 'tbl_pos_settings'
@@ -1308,13 +1311,13 @@ class PosCashPullout(models.Model):
     pullout_name = models.CharField(max_length=100, default='')
     verified_by = models.CharField(max_length=100, default='')
     parent_autonum_ref = models.CharField(max_length=50, default='')
-    sync_created = models.CharField(max_length=50, default='')
-    sync_status_server2 = models.CharField(max_length=4, default='NO')
-    sync_status_server1 = models.CharField(max_length=4, default='NO')
-    sync_status = models.CharField(max_length=4, default='NO')
-    sync_terminal_no = models.IntegerField(default=0)
-    sync_created_server1 = models.CharField(max_length=50, default='')
-    sync_created_server2 = models.CharField(max_length=50, default='')
+    # sync_created = models.CharField(max_length=50, default='')
+    # sync_status_server2 = models.CharField(max_length=4, default='NO')
+    # sync_status_server1 = models.CharField(max_length=4, default='NO')
+    # sync_status = models.CharField(max_length=4, default='NO')
+    # sync_terminal_no = models.IntegerField(default=0)
+    # sync_created_server1 = models.CharField(max_length=50, default='')
+    # sync_created_server2 = models.CharField(max_length=50, default='')
 
     class Meta:
         db_table = 'tbl_pos_cash_pullout'

@@ -1,6 +1,6 @@
 
 from django.urls import path
-from .views import user_login_api,get_csrf_token,verification_account,user_logout_api,user_endshift_api,call_onscreen_keyboard_windows,unlock_terminal
+from .views import user_login_api,get_csrf_token,verification_account,user_logout_api,user_endshift_api,call_onscreen_keyboard_windows,unlock_terminal,CheckTerminalLogIn
 from .Restaurant.restaurantviews import (get_product_data, get_productCategory_data,product_list_by_category,table_list_view,save_sales_order,
                                          get_sales_order_list,get_sales_order_listing,get_add_order_view,save_cash_payment,get_customer_list,
                                          get_waiter_list,cancel_sales_order,save_sales_order_payment,get_reprint_transaction,get_reprint_transaction_for_receipt
@@ -15,6 +15,7 @@ urlpatterns = [
 
     # Other URL patterns
     path('login/', user_login_api, name='user_login_api'),
+    path('check-login/',CheckTerminalLogIn,name='CheckTerminalLogIn'),
     path('logout/', user_logout_api, name='user_logout_api'),
     path('end-shift/', user_endshift_api, name='user_endshift_api'),
     path('verification/', verification_account, name='verification_account'),

@@ -36,6 +36,7 @@ DEBUG = False
 # Application definition
 
 INSTALLED_APPS = [
+    'django_user_agents',
     'daphne',
     'backend',
     'channels',
@@ -56,6 +57,7 @@ MIDDLEWARE = [
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
+     'django_user_agents.middleware.UserAgentMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
@@ -137,7 +139,7 @@ CORS_ALLOW_HEADERS = [
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.mysql',
-        'NAME': 'db_gerry_bels_pos',
+        'NAME': 'db_gerry_bels_posV2',
         'USER': 'root',
         'PASSWORD': 'lsi2010',
         'HOST': 'localhost',  # Use the service name

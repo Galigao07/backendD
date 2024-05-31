@@ -26,9 +26,15 @@ from backend.globalFunction import GetPHilippineDate,GetPHilippineDateTime
 from django.db.models import Q
 from django.core.exceptions import PermissionDenied
 from django.db import IntegrityError
-
+from django_user_agents.utils import get_user_agent
 from cryptography.hazmat.primitives import padding
-
+def check_mobile(request):
+    user_agent = get_user_agent(request)
+    is_mobile = user_agent.is_mobile
+    response_data = {
+        'is_mobile': is_mobile,
+    }
+    return JsonResponse(response_data)
 
 @api_view(['GET'])
 def user_login_api(request):
@@ -44,22 +50,33 @@ def user_login_api(request):
         password_with_date = password1 + day_of_month
         serial_number = get_serial_number()
 
+
+        # CHECK IF MOBILE DEVICE
+        user_agent = get_user_agent(request)
+        is_mobile = user_agent.is_mobile
+        print('is mobile',is_mobile)
+        # pdb.set_trace()
+
         if (username=='Admin') & (password==password_with_date):
             print('yy',serial_number)
-            if (serial_number =='N9YC13A28A07691'):
-                    infolist ={
-                        'UserRank': 'Admin',
-                        'FullName':'Admin',
-                        'UserID':'9999999',
-                        'UserName':'Admin',
-                        'TerminalNo':0,
-                        'SiteCode': 0,
-                        'PTU': 0
+            if is_mobile == False:
+                if (serial_number =='N9YC13A28A07691'):
+                        infolist ={
+                            'UserRank': 'Admin',
+                            'FullName':'Admin',
+                            'UserID':'9999999',
+                            'UserName':'Admin',
+                            'TerminalNo':0,
+                            'SiteCode': 0,
+                            'PTU': 0
+                            
+                        }
+                        print('infolist',infolist)
                         
-                    }
-                    print('infolist',infolist)
-                    
-                    return JsonResponse({'Info':infolist}, status=200)
+                        return JsonResponse({'Info':infolist}, status=200)
+            else:
+                return JsonResponse({'message':'Error'},status=404)
+                
         user = User.objects.filter(user_name=username).first()
         stored_hashed_password = user.password
         # pdb.set_trace()
@@ -70,58 +87,111 @@ def user_login_api(request):
                 machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number.strip()).first()
                 latest_trans_id = PosCashiersLogin.objects.aggregate(max_trans_id=Max('trans_id'))['max_trans_id']
                 new_trans_id = 0
-                if user.user_rank =='Cashier':
-                    current_date_ph = GetPHilippineDate()
-                    current_datetime_ph = GetPHilippineDateTime()   
-                    check_if_cashier_login = PosCashiersLogin.objects.filter(id_code = user.id_code,islogout='YES',isshift_end = 'NO',date_stamp = current_date_ph)
-                    if check_if_cashier_login.exists():
-                        cashier_login = check_if_cashier_login.first()  # or cashier_login = check_if_cashier_login.get()
-                        cashier_login.islogout = 'NO'
-                        cashier_login.save()
-                    else:
+                if is_mobile == False:
+                    if user.user_rank =='Cashier':
                         current_date_ph = GetPHilippineDate()
-                        current_datetime_ph = GetPHilippineDateTime()
-                        if latest_trans_id is None:
-                            new_trans_id = 1
+                        current_datetime_ph = GetPHilippineDateTime()   
+                        check_if_cashier_login = PosCashiersLogin.objects.filter(id_code = user.id_code,islogout='YES',
+                                                                                 isshift_end = 'NO',isxread='NO')
+                                                                                #  date_stamp = current_date_ph)
+                        if check_if_cashier_login.exists():
+                            cashier_login = check_if_cashier_login.first()  # or cashier_login = check_if_cashier_login.get()
+                            print(machineInfo.terminal_no,cashier_login.terminal_no)
+                            if int(cashier_login.terminal_no) == int(machineInfo.terminal_no):
+                                cashier_login.islogout = 'NO'
+                                cashier_login.save()
+                            else:
+                                return JsonResponse({'message':'Cashier Already login in Terminal No. ' + cashier_login.terminal_no},status=200)
                         else:
-                            new_trans_id = latest_trans_id + 1
+                            current_date_ph = GetPHilippineDate()
+                            current_datetime_ph = GetPHilippineDateTime()
+                            if latest_trans_id is None:
+                                new_trans_id = 1
+                            else:
+                                new_trans_id = latest_trans_id + 1
 
-                        cashier_data = PosCashiersLogin(
-                            trans_id=new_trans_id,
-                            terminal_no=machineInfo.terminal_no,
-                            site_code=machineInfo.site_no,
-                            id_code=user.id_code,
-                            name_stamp=user.fullname,
-                            date_stamp=current_date_ph,
-                            change_fund=0.0,
-                            borrowed_fund=0.0,
-                            time_login=current_datetime_ph,
-                            time_logout='',
-                            islogout='NO',
-                            isshift_end='NO',
-                            isxread='NO',
-                        )
+                            cashier_data = PosCashiersLogin(
+                                trans_id=new_trans_id,
+                                terminal_no=machineInfo.terminal_no,
+                                site_code=machineInfo.site_no,
+                                id_code=user.id_code,
+                                name_stamp=user.fullname,
+                                date_stamp=current_date_ph,
+                                change_fund=0.0,
+                                borrowed_fund=0.0,
+                                time_login=current_datetime_ph,
+                                time_logout='',
+                                islogout='NO',
+                                isshift_end='NO',
+                                isxread='NO',
+                            )
 
-                        # Save the instance
-                        cashier_data.save()
-                infolist ={
-                    'UserRank': user.user_rank,
-                    'FullName':user.fullname,
-                    'UserID':user.id_code,
-                    'UserName':user.user_name,
-                    'TerminalNo': machineInfo.terminal_no,
-                    'SiteCode': machineInfo.site_no,
-                    'PTU': machineInfo.PTU_no,
-                    'TransID':new_trans_id
-                }
-                
-                return JsonResponse({'Info':infolist}, status=200)
+                            # Save the instance
+                            cashier_data.save()
+                    infolist ={
+                        'UserRank': user.user_rank,
+                        'FullName':user.fullname,
+                        'UserID':user.id_code,
+                        'UserName':user.user_name,
+                        'TerminalNo': machineInfo.terminal_no,
+                        'SiteCode': machineInfo.site_no,
+                        'PTU': machineInfo.PTU_no,
+                        'TransID':new_trans_id
+                    }
+                    
+                    return JsonResponse({'Info':infolist}, status=200)
+                else:
+                    if user.user_rank =='Salesman':
+                        infolist ={
+                            'UserRank': user.user_rank,
+                            'FullName':user.fullname,
+                            'UserID':user.id_code,
+                            'UserName':user.user_name,
+                            'TerminalNo': machineInfo.terminal_no,
+                            'SiteCode': machineInfo.site_no,
+                            'PTU': machineInfo.PTU_no,
+                            'TransID':new_trans_id
+                        }
+                        return JsonResponse({'Info':infolist}, status=200)
+
             else:
                 return JsonResponse({'message': 'Invalid credentials'}, status=401)  
         else:
             # Login failed
             return JsonResponse({'message': 'Invalid credentials'}, status=401)
     return JsonResponse({'message': 'Method not allowed'}, status=405)
+
+
+@api_view(['GET'])
+def CheckTerminalLogIn(request):
+    if request.method == 'GET':
+        try:
+            serial_number = get_serial_number()
+            machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number.strip()).first()
+
+            checkLogin = PosCashiersLogin.objects.filter(terminal_no=machineInfo.terminal_no,isshift_end = 'NO',isxread = 'NO',islogout='NO').first()
+           
+            if checkLogin:
+                user = User.objects.filter(id_code = checkLogin.id_code).first()
+                if user:
+                    infolist ={
+                            'UserRank': user.user_rank,
+                            'FullName':user.fullname,
+                            'UserID':user.id_code,
+                            'UserName':user.user_name,
+                            'TerminalNo': machineInfo.terminal_no,
+                            'SiteCode': machineInfo.site_no,
+                            'PTU': machineInfo.PTU_no,
+                            'TransID':checkLogin.trans_id
+                        }
+                        
+                    return JsonResponse({'Info':infolist}, status=200)
+                
+            else:
+                return JsonResponse({'message': 'Invalid credentials'}, status=401)
+        except Exception as e:
+            print(e)
+            
 
 
 @api_view(["GET"])
@@ -144,7 +214,7 @@ def user_logout_api(request):
             current_date_ph = GetPHilippineDate()
             current_datetime_ph = GetPHilippineDateTime()
             if user.user_rank == 'Cashier':
-                cashier_data = PosCashiersLogin.objects.get(id_code=UserID,trans_id = TransID,islogout='NO')
+                cashier_data = PosCashiersLogin.objects.get(id_code=UserID,islogout='NO')
 
                 cashier_data.time_logout = current_datetime_ph
                 cashier_data.islogout = "YES"

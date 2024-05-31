@@ -5107,6 +5107,7 @@ def cash_breakdown(request):
         serialize = PosCashBreakdownSerializer(cash_breakdown,many=True)
         return JsonResponse({'CashBreakdown':serialize.data},status=200)
     elif request.method == 'POST':
+        # pdb.set_trace()
         try:
             data_recieve = json.loads(request.body)
             TransID = data_recieve.get('TransID')
@@ -5137,13 +5138,20 @@ def cash_breakdown(request):
                 # Create a new instance of the PosCashBreakdown model for each key-value pair
                 for denomination, quantity in dinomination.items():
                     if int(quantity) > 0:
+                        trans_id = 0
                         value = conversion_rates[denomination]
                         print((float(value) * int(quantity)))
+                        try:
+                            last_record = PosCashBreakdown.objects.latest('trans_id')
+                            trans_id = last_record.trans_id + 1
+                        except PosCashBreakdown.DoesNotExist:
+                            trans_id = 1
                         breakdown_instance = PosCashBreakdown(
+                                trans_id=trans_id,
                                 login_record=TransID,  # Provide appropriate value
                                 date_stamp=current_date_ph,  # Provide appropriate value
                                 quantity=quantity,
-                                denomination= value,
+                                denomination = f'Php {float(value):,.2f}',
                                 total=float(value) * int(quantity),  # Get the total amount by multiplying quantity with value
                                 reviewed_by=0,  # Provide appropriate value
                             )
@@ -5182,7 +5190,7 @@ def cash_breakdown(request):
                                 trans_id=trans_id,  # Provide appropriate value
                                 details_id=details_id,  # Provide appropriate value
                                 quantity=quantity,
-                                denomination= value,
+                                denomination = f'Php {float(value):,.2f}',
                                 total=float(value) * int(quantity),  # Get the total amount by multiplying quantity with value
                             )
                         save_cash_pullout_details.save()
@@ -5207,6 +5215,7 @@ def cash_breakdown(request):
             # Optionally, log the error or handle it in some way
             return Response({"message": "An error occurred while saving the sales order"}, status=500)
         
+
 @api_view(['GET','POST'])
 def get_sales_list_of_transaction(request):
     if request.method =='GET':

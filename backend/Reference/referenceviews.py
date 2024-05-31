@@ -12,7 +12,7 @@ from backend.models import (Product,PosRestTable,PosSalesOrder,PosSalesTransDeta
 from backend.serializers import (ProductSerializer,ProductCategorySerializer,PosSalesOrderSerializer,PosSalesTransDetailsSerializer,PosSalesTransSerializer,
                                  PosSalesInvoiceListing,PosSalesInvoiceList,CustomerSerializer,PosWaiterListSerializer,PosPayorSerializer,PosSalesInvoiceListSerializer,
                                  UserSerializer,EmployeeSetupSerializer,PosRestTableSerializer,POS_TerminalSerializer,LeadSetupSerializer,PosClientSetupSerializer,
-                                 PosCashiersLoginpSerializer,PosCashBreakdownSerializer,PosVideoSerializer)
+                                 PosCashiersLoginpSerializer,PosCashBreakdownSerializer,PosVideoSerializer,Product2Serializer)
 from rest_framework.decorators import api_view
 from rest_framework.views import APIView
 from django.db.models import Min,Max
@@ -38,6 +38,44 @@ def get_employee_list(request):
         EmployeeList = EmployeeSetupSerializer(data, many=True).data
         return JsonResponse({'EmployeeList': EmployeeList}, status=200)
     
+@api_view(['GET','POST'])
+def get_product_profile(request):
+    if request.method == 'GET':
+        try:
+            # recieve_data = json.loads(request.body)
+            # print('recieve_data',recieve_data)
+            # pdb.set_trace()
+            serial_number = get_serial_number()
+            machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number.strip()).first()
+            description = request.GET.get('Search')
+            if description== None:
+                product_list = Product.objects.all()
+                serialize = Product2Serializer(product_list,many=True)
+                return Response(serialize.data)
+            else:
+                product_list = Product.objects.filter(long_desc__icontains=description)
+                serialize = Product2Serializer(product_list,many=True)
+                return Response(serialize.data)
+        except Exception as e:
+            print(e)
+            traceback.print_exc()
+    elif request.method =='POST':
+        try:
+            receive_data = json.loads(request.body)
+            data = receive_data.get('data')
+            img = receive_data.get('image_prod')
+            if img:
+                image = base64.b64decode(img.split(',')[1])
+                if data:
+                    product_list = Product.objects.filter(bar_code=data['barcode']).first()
+                    if product_list:
+                        product_list.prod_img = image
+                        product_list.save()
+                        return Response('Success')
+        
+        except Exception as e:
+            print(e)
+            traceback.print_exc()
 
 
 
@@ -409,6 +447,7 @@ def UploadVideo(request):
         try:
             video_file = request.FILES.get('video')
             if video_file:
+                # pdb.set_trace()
                 # Get the desktop path
                 username = os.getlogin()
                 desktop_path = os.path.join('C:/Users', username, 'Desktop')

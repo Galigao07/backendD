@@ -314,18 +314,27 @@ def setup_configure(request):
             data = received_data.get('data', [])
             print(data)
             for items in data:
+                # pdb.set_trace()
                 event_name = items['event']
                 acct_title = items['accttitle']
                 sl_acct = items['slacct']
                 sl_id = items['slid']
                 sl_type = items['sl_type']
-
+            try:
                 t_setup = TSetup.objects.get(event_name=event_name)
-
                 t_setup.acct_title = acct_title
                 t_setup.sl_acct = sl_acct
                 t_setup.sl_id = sl_id
                 t_setup.sl_type = sl_type
+                t_setup.save()
+            except TSetup.DoesNotExist:
+                t_setup = TSetup(
+                    event_name=event_name,
+                    acct_title=acct_title,
+                    sl_acct=sl_acct,
+                    sl_id=sl_id,
+                    sl_type=sl_type
+                )
                 t_setup.save()
             return Response('Success',status=200)
         except Exception as e:

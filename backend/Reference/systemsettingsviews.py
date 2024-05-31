@@ -54,6 +54,9 @@ def systemSettings(request):
             pos_settings = POSSettings.objects.filter(terminal_no=machineInfo.terminal_no,site_no = machineInfo.site_no).first()
             if pos_settings:
                 pos_settings.withHotel = data['withHotel']
+                pos_settings.ProductColPerRows =  data['ProductColPerRows']
+                pos_settings.TableColPerRows =  data['TableColPerRows']
+                pos_settings.ShowArrowUpAndDown = data['ShowArrowUpAndDown']
                 pos_settings.save()
                 return Response('Success')
             return Response(serializer.errors)
