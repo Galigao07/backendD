@@ -323,6 +323,7 @@ class PosSalesTransSeniorCitizenDiscount(models.Model):
     id = models.IntegerField(default=0)
     tin_no = models.CharField(max_length=100, default='0')
     so_no = models.CharField(max_length=50, default=' ')
+    amount_covered = models.DecimalField(max_digits=15, decimal_places=3, default=0.000)
 
     class Meta:
         db_table = 'tbl_pos_sales_trans_senior_citizen_discount'
@@ -639,7 +640,7 @@ class Customer(models.Model):
     mobile_no = models.CharField(max_length=15, default=' ')
     fax_no = models.CharField(max_length=15, default=' ')
     st_address = models.CharField(max_length=60, default=' ')
-    province = models.CharField(max_length=225, default=' ')
+    # province = models.CharField(max_length=225, default=' ')
     city_address = models.CharField(max_length=30, default=' ')
     zip_code = models.IntegerField(default=0)
     vat = models.CharField(max_length=1, default='')
@@ -1348,3 +1349,35 @@ class PosVideo(models.Model):
         managed = False
 
 
+class POSProductPrinter(models.Model):
+    autonum = models.BigAutoField(primary_key=True)
+    prod_code = models.IntegerField(default=0)
+    prod_desc = models.CharField(max_length=100, default='')
+    printer_name = models.CharField(max_length=500, default='')
+    category_desc = models.CharField(max_length=999, default='')
+    parent_autonum_ref = models.CharField(max_length=50, default='')
+    sync_created = models.CharField(max_length=50, default='')
+    sync_status_server1 = models.CharField(max_length=4, default='NO')
+    sync_status = models.CharField(max_length=4, default='NO')
+    sync_created_server1 = models.CharField(max_length=50, default='')
+
+    class Meta:
+        db_table = 'tbl_pos_product_printer'
+        managed = False
+
+class PosSalesTransCustomer(models.Model):
+    sales_trans_id = models.IntegerField()
+    terminal_no = models.CharField(max_length=21, default='0')
+    cashier_id = models.IntegerField(default=0)
+    document_type = models.CharField(max_length=100, default='"')
+    name_stamp = models.CharField(max_length=500, blank=True, default='')
+    address = models.CharField(max_length=100, null=True, blank=True)
+    parent_autonum_ref = models.CharField(max_length=50, blank=True, default='')
+    sync_created = models.CharField(max_length=50, blank=True, default='')
+    sync_status_server1 = models.CharField(max_length=4, default='NO')
+    sync_status = models.CharField(max_length=4, default='NO')
+    sync_created_server1 = models.CharField(max_length=50, blank=True, default='')
+
+    class Meta:
+        db_table = 'tbl_pos_sales_trans_customer'
+        managed = False

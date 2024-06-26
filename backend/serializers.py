@@ -4,7 +4,7 @@ from .models import (Product, PosRestTable,PosSalesOrder,User,POS_Terminal,PosSa
                      PosCashiersLogin,PosCashBreakdown,BankCompany,TSetup,OtherAccount,ProductCategorySetup,BankCard,SalesTransCreditCard,
                      SalesTransEPS,PosSalesTransSeniorCitizenDiscount,AcctSubsidiary,RCCDetails,CCCDetails,ProductSiteSetup,PosPriceTypeSiteSetup,
                      PosMultiplePriceTypeSiteSetup,ProductCategorySales,PosSetup,AcctList,POSSettings,SLCategory,PosSalesTransCreditSale,
-                     PosSuspendList,PosSuspendListing,PosCashPullout,PosCashPulloutDetails,PosVideo)
+                     PosSuspendList,PosSuspendListing,PosCashPullout,PosCashPulloutDetails,PosVideo,POSProductPrinter)
 
 
 
@@ -12,6 +12,11 @@ from .models import (Product, PosRestTable,PosSalesOrder,User,POS_Terminal,PosSa
 class PosCashPulloutDetailsSerializer(serializers.ModelSerializer):
     class Meta:
         model =  PosCashPulloutDetails
+        fields = '__all__'
+
+class POSProductPrinterSerializer(serializers.ModelSerializer):
+    class Meta:
+        model =  POSProductPrinter
         fields = '__all__'
 
 class PosVideoSerializer(serializers.ModelSerializer):

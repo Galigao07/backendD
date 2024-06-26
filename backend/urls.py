@@ -1,6 +1,7 @@
 
 from django.urls import path
-from .views import user_login_api,get_csrf_token,verification_account,user_logout_api,user_endshift_api,call_onscreen_keyboard_windows,unlock_terminal,CheckTerminalLogIn
+from .views import (user_login_api,get_csrf_token,verification_account,user_logout_api,user_endshift_api,call_onscreen_keyboard_windows,unlock_terminal,CheckTerminalLogIn,
+                    download_pdf,download_sales_order_pdf)
 from .Restaurant.restaurantviews import (get_product_data, get_productCategory_data,product_list_by_category,table_list_view,save_sales_order,
                                          get_sales_order_list,get_sales_order_listing,get_add_order_view,save_cash_payment,get_customer_list,
                                          get_waiter_list,cancel_sales_order,save_sales_order_payment,get_reprint_transaction,get_reprint_transaction_for_receipt
@@ -62,5 +63,8 @@ urlpatterns = [
     path('susppend-sales-order/', suspend_save_sales_order, name='suspend_save_sales_order'), 
     path('sales-list-of-transaction/', get_sales_list_of_transaction, name='get_sales_list_of_transaction'), 
     path('cleared-table/', cleared_table_dinein_order_and_pay, name='cleared_table_dinein_order_and_pay'), 
+    path('receipt-pdf/', download_pdf, name='download_pdf'),
+    path('sales-order-pdf/', download_sales_order_pdf, name='download_sales_order_pdf'),
+
     
 ]

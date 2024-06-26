@@ -98,13 +98,19 @@ CORS_ALLOWED_ORIGINS = [
     'http://localhost:5174',
     'http://192.168.68.106:5173',
     'http://192.168.43.155:5173',
+    'http://192.168.43.155:8081',
+    'http://192.168.43.155:8000',
+    'http://192.168.43.155:8001',
+    'http://192.168.68.112:8081',
  
     # Add other allowed origins as needed
 ]
+CORS_ALLOW_ORIGIN_REGEX = r'^https?://\w+(\.\w+)+(:\d{1,5})?$'  # Regex to match origins
+CORS_ALLOW_HEADERS = ['Content-Type', 'Authorization']  # Allowed headers
+CORS_ALLOW_METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'] 
 
 
 APPEND_SLASH = False
-CORS_EXPOSE_HEADERS = ["Content-Type", "X-CSRFToken"]
 CORS_ALLOW_HEADERS = [
     "accept",
     "accept-encoding",
@@ -115,6 +121,12 @@ CORS_ALLOW_HEADERS = [
     "user-agent",
     "x-csrftoken",
     "x-requested-with",
+]
+
+CORS_EXPOSE_HEADERS = [
+    "Content-Type",
+    "X-CSRFToken",
+    "Content-Disposition",  # Important for downloads
 ]
 # Database
 # https://docs.djangoproject.com/en/4.2/ref/settings/#databases

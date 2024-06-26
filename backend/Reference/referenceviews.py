@@ -8,11 +8,13 @@ from django.conf import settings
 from django.http import FileResponse, JsonResponse
 from rest_framework.response import Response
 from backend.models import (Product,PosRestTable,PosSalesOrder,PosSalesTransDetails,InvRefNo,POS_Terminal,PosSalesTrans,PosSalesInvoiceList,PosSalesInvoiceListing,
-                            CompanySetup,Customer,PosWaiterList,PosPayor,User,Employee,LeadSetup,PosClientSetup,PosCashiersLogin,PosCashBreakdown,PosVideo)
+                            CompanySetup,Customer,PosWaiterList,PosPayor,User,Employee,LeadSetup,PosClientSetup,PosCashiersLogin,PosCashBreakdown,PosVideo,
+                            POSProductPrinter,ProductCategorySetup)
 from backend.serializers import (ProductSerializer,ProductCategorySerializer,PosSalesOrderSerializer,PosSalesTransDetailsSerializer,PosSalesTransSerializer,
                                  PosSalesInvoiceListing,PosSalesInvoiceList,CustomerSerializer,PosWaiterListSerializer,PosPayorSerializer,PosSalesInvoiceListSerializer,
                                  UserSerializer,EmployeeSetupSerializer,PosRestTableSerializer,POS_TerminalSerializer,LeadSetupSerializer,PosClientSetupSerializer,
-                                 PosCashiersLoginpSerializer,PosCashBreakdownSerializer,PosVideoSerializer,Product2Serializer)
+                                 PosCashiersLoginpSerializer,PosCashBreakdownSerializer,PosVideoSerializer,Product2Serializer,POSProductPrinterSerializer,
+                                 ProductCategorySetupSerializer)
 from rest_framework.decorators import api_view
 from rest_framework.views import APIView
 from django.db.models import Min,Max
@@ -28,7 +30,9 @@ from rest_framework.permissions import IsAuthenticated
 from backend.globalFunction import GetPHilippineDate,GetPHilippineDateTime
 from django.db.models import Sum
 import traceback
-
+import win32print
+import subprocess
+import re
 @api_view(['GET'])
 def get_employee_list(request):
     if request.method == 'GET':
@@ -591,50 +595,54 @@ def lead_setup(request):
     
     elif request.method == 'POST':
         print('sfsdfsdf')
-        received_data = json.loads(request.body)
-        print('received_data',received_data)
-        autonum = received_data.get('autonum')
-        company_code = received_data.get('companycode')
-        company_name = received_data.get('companyname')
-        company_name2 = received_data.get('companyname2')
-        company_address = received_data.get('companyaddress')
-        company_address2 = received_data.get('companyaddress2')
-        tin = received_data.get('tin')
-        accreditation_no = received_data.get('accreditation')
-        date_issued = received_data.get('dateissued')
-        date_valid = received_data.get('datevalid')
+        try:
+            received_data = json.loads(request.body)
+            print('received_data',received_data)
+            autonum = received_data.get('autonum')
+            company_code = received_data.get('companycode')
+            company_name = received_data.get('companyname')
+            company_name2 = received_data.get('companyname2')
+            company_address = received_data.get('companyaddress')
+            company_address2 = received_data.get('companyaddress2')
+            tin = received_data.get('tin')
+            accreditation_no = received_data.get('accreditation')
+            date_issued = received_data.get('dateissued')
+            date_valid = received_data.get('datevalid')
+            if autonum == '':
+                autonum = 0
+            CheckDtata = LeadSetup.objects.filter(autonum=autonum).first()
+            
+            if CheckDtata:
+                    CheckDtata.company_code = company_code
+                    CheckDtata.company_name = company_name
+                    CheckDtata.company_name2= company_name2
+                    CheckDtata.company_address = company_address
+                    CheckDtata.company_address2 = company_address2
+                    CheckDtata.tin = tin
+                    CheckDtata.accreditation_no = accreditation_no
+                    CheckDtata.date_issued = date_issued
+                    CheckDtata.date_valid =date_valid
+                    CheckDtata.save()
+                    return JsonResponse({'data':'Terminal Successfully Update'},status=200)
 
-        CheckDtata = LeadSetup.objects.filter(autonum=autonum).first()
-        # pdb.set_trace()
-        if CheckDtata:
-                CheckDtata.company_code = company_code
-                CheckDtata.company_name = company_name
-                CheckDtata.company_name2= company_name2
-                CheckDtata.company_address = company_address
-                CheckDtata.company_address2 = company_address2
-                CheckDtata.tin = tin
-                CheckDtata.accreditation_no = accreditation_no
-                CheckDtata.date_issued = date_issued
-                CheckDtata.date_valid =date_valid
-                CheckDtata.save()
-                return JsonResponse({'data':'Terminal Successfully Update'},status=200)
+            else:    
+                lead_setup = LeadSetup(
+                    company_code=company_code,
+                    company_name=company_name,
+                    company_name2=company_name2,
+                    company_address=company_address,
+                    company_address2=company_address2,
+                    tin=tin,
+                    accreditation_no=accreditation_no,
+                    date_issued=date_issued,
+                    date_valid=date_valid
+                )
 
-        else:    
-            lead_setup = LeadSetup(
-                autonum=autonum,
-                company_code=company_code,
-                company_name=company_name,
-                company_name2=company_name2,
-                company_address=company_address,
-                company_address2=company_address2,
-                tin=tin,
-                accreditation_no=accreditation_no,
-                date_issued=date_issued,
-                date_valid=date_valid
-            )
-
-            lead_setup.save()
-            return JsonResponse({'data':'Terminal Successfully Added'},status=200)
+                lead_setup.save()
+                return JsonResponse({'data':'Terminal Successfully Added'},status=200)
+        except Exception as e:
+            print(e)
+            traceback.print_exc()
 
 ####* **************************** Client Setup *******************************
 @api_view(['GET','POST'])   
@@ -1154,3 +1162,108 @@ def generate_data_xread(request):
 }
 
         return JsonResponse(response_data)
+    
+
+@api_view(['GET','POST','DELETE'])
+def product_printer_category(request):
+    if request.method == 'GET':
+        try:
+            product_printer_category_list= POSProductPrinter.objects.all()
+
+            serialize = POSProductPrinterSerializer(product_printer_category_list,many=True)
+            return JsonResponse(serialize.data,safe=False)
+
+        except Exception as e:
+            print(e)
+            traceback.print_exc()
+    elif request.method == 'POST':
+        try:
+            data_receiver = json.loads(request.body)
+
+            data_receive = data_receiver.get('data')
+            print(data_receive)
+            prod_code = data_receive.get('prod_code')
+            prod_desc = data_receive.get('prod_desc')
+            printer_name = data_receive.get('printer_name')
+            category_desc = data_receive.get('category_desc')
+
+            check_data = POSProductPrinter.objects.filter(prod_code=prod_code).first()
+
+            if check_data:
+                check_data.prod_desc = prod_desc
+                check_data.printer_name = printer_name
+                check_data.category_desc = category_desc
+                check_data.save()
+
+            else:
+                savePrinterCat = POSProductPrinter (
+                    prod_code = prod_code,
+                    prod_desc = prod_desc,
+                    printer_name = printer_name,
+                    category_desc = category_desc
+                )
+                savePrinterCat.save()
+
+
+
+            return Response('Success')
+
+        except Exception as e:
+            print(e)
+            traceback.print_exc()
+    elif request.method == 'DELETE':
+        try:
+            prod_code = request.GET.get('prod_code')
+            print(prod_code)
+            POSProductPrinter.objects.filter(prod_code=prod_code).delete()
+            return Response('Success')
+
+        except Exception as e:
+            print(e)
+            traceback.print_exc()
+
+
+@api_view(['GET'])
+def printer_list(request):
+    if request.method == 'GET':
+        try:
+            list_data = []
+            data =subprocess.check_output(['wmic','printer','list','brief']).decode('utf-8').split('\r\r\n')
+            data = data[1:]
+            for line in data:
+                for printername in line.split("   "):
+                    if printername !="":
+                        match = re.search(r'Device\s+([\w\s-]+)', printername)
+                        if match:
+                            list = {
+                                "printer_name":match.group(1).lstrip()
+                            }
+                            print(printername)
+                        else:
+                            list = {
+                                "printer_name":printername.lstrip()
+                            }
+                            print(printername)
+                        list_data.append(list)
+                        break
+            return Response(list_data,status=200)
+
+
+        except Exception as e:
+            print(e)
+            traceback.print_exc()
+
+@api_view(['GET'])
+def get_product_Category_setup(request):
+    if request.method =='GET':
+        try:
+            category_setup = ProductCategorySetup.objects.filter(pos_category='Y')
+
+            serialize = ProductCategorySetupSerializer(category_setup,many=True)
+            return Response(serialize.data,status=200)
+            
+        except Exception as e:
+            print(e)
+            traceback.print_exc()
+
+

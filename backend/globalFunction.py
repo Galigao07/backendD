@@ -1,6 +1,8 @@
 
 import datetime
 import pytz
+from .models import POSProductPrinter,POSSettings
+from .serializers import POSProductPrinterSerializer
 
 def GetPHilippineDateTime():
     ph_time_zone = pytz.timezone('Asia/Manila')
@@ -14,4 +16,15 @@ def GetPHilippineDate():
 
 def GetSLnameInOtherAccounts():
     return True
+
+# def GetCompanyConfig(fieldName):
+#     result = POSProductPrinter.objects.values_list(fieldName, flat=True).first()
+#     print('result',result)
+#     return result
+
+def GetCompanyConfig(fieldName):
+    result = POSSettings.objects.values_list(fieldName, flat=True).first()
+    print('result',result)
+    return result
+
 

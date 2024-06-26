@@ -2,7 +2,8 @@ from django.urls import path
 from backend.Reference.referenceviews import (add_user,view_user,update_user,get_employee_list,delete_user,view_waiter,add_waiter,update_waiter,delete_waiter,
                                               view_table,add_table,delete_table,update_table,UploadVideo,terminal_setup,lead_setup,Client_setup,
                                               CustomerDetails,CustomerSearchResults,SupplierDetails,get_cahiers_login,get_cash_count_cash_breakdown,
-                                              get_cahiers_login_for_xread,generate_data_xread,get_product_profile)
+                                              get_cahiers_login_for_xread,generate_data_xread,get_product_profile,product_printer_category,printer_list,
+                                              get_product_Category_setup)
 
 
 urlpatterns = [
@@ -32,5 +33,11 @@ urlpatterns = [
     path('cashiers-login-xread/', get_cahiers_login_for_xread, name='get_cahiers_login_for_xread'),
     path('generate-sales-xread/', generate_data_xread, name='generate_data_xread'),
     path('product-profile/', get_product_profile, name='get_product_profile'),
+    path('printer-categories/', product_printer_category, name='product_printer_category'),
+    path('printer-list/', printer_list, name='printer_list'),
+    path('product-category-setup/', get_product_Category_setup, name='get_product_Category_setup'),
+    
+
+   
 
 ]
