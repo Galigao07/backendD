@@ -462,45 +462,65 @@ def get_sales_order_list(request):
 def get_sales_order_listing(request):
     # document_no = request.GET.get('document_no[]')
     # pdb.set_trace()
-    TableNo = request.GET.get('tableno')
-    so_no = request.GET.get('so_no')
+    try:
 
-    serial_number = get_serial_number()
-    machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number.strip()).first()
-    queno = request.GET.get('queno')
-    print('queno',queno)
-    # pdb.set_trace()
-    if TableNo is not None:
-       
-        if so_no:
-            print('pos_sales_order_dataaaa',int(machineInfo.site_no),machineInfo.terminal_no)
-            # pdb.set_trace()
-            pos_sales_order_data = PosSalesOrder.objects.filter(paid = 'N',terminal_no = machineInfo.terminal_no,site_code = int(machineInfo.site_no) ,table_no =TableNo,SO_no = so_no)
-            result = []
-           
+        TableNo = request.GET.get('tableno')
+        so_no = request.GET.get('so_no')
+
+        serial_number = get_serial_number()
+        machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number.strip()).first()
+        queno = request.GET.get('queno')
+        print('queno',queno)
+        # pdb.set_trace()
+        if TableNo !='':
+        
+            if so_no:
+                print('pos_sales_order_dataaaa',int(machineInfo.site_no),machineInfo.terminal_no)
+                # pdb.set_trace()
+                pos_sales_order_data = PosSalesOrder.objects.filter(paid = 'N',terminal_no = machineInfo.terminal_no,site_code = int(machineInfo.site_no) ,table_no =TableNo,SO_no = so_no)
+                result = []
             
-            for item in pos_sales_order_data:
-                matched_records = PosSalesTransDetails.objects.extra(
-                    select={
-                        'sales_order_document_no': 'tbl_pos_sales_order.document_no',
-                        'so_no': 'tbl_pos_sales_order.SO_no'
-                    },
-                    tables=['tbl_pos_sales_trans_details', 'tbl_pos_sales_order'],
-                    where=[
-                        'tbl_pos_sales_trans_details.sales_trans_id = tbl_pos_sales_order.document_no',
-                        'tbl_pos_sales_order.document_no = %s'
-                    ],
-                    params=[item.document_no]  
-                )
-                result.extend(list(matched_records.values()))
-            pos_extended_save_from_listing(result ,TableNo,queno)   
+                
+                for item in pos_sales_order_data:
+                    matched_records = PosSalesTransDetails.objects.extra(
+                        select={
+                            'sales_order_document_no': 'tbl_pos_sales_order.document_no',
+                            'so_no': 'tbl_pos_sales_order.SO_no'
+                        },
+                        tables=['tbl_pos_sales_trans_details', 'tbl_pos_sales_order'],
+                        where=[
+                            'tbl_pos_sales_trans_details.sales_trans_id = tbl_pos_sales_order.document_no',
+                            'tbl_pos_sales_order.document_no = %s'
+                        ],
+                        params=[item.document_no]  
+                    )
+                    result.extend(list(matched_records.values()))
+                pos_extended_save_from_listing(result ,TableNo,queno)   
+            else:
+                pos_sales_order_data = PosSalesOrder.objects.filter(paid = 'N',terminal_no = machineInfo.terminal_no,site_code = int(machineInfo.site_no) ,table_no =TableNo,active ='Y')
+                result = []
+                # print('pos_sales_order_data',pos_sales_order_data)
+                
+                for item in pos_sales_order_data:
+                    print('item.document_no',item.document_no)
+                    matched_records = PosSalesTransDetails.objects.extra(
+                        select={
+                            'sales_order_document_no': 'tbl_pos_sales_order.document_no',
+                            'so_no': 'tbl_pos_sales_order.SO_no'
+                        },
+                        tables=['tbl_pos_sales_trans_details', 'tbl_pos_sales_order'],
+                        where=[
+                            'tbl_pos_sales_trans_details.sales_trans_id = tbl_pos_sales_order.document_no',
+                            'tbl_pos_sales_order.document_no = %s'
+                        ],
+                        params=[item.document_no]  
+                    )
+                    result.extend(list(matched_records.values()))
+                pos_extended_save_from_listing(result ,TableNo,queno)   
         else:
-            pos_sales_order_data = PosSalesOrder.objects.filter(paid = 'N',terminal_no = machineInfo.terminal_no,site_code = int(machineInfo.site_no) ,table_no =TableNo,active ='Y')
+            pos_sales_order_data = PosSalesOrder.objects.filter(paid = 'N',terminal_no = machineInfo.terminal_no,site_code = int(machineInfo.site_no) ,q_no =queno)
             result = []
-            # print('pos_sales_order_data',pos_sales_order_data)
-            
             for item in pos_sales_order_data:
-                print('item.document_no',item.document_no)
                 matched_records = PosSalesTransDetails.objects.extra(
                     select={
                         'sales_order_document_no': 'tbl_pos_sales_order.document_no',
@@ -514,29 +534,13 @@ def get_sales_order_listing(request):
                     params=[item.document_no]  
                 )
                 result.extend(list(matched_records.values()))
-            pos_extended_save_from_listing(result ,TableNo,queno)   
-    else:
-        pdb.set_trace()
-        pos_sales_order_data = PosSalesOrder.objects.filter(paid = 'N',terminal_no = machineInfo.terminal_no,site_code = int(machineInfo.site_no) ,q_no =queno)
-        result = []
-        print('eeeeeeeeeeeeeeeeeeeee')
-        for item in pos_sales_order_data:
-            matched_records = PosSalesTransDetails.objects.extra(
-                select={
-                    'sales_order_document_no': 'tbl_pos_sales_order.document_no',
-                    'so_no': 'tbl_pos_sales_order.SO_no'
-                },
-                tables=['tbl_pos_sales_trans_details', 'tbl_pos_sales_order'],
-                where=[
-                    'tbl_pos_sales_trans_details.sales_trans_id = tbl_pos_sales_order.document_no',
-                    'tbl_pos_sales_order.document_no = %s'
-                ],
-                params=[item.document_no]  
-            )
-            result.extend(list(matched_records.values()))
-            print('result',result)
-        pos_extended_save_from_listing(result ,TableNo,queno)   
-    return Response(result)
+                print('result',result)
+            pos_extended_save_from_listing(result ,TableNo,queno)  
+        return Response(result)
+    except Exception as e:
+        print(e) 
+        traceback.print_exc()
+    
 
 ## **************** CANCELLED SALES ORDER TRANSACTION *****************
 @api_view(['GET'])
@@ -928,6 +932,34 @@ def getCompanyData():
     return first_autonum
 
 
+
+###***************CHECK QUE NO IF EXIST *******************
+
+@api_view(['GET'])
+def Check_Que_No(request):
+    if request.method == 'GET':
+        try:
+            QueNo = request.GET.get('QueNo')
+            serial_number = get_serial_number()
+            machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number.strip()).first()
+            Check_Que_No_if_exist = PosSalesOrder.objects.filter(
+                    q_no=QueNo,
+                    paid='N',
+                    active='Y',
+                    terminal_no=int(machineInfo.terminal_no),
+                    site_code=int(machineInfo.site_no)
+                ).first()
+            
+            if Check_Que_No_if_exist:
+                 return Response('Exist')
+
+            else:
+                return Response('Not Exist')
+           
+        except Exception as e:
+            print(e)
+            traceback.print_exc(0)
+
 ###***************ADD SALES ORDER *******************
 
 @api_view(['POST'])
@@ -938,6 +970,7 @@ def save_sales_order(request):
             print('sales order save') 
             waiter = ''
             waiterID = 0
+            QueNo = 0
             received_data = json.loads(request.body)
             cart_items = received_data.get('data', [])
             data_from_modal = received_data.get('data2')
@@ -951,7 +984,12 @@ def save_sales_order(request):
             waiterName = data_from_modal.get('Waiter')
             waiterID = data_from_modal.get('waiterID')
             payment_type = data_from_modal.get('PaymentType')
-            QueNo = data_from_modal.get('QueNO')
+            QueNo = data_from_modal.get('QueNO',0)
+            if QueNo =='' :
+                QueNo = 0
+            elif QueNo is None:
+                QueNo = 0
+
             print('Order And Pay',payment_type)
 
             if table_no == '':
@@ -1112,7 +1150,7 @@ def save_sales_order(request):
                 'customer_name': customer,
                 'table_no': table_no,
                 'q_no': QueNo,
-                'dinein_takeout': 'Dine In',
+                'dinein_takeout': OrderType,
                 'guest_count': guest_count,
                 'waiter_id': int(waiterID),
                 'cashier_id': cashier_id,
@@ -1360,7 +1398,7 @@ def save_cash_payment(request):
                 CusTIN =""
                 CusAddress =""
                 CusBusiness =""
-                
+            Guest_Count = 0
             so_no = ''
             so_doc_no = ''
             disc_amt = 0
@@ -1791,6 +1829,18 @@ def save_cash_payment(request):
                     # Handle the case where GetWaiterID is None (no matching record found)
                     waiterID = None  # or any default value or error handling
                     waiterName = None  # or any default value or error handling
+
+                sales_orders_data = PosSalesOrder.objects.filter(
+                    table_no=table_no,
+                    paid='N',
+                    active='Y',
+                    terminal_no=TerminalNo,
+                    site_code=int(machineInfo.site_no)
+                ).first()
+                if sales_orders_data:
+                    Guest_Count=sales_orders_data.guest_count
+                    table_no = sales_orders_data.table_no
+                    QueNo = sales_orders_data.q_no
             
                 sales_orders_to_update = PosSalesOrder.objects.filter(
                     table_no=table_no,
@@ -1804,7 +1854,34 @@ def save_cash_payment(request):
                 if sales_orders_to_update.exists():
                     # Update all matching objects to set 'paid' to 'Y'
                     sales_orders_to_update.update(paid='Y')
-                    
+                    pass
+            else:
+
+                sales_orders_data = PosSalesOrder.objects.filter(
+                    q_no=QueNo,
+                    paid='N',
+                    active='Y',
+                    terminal_no=TerminalNo,
+                    site_code=int(machineInfo.site_no)
+                ).first()
+                if sales_orders_data:
+                    Guest_Count=sales_orders_data.guest_count
+                    QueNo = sales_orders_data.q_no
+                    table_no = sales_orders_data.table_no
+
+
+                sales_orders_to_update = PosSalesOrder.objects.filter(
+                    q_no=QueNo,
+                    paid='N',
+                    active='Y',
+                    terminal_no=TerminalNo,
+                    site_code=int(machineInfo.site_no)
+                )
+
+                # Check if there are any matching objects
+                if sales_orders_to_update.exists():
+                    # Update all matching objects to set 'paid' to 'Y'
+                    sales_orders_to_update.update(paid='Y')
                     pass
 
             UpdateINVRef = InvRefNo.objects.filter(description='POS SI',terminalno=TerminalNo).first()
@@ -1849,6 +1926,9 @@ def save_cash_payment(request):
                 'CusTIN' :CusTIN,
                 'CusAddress' :CusAddress,
                 'CusBusiness' : CusBusiness,
+                'TableNo':table_no,
+                'Guest_Count':Guest_Count,
+                'QueNo':QueNo
                 }
 
             PDFReceipt(doc_no,'POS-SI',cus_Data)
@@ -2422,6 +2502,9 @@ def save_credit_card_payment(request):
             doc_no = get_sales_transaction_id(TerminalNo,doctype)
             # CreditCardPaymentListData = CreditCard.get("CreditCardPaymentList")
             # pdb.set_trace()
+            Guest_Count = 0
+            if QueNo == '':
+                QueNo=0
             bankID = ''
             BankName = ''
             if table_no =='':
@@ -2966,9 +3049,51 @@ def save_credit_card_payment(request):
                     # Handle the case where GetWaiterID is None (no matching record found)
                     waiterID = None  # or any default value or error handling
                     waiterName = None  # or any default value or error handling
+
+
+                sales_orders_data = PosSalesOrder.objects.filter(
+                    table_no=table_no,
+                    paid='N',
+                    active='Y',
+                    terminal_no=TerminalNo,
+                    site_code=int(machineInfo.site_no)
+                ).first()
+
+                if sales_orders_data:
+                    Guest_Count=sales_orders_data.guest_count
+                    QueNo = sales_orders_data.q_no
+                    table_no = sales_orders_data.table_no
             
                 sales_orders_to_update = PosSalesOrder.objects.filter(
                     table_no=table_no,
+                    paid='N',
+                    active='Y',
+                    terminal_no=TerminalNo,
+                    site_code=int(machineInfo.site_no)
+                )
+
+                # Check if there are any matching objects
+                if sales_orders_to_update.exists():
+                    # Update all matching objects to set 'paid' to 'Y'
+                    sales_orders_to_update.update(paid='Y')
+                    
+                    pass
+            else:
+                sales_orders_data = PosSalesOrder.objects.filter(
+                    q_no=QueNo,
+                    paid='N',
+                    active='Y',
+                    terminal_no=TerminalNo,
+                    site_code=int(machineInfo.site_no)
+                ).first()
+
+                if sales_orders_data:
+                    Guest_Count=sales_orders_data.guest_count
+                    QueNo = sales_orders_data.q_no
+                    table_no = sales_orders_data.table_no
+
+                sales_orders_to_update = PosSalesOrder.objects.filter(
+                    q_no=QueNo,
                     paid='N',
                     active='Y',
                     terminal_no=TerminalNo,
@@ -3024,6 +3149,9 @@ def save_credit_card_payment(request):
                 'CusTIN' :CusTIN,
                 'CusAddress' :CusAddress,
                 'CusBusiness' : CusBusiness,
+                'TableNo':table_no,
+                'Guest_Count':Guest_Count,
+                'QueNo':QueNo
                 }
             # transaction.commit()
             PDFReceipt(doc_no,'POS-SI',cus_Data)
@@ -3066,7 +3194,7 @@ def save_debit_card_payment(request):
             # CreditCardPaymentListData = CreditCard.get("CreditCardPaymentList")
             bankID = ''
             BankName = ''
-
+            Guest_Count = 0
             last_details_id = 0
             try:
                 # Get the last details_id
@@ -3116,6 +3244,9 @@ def save_debit_card_payment(request):
 
                 save_debitcardSales.save()
 
+            Guest_Count = 0
+            if QueNo == '':
+                QueNo = '0'
 
             if table_no =='':
                 table_no = 0
@@ -3193,108 +3324,7 @@ def save_debit_card_payment(request):
             Vatable_Amount = 0
 
                 
-            
-
-            # for items in cart_items:
-            #     productInfo = Product.objects.filter(bar_code=items['barcode']).first()
-
-            #     if productInfo is not None:
-            #         quantity = float(items['quantity'])
-            #         price = float(items['price'])
-            #         item_disc = float(items['item_disc'])
-            #         total_sub_total = total_sub_total + (quantity * price)
-                    
-            #         if DiscountType == 'SC':
-            #             vatable = 'Es'
-            #             desc_rate = 20
-            #             totalItem = quantity * price
-                        
-            #             NetSale =  totalItem / (0.12 + 1 )
-            #             vat_exempt =  totalItem - NetSale
-            #             disc_amt  = (totalItem - vat_exempt ) * 0.2
-            #             net_total = (quantity * price) - (disc_amt + vat_exempt)
-                        
-            #             print('NetSale',NetSale)
-            #             print('vat_exempt',vat_exempt)
-            #             print('disc_amt',disc_amt)
-            #             print('net_total',net_total)
-                    
-                        
-            #         else:
-            #             if productInfo.tax_code == 'VAT':
-            #                 vatable = 'V'
-            #                 desc_rate = item_disc / (quantity * price) * 100
-            #                 vat_amt = (((quantity * price) - item_disc) / 1.12) * 0.12
-            #                 net_total = (quantity * price) - item_disc - vat_amt
-            #             else:
-            #                 vatable = 'N'
-            #                 vat_amt = 0
-            #                 disc_amt = item_disc
-            #                 net_total = (quantity * price) - disc_amt
-            #     else:
-            #         # Handle case where productInfo is None (no product found for the barcode)
-            #         pass  # You might want to log this or handle it according to your logic
-                    
-
-            #     total_disc_amt = total_disc_amt + desc_rate
-            #     total_desc_rate= total_desc_rate + desc_rate
-            #     total_vat_amt = total_vat_amt + vat_amt
-
-            #     if DiscountType == 'SC':
-            #         total_vat_exempt = total_vat_exempt + net_total
-            #         print('total_vat_exempt',total_vat_exempt)
-            #     else:
-            #         total_net_total = total_net_total + net_total
-                
-            #     # pdb.set_trace()
-            #     totalQty = totalQty + float(items['quantity'])
-            #     if so_no == '':
-            #         so_no = items['sales_trans_id']
-            #     else:
-            #         if so_no == items['sales_trans_id']:
-            #             so_no = so_no
-            #         else:
-            #             so_no = so_no + ', ' + items['sales_trans_id']
-            #     so_doc_no = so_no
-
-            #     SaveToPOSSalesInvoiceListing = PosSalesInvoiceListing(
-            #         company_code = f"{companyCode.autonum:0>4}",
-            #         ul_code = machineInfo.ul_code,
-            #         terminal_no = TerminalNo,
-            #         site_code = int(machineInfo.site_no),
-            #         cashier_id = cashier_id,
-            #         doc_date = datetime_stamp,
-            #         doc_no = doc_no,
-            #         doc_type = 'POS-SI',
-            #         line_number = items['line_no'],
-            #         bar_code =items['barcode'],
-            #         alternate_code = 0,
-            #         item_code = items['barcode'],
-            #         rec_qty = items['quantity'],
-            #         rec_uom = productInfo.uom,
-            #         description = items['description'],
-            #         unit_price = items['price'],
-            #         sub_total = float(items['quantity']) * float(items['price']),
-            #         pc_price =  items['price'],
-            #         qtyperuom = 1,
-            #         disc_amt = f"{disc_amt:.3f}",
-            #         desc_rate =f"{desc_rate:.3f}",
-            #         vat_amt =  f"{vat_amt:.3f}",
-            #         vat_exempt = f"{vat_exempt:.3f}",
-            #         net_total =  f"{net_total:.3f}",
-            #         isvoid = 'No',
-            #         unit_cost = '0',
-            #         vatable = vatable,
-            #         status = 'A',
-            #         so_no =items['sales_trans_id'],
-            #         so_doc_no =items['sales_trans_id'],
-            #         sn_bc = '',
-            #         discounted_by = '',
-                    
-            #     )
-            #     SaveToPOSSalesInvoiceListing.save()
-
-
+        
             tmp_cart_item_discount = cart_items
             for items in cart_items:
                 productInfo = Product.objects.filter(bar_code=items['barcode']).first()
@@ -3682,20 +3712,62 @@ def save_debit_card_payment(request):
                     waiterID = None  # or any default value or error handling
                     waiterName = None  # or any default value or error handling
             
-                sales_orders_to_update = PosSalesOrder.objects.filter(
-                    table_no=table_no,
-                    paid='N',
-                    active='Y',
-                    terminal_no=TerminalNo,
-                    site_code=int(machineInfo.site_no)
-                )
+                    sales_orders_data = PosSalesOrder.objects.filter(
+                            table_no=table_no,
+                            paid='N',
+                            active='Y',
+                            terminal_no=TerminalNo,
+                            site_code=int(machineInfo.site_no)
+                        ).first()
 
-                # Check if there are any matching objects
-                if sales_orders_to_update.exists():
-                    # Update all matching objects to set 'paid' to 'Y'
-                    sales_orders_to_update.update(paid='Y')
+                    if sales_orders_data:
+                            Guest_Count=sales_orders_data.guest_count
+                            QueNo = sales_orders_data.q_no
+                            table_no = sales_orders_data.table_no
                     
-                    pass
+                    sales_orders_to_update = PosSalesOrder.objects.filter(
+                            table_no=table_no,
+                            paid='N',
+                            active='Y',
+                            terminal_no=TerminalNo,
+                            site_code=int(machineInfo.site_no)
+                        )
+
+                        # Check if there are any matching objects
+                    if sales_orders_to_update.exists():
+                            # Update all matching objects to set 'paid' to 'Y'
+                            sales_orders_to_update.update(paid='Y')
+                            
+                            pass
+            else:
+                sales_orders_data = PosSalesOrder.objects.filter(
+                            q_no=QueNo,
+                            paid='N',
+                            active='Y',
+                            terminal_no=TerminalNo,
+                            site_code=int(machineInfo.site_no)
+                        ).first()
+
+                if sales_orders_data:
+                            Guest_Count=sales_orders_data.guest_count
+                            QueNo = sales_orders_data.q_no
+                            table_no = sales_orders_data.table_no
+
+                sales_orders_to_update = PosSalesOrder.objects.filter(
+                            q_no=QueNo,
+                            paid='N',
+                            active='Y',
+                            terminal_no=TerminalNo,
+                            site_code=int(machineInfo.site_no)
+                        )
+
+                        # Check if there are any matching objects
+                if sales_orders_to_update.exists():
+                            # Update all matching objects to set 'paid' to 'Y'
+                    sales_orders_to_update.update(paid='Y')
+                            
+                    pass  
+
 
             UpdateINVRef = InvRefNo.objects.filter(description=doctype,terminalno=TerminalNo).first()
             UpdateINVRef.next_no = doc_no
@@ -3740,6 +3812,9 @@ def save_debit_card_payment(request):
                 'CusTIN' :CusTIN,
                 'CusAddress' :CusAddress,
                 'CusBusiness' : CusBusiness,
+                'TableNo':table_no,
+                'Guest_Count':Guest_Count,
+                'QueNo':QueNo
                 }
             # transaction.commit()
             PDFReceipt(doc_no,'POS-SI',cus_Data)
@@ -3784,6 +3859,7 @@ def save_multiple_payment(request):
             doctype = received_data.get('doctype')
             doc_no = get_sales_transaction_id(TerminalNo,doctype)
             # CreditCardPaymentListData = CreditCard.get("CreditCardPaymentList")
+            Guest_Count = 0
             bankID = ''
             BankName = ''
             CreditCardAmount = 0
@@ -3908,7 +3984,8 @@ def save_multiple_payment(request):
                 table_no = 0
         
             
-            
+            if QueNo == '':
+                QueNo = 0
             current_datetime = timezone.now()
             datetime_stamp = current_datetime.strftime('%Y-%m-%d %H:%M:%S')
             
@@ -4362,7 +4439,19 @@ def save_multiple_payment(request):
                     # Handle the case where GetWaiterID is None (no matching record found)
                     waiterID = None  # or any default value or error handling
                     waiterName = None  # or any default value or error handling
-            
+                sales_orders_data = PosSalesOrder.objects.filter(
+                            table_no=table_no,
+                            paid='N',
+                            active='Y',
+                            terminal_no=TerminalNo,
+                            site_code=int(machineInfo.site_no)
+                        ).first()
+
+                if sales_orders_data:
+                    Guest_Count=sales_orders_data.guest_count
+                    QueNo = sales_orders_data.q_no
+                    table_no = sales_orders_data.table_no
+                    
                 sales_orders_to_update = PosSalesOrder.objects.filter(
                     table_no=table_no,
                     paid='N',
@@ -4377,6 +4466,38 @@ def save_multiple_payment(request):
                     sales_orders_to_update.update(paid='Y')
                     
                     pass
+
+            else:
+                sales_orders_data = PosSalesOrder.objects.filter(
+                    q_no=QueNo,
+                    paid='N',
+                    active='Y',
+                    terminal_no=TerminalNo,
+                    site_code=int(machineInfo.site_no)
+                ).first()
+
+                if sales_orders_data:
+                    Guest_Count=sales_orders_data.guest_count
+                    QueNo = sales_orders_data.q_no
+                    table_no = sales_orders_data.table_no
+
+                sales_orders_to_update = PosSalesOrder.objects.filter(
+                    q_no=QueNo,
+                    paid='N',
+                    active='Y',
+                    terminal_no=TerminalNo,
+                    site_code=int(machineInfo.site_no)
+                )
+
+                # Check if there are any matching objects
+                if sales_orders_to_update.exists():
+                    # Update all matching objects to set 'paid' to 'Y'
+                    sales_orders_to_update.update(paid='Y')
+                    
+                    pass  
+
+
+
 
             UpdateINVRef = InvRefNo.objects.filter(description=doctype,terminalno=TerminalNo).first()
             UpdateINVRef.next_no = doc_no
@@ -4423,6 +4544,9 @@ def save_multiple_payment(request):
                 'CusTIN' :CusTIN,
                 'CusAddress' :CusAddress,
                 'CusBusiness' : CusBusiness,
+                'TableNo':table_no,
+                'Guest_Count':Guest_Count,
+                'QueNo':QueNo
                 }
             
      

@@ -9,7 +9,7 @@ from .Restaurant.restaurantviews import (get_product_data, get_productCategory_d
                                          cash_breakdown,get_bank_card,get_bank_list,save_credit_card_payment,save_debit_card_payment,
                                          save_multiple_payment,get_waiter_name,get_sales_order_list_cancelled,get_sales_order_listing_cancelled,
                                          uncancelled_sales_order,transfer_table,get_customer_category,get_customer_with_category,save_charge_payment,
-                                         suspend_save_sales_order,get_sales_list_of_transaction,cleared_table_dinein_order_and_pay)
+                                         suspend_save_sales_order,get_sales_list_of_transaction,cleared_table_dinein_order_and_pay,Check_Que_No)
 
 urlpatterns = [
     path('onscreen-keyboard/',call_onscreen_keyboard_windows, name='call_onscreen_keyboard_windows'),
@@ -65,6 +65,7 @@ urlpatterns = [
     path('cleared-table/', cleared_table_dinein_order_and_pay, name='cleared_table_dinein_order_and_pay'), 
     path('receipt-pdf/', download_pdf, name='download_pdf'),
     path('sales-order-pdf/', download_sales_order_pdf, name='download_sales_order_pdf'),
+    path('check-que-no/', Check_Que_No, name='Check_Que_No'),
 
     
 ]

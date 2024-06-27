@@ -106,7 +106,7 @@ def PDFSalesOrder(data,SO,TableNo,QueNo,GuestCount,Customer,order_type,cashierID
         y_position -= line_height
         y_position -= line_height
         c.drawString(10 * mm, y_position, "Cusomer: " f'{Customer}')
-        if TableNo != '0':
+        if TableNo != 0:
             y_position -= line_height
             c.drawString(10 * mm, y_position, f"Table No.: {TableNo}")
 
@@ -120,9 +120,12 @@ def PDFSalesOrder(data,SO,TableNo,QueNo,GuestCount,Customer,order_type,cashierID
         #     c.drawString(10 * mm, y_position, "Guest Count: " f'{GuestCount}')
         
         
-        if QueNo != '0':
+        if QueNo != 0:
             y_position -= line_height
             c.drawString(10 * mm, y_position, "QueNo: " f'{QueNo}')
+            guest_count_text = f"Guest Count: {GuestCount}"
+            text_width = c.stringWidth(guest_count_text, "Helvetica", 12)  # Use appropriate font and size
+            c.drawRightString(width - margin, y_position, guest_count_text)
         y_position -= line_height
         y_position -= line_height
         text_width = c.stringWidth(order_type, "Helvetica-Bold", 10)
@@ -239,7 +242,7 @@ def PDFSalesOrderaLL(data,SO,TableNo,QueNo,GuestCount,Customer,order_type,cashie
         y_position -= line_height
         y_position -= line_height
         c.drawString(10 * mm, y_position, "Cusomer: " f'{Customer}')
-        if TableNo != '0':
+        if TableNo != 0:
             y_position -= line_height
             c.drawString(10 * mm, y_position, f"Table No.: {TableNo}")
 
@@ -253,9 +256,12 @@ def PDFSalesOrderaLL(data,SO,TableNo,QueNo,GuestCount,Customer,order_type,cashie
         #     c.drawString(10 * mm, y_position, "Guest Count: " f'{GuestCount}')
         
         
-        if QueNo != '0':
+        if QueNo != 0:
             y_position -= line_height
             c.drawString(10 * mm, y_position, "QueNo: " f'{QueNo}')
+            guest_count_text = f"Guest Count: {GuestCount}"
+            text_width = c.stringWidth(guest_count_text, "Helvetica", 12)  # Use appropriate font and size
+            c.drawRightString(width - margin, y_position, guest_count_text)
         y_position -= line_height
         y_position -= line_height
         text_width = c.stringWidth(order_type, "Helvetica-Bold", 10)
@@ -524,9 +530,11 @@ def PDFReceipt(doc_no,doc_type,cusData):
             Customer =  cusData['CustomerName']
 
             Order_Type= 'DINE IN'
-            TableNo = 1
-            GuestCount = '1'
-            QueNo = 0
+            TableNo = int(float(cusData['TableNo']))
+            GuestCount = int(float(cusData['Guest_Count']))
+            QueNo = int(float(cusData['QueNo']))
+
+            
 
             vat = 0
             vatable = 0
@@ -668,6 +676,7 @@ def PDFReceipt(doc_no,doc_type,cusData):
 
             c.drawString(10 * mm, y_position, "Cusomer: " f'{Customer}')
             if TableNo != 0:
+                
                 y_position -= line_height
                 c.drawString(10 * mm, y_position, f"Table No.: {TableNo}")
 
@@ -677,6 +686,7 @@ def PDFReceipt(doc_no,doc_type,cusData):
                 c.drawRightString(width - margin_right, y_position, guest_count_text)
 
             if QueNo != 0:
+                Order_Type = 'TAKE OUT'
                 y_position -= line_height
                 c.drawString(10 * mm, y_position, f"QueNo.: {QueNo}")
                 guest_count_text = f"Guest Count: {GuestCount}"
@@ -850,11 +860,16 @@ def PDFReceipt(doc_no,doc_type,cusData):
             c.drawString(10 * mm, y_position,'TOTAL DUE:')
             c.drawRightString(width - margin_right, y_position, f'{float(Total_due):,.2f}')
             y_position -= line_height
-            
+          
             if is_cash_payment:
                 y_position -= line_height
                 c.drawString(10 * mm, y_position,'CASH:')
-                c.drawRightString(width - margin_right, y_position, f'{float(cash_payment):,.2f}')
+                if is_credit_card_payment or is_debit_card_payment: 
+                    
+                    c.drawRightString(width - margin_right, y_position, f'{float(cash_payment):,.2f}')
+                else:
+                    cash_payment = Amount_Tendered
+                    c.drawRightString(width - margin_right, y_position, f'{float(cash_payment):,.2f}')
                 y_position -= line_height
                 if is_credit_card_payment | is_debit_card_payment:
                     pass
