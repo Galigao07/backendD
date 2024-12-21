@@ -9,12 +9,12 @@ from django.http import FileResponse, JsonResponse
 from rest_framework.response import Response
 from backend.models import (Product,PosRestTable,PosSalesOrder,PosSalesTransDetails,InvRefNo,POS_Terminal,PosSalesTrans,PosSalesInvoiceList,PosSalesInvoiceListing,
                             CompanySetup,Customer,PosWaiterList,PosPayor,User,Employee,LeadSetup,PosClientSetup,PosCashiersLogin,PosCashBreakdown,PosVideo,
-                            POSProductPrinter,ProductCategorySetup)
+                            POSProductPrinter,ProductCategorySetup,POSGiftCheckDenomination,POSGiftCheckSeries,POSSalesTransGiftCheck)
 from backend.serializers import (ProductSerializer,ProductCategorySerializer,PosSalesOrderSerializer,PosSalesTransDetailsSerializer,PosSalesTransSerializer,
                                  PosSalesInvoiceListing,PosSalesInvoiceList,CustomerSerializer,PosWaiterListSerializer,PosPayorSerializer,PosSalesInvoiceListSerializer,
                                  UserSerializer,EmployeeSetupSerializer,PosRestTableSerializer,POS_TerminalSerializer,LeadSetupSerializer,PosClientSetupSerializer,
                                  PosCashiersLoginpSerializer,PosCashBreakdownSerializer,PosVideoSerializer,Product2Serializer,POSProductPrinterSerializer,
-                                 ProductCategorySetupSerializer)
+                                 ProductCategorySetupSerializer,POSGiftCheckDenominationSerializer,POSGiftCheckSeriesSerializer,POSSalesTransGiftCheckSerializer)
 from rest_framework.decorators import api_view
 from rest_framework.views import APIView
 from django.db.models import Min,Max
@@ -1262,6 +1262,132 @@ def get_product_Category_setup(request):
             serialize = ProductCategorySetupSerializer(category_setup,many=True)
             return Response(serialize.data,status=200)
             
+        except Exception as e:
+            print(e)
+            traceback.print_exc()
+
+
+####* **************************** GIFT CHECK SERIES ****************************
+
+@api_view(['GET','POST','DELETE'])
+def Gift_Check_series(request):
+    if request.method == 'GET':
+        try:
+            gift_Check_series= POSGiftCheckSeries.objects.all()
+
+            serialize = POSGiftCheckSeriesSerializer(gift_Check_series,many=True)
+            return JsonResponse(serialize.data,safe=False)
+
+        except Exception as e:
+            print(e)
+            traceback.print_exc()
+    elif request.method == 'POST':
+        try:
+            data_receiver = json.loads(request.body)
+
+            data_receive = data_receiver.get('data')
+            print(data_receive)
+            trans_no = data_receive.get('trans_no')
+            SeriesFrom = data_receive.get('series_from')
+            SeriesTo = data_receive.get('series_to')
+            DateFrom = data_receive.get('validity_date_from')
+            DateTo = data_receive.get('validity_date_to')
+            Amount = data_receive.get('amount')
+            serial_number = get_serial_number()
+            machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number).first()
+            check_data = POSGiftCheckSeries.objects.filter(trans_no=trans_no).first()
+
+            if check_data:
+                check_data.site_code = machineInfo.site_no
+                check_data.ul_code = machineInfo.ul_code
+                check_data.trans_no = trans_no
+                check_data.series_from = SeriesFrom
+                check_data.series_to = SeriesTo
+                check_data.validity_date_from = DateFrom
+                check_data.validity_date_to = DateTo
+                check_data.amount = Amount
+                check_data.save()
+
+            else:
+                savePrinterCat = POSGiftCheckSeries (
+                    site_code = machineInfo.site_no,
+                    ul_code = machineInfo.ul_code,
+                    trans_no = trans_no,
+                    series_from = SeriesFrom,
+                    series_to = SeriesTo,
+                    validity_date_from = DateFrom,
+                    validity_date_to = DateTo,
+                    amount = Amount,
+                )
+                savePrinterCat.save()
+            return Response('Success')
+
+        except Exception as e:
+            print(e)
+            traceback.print_exc()
+    elif request.method == 'DELETE':
+        try:
+            data_receiver = json.loads(request.body)
+            trans_no = data_receiver.get('trans_no')
+            print(trans_no)
+            POSGiftCheckSeries.objects.filter(trans_no=trans_no).delete()
+            return Response('Success')
+
+        except Exception as e:
+            print(e)
+            traceback.print_exc()
+
+
+
+####* **************************** GIFT CHECK DENOMINATION ****************************
+
+@api_view(['GET','POST','DELETE'])
+def Gift_Check_Denomination(request):
+
+    if request.method == 'GET':
+     
+        try:
+            gift_Check_Denomination= POSGiftCheckDenomination.objects.all()
+            serialize = POSGiftCheckDenominationSerializer(gift_Check_Denomination,many=True)
+            return JsonResponse(serialize.data,safe=False)
+
+        except Exception as e:
+            print(e)
+            traceback.print_exc()
+    elif request.method == 'POST':
+        try:
+            data_receiver = json.loads(request.body)
+            data_receive = data_receiver.get('data')
+            code = data_receive.get('code')
+            denomination = data_receive.get('denomination_amount')
+
+  
+
+            check_data = POSGiftCheckDenomination.objects.filter(code=code).first()
+            print(check_data)
+            if check_data:
+                check_data.code = code
+                check_data.denomination_amount = denomination
+                check_data.save()
+
+            else:
+                savePrinterCat = POSGiftCheckDenomination (
+                code = code,
+                denomination_amount = denomination,
+                )
+                savePrinterCat.save()
+            return Response('Success')
+
+        except Exception as e:
+            print(e)
+            traceback.print_exc()
+    elif request.method == 'DELETE':
+        try:
+            data_receiver = json.loads(request.body)
+            code = data_receiver.get('code')
+            POSGiftCheckDenomination.objects.filter(code=code).delete()
+            return Response('Success')
+
         except Exception as e:
             print(e)
             traceback.print_exc()

@@ -36,7 +36,7 @@ def systemSettings(request):
             machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number).first()
             pos_settings = POSSettings.objects.filter(terminal_no=machineInfo.terminal_no,site_no = machineInfo.site_no)
             serialize = POSSettingsSerializer(pos_settings,many=True)
-            # print(serialize)
+            print('Check POS setting  ',serialize.data)
             return Response(serialize.data)
         except Exception as e:
             print(e)

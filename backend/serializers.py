@@ -4,7 +4,24 @@ from .models import (Product, PosRestTable,PosSalesOrder,User,POS_Terminal,PosSa
                      PosCashiersLogin,PosCashBreakdown,BankCompany,TSetup,OtherAccount,ProductCategorySetup,BankCard,SalesTransCreditCard,
                      SalesTransEPS,PosSalesTransSeniorCitizenDiscount,AcctSubsidiary,RCCDetails,CCCDetails,ProductSiteSetup,PosPriceTypeSiteSetup,
                      PosMultiplePriceTypeSiteSetup,ProductCategorySales,PosSetup,AcctList,POSSettings,SLCategory,PosSalesTransCreditSale,
-                     PosSuspendList,PosSuspendListing,PosCashPullout,PosCashPulloutDetails,PosVideo,POSProductPrinter)
+                     PosSuspendList,PosSuspendListing,PosCashPullout,PosCashPulloutDetails,PosVideo,POSProductPrinter,POSGiftCheckDenomination,
+                     POSGiftCheckSeries,POSSalesTransGiftCheck)
+
+
+class POSSalesTransGiftCheckSerializer(serializers.ModelSerializer):
+    class Meta:
+        model =  POSSalesTransGiftCheck
+        fields = '__all__'
+
+class POSGiftCheckSeriesSerializer(serializers.ModelSerializer):
+    class Meta:
+        model =  POSGiftCheckSeries
+        fields = '__all__'
+
+class POSGiftCheckDenominationSerializer(serializers.ModelSerializer):
+    class Meta:
+        model =  POSGiftCheckDenomination
+        fields = '__all__'
 
 
 

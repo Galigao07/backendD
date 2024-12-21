@@ -91,22 +91,24 @@ CHANNEL_LAYERS = {
 }
 WSGI_APPLICATION = 'backendD.wsgi.application'
 ASGI_APPLICATION = 'backendD.asgi.application'
+CORS_ALLOW_ALL_ORIGINS = True
 CORS_ORIGIN_ALLOW_ALL = True
-CORS_ALLOWED_ORIGINS = [
-    'http://localhost:3000',
-    'http://localhost:5173',
-    'http://localhost:5174',
-    'http://192.168.68.106:5173',
-    'http://192.168.43.155:5173',
-    'http://192.168.43.155:8081',
-    'http://192.168.43.155:8000',
-    'http://192.168.43.155:8001',
-    'http://192.168.68.112:8081',
+# CORS_ALLOWED_ORIGINS = [
+#     'http://localhost:3000',
+#     'http://localhost:5173',
+#     'http://localhost:5174',
+#     'http://192.168.68.106:5173',
+#     'http://192.168.43.155:5173',
+#     'http://192.168.43.155:8081', 
+#     'http://192.168.43.155:8000',
+#     'http://192.168.43.155:8001',
+#     'http://192.168.68.108:8081',
+#     'http://192.168.68.108:8000',
  
-    # Add other allowed origins as needed
-]
+#     # Add other allowed origins as needed
+# ]
 CORS_ALLOW_ORIGIN_REGEX = r'^https?://\w+(\.\w+)+(:\d{1,5})?$'  # Regex to match origins
-CORS_ALLOW_HEADERS = ['Content-Type', 'Authorization']  # Allowed headers
+# CORS_ALLOW_HEADERS = ['Content-Type', 'Authorization']  # Allowed headers
 CORS_ALLOW_METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'] 
 
 

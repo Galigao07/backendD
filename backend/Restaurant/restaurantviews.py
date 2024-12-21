@@ -20,7 +20,7 @@ from backend.serializers import (ProductSerializer,ProductCategorySerializer,Pos
 from rest_framework.decorators import api_view
 from django.db.models import Min,Max
 from django.utils import timezone
-from backend.views import PDFReceipt, PDFSalesOrderaLL, get_serial_number,PDFSalesOrder,print_pdf_salesOrder
+from backend.views import PDFChargeReceipt, PDFReceipt, PDFSalesOrderaLL, get_serial_number,PDFSalesOrder,print_pdf_salesOrder
 from datetime import datetime, timedelta
 from datetime import datetime
 from django.db.models import Q
@@ -377,6 +377,7 @@ def cleared_table_dinein_order_and_pay(request):
         except Exception as e:
             print(e)
             traceback.print_exc(0)
+            return Response({"error": str(e)}, status=500)
 
         
 
@@ -1069,15 +1070,19 @@ def save_sales_order(request):
                     for printer_name in printer_list:
                         itemList = cart_items
                         print(3)
+                        print(printer_name.printer_name)
                         for category in printer_name.category_desc.split(','):
                             for item in itemList:
                                 ProductCat = Product.objects.filter(bar_code=item['barcode']).values('category').first()
-                                if ProductCat['category'] == category.strip():
-                                    item['printer_name'] = printer_name.printer_name  # Assuming 'name' is a field in POSProductPrinter
-                                    item['matched_category'] = category.strip()
-                                    make_print = True
-                                    print(f"printer_name: {printer_name.printer_name}")
-                                    list_to_print.append(item)
+                                if ProductCat is not None and 'category' in ProductCat:
+
+                                    if ProductCat['category'] == category.strip():
+                                        item['printer_name'] = printer_name.printer_name  # Assuming 'name' is a field in POSProductPrinter
+                                        item['matched_category'] = category.strip()
+                                        make_print = True
+                                        print(f"printer_name: {printer_name.printer_name}")
+                                        list_to_print.append(item)
+
                         if make_print == True:
                             print(4)
                             print('list_to_print')
@@ -1834,8 +1839,8 @@ def save_cash_payment(request):
                     table_no=table_no,
                     paid='N',
                     active='Y',
-                    terminal_no=TerminalNo,
-                    site_code=int(machineInfo.site_no)
+                    terminal_no=int(float(machineInfo.terminal_no)),
+                    site_code=int(float(machineInfo.site_no))
                 ).first()
                 if sales_orders_data:
                     Guest_Count=sales_orders_data.guest_count
@@ -1846,8 +1851,8 @@ def save_cash_payment(request):
                     table_no=table_no,
                     paid='N',
                     active='Y',
-                    terminal_no=TerminalNo,
-                    site_code=int(machineInfo.site_no)
+                    terminal_no=int(float(machineInfo.terminal_no)),
+                    site_code=int(float(machineInfo.site_no))
                 )
 
                 # Check if there are any matching objects
@@ -1861,8 +1866,8 @@ def save_cash_payment(request):
                     q_no=QueNo,
                     paid='N',
                     active='Y',
-                    terminal_no=TerminalNo,
-                    site_code=int(machineInfo.site_no)
+                    terminal_no=int(float(machineInfo.terminal_no)),
+                    site_code=int(float(machineInfo.site_no))
                 ).first()
                 if sales_orders_data:
                     Guest_Count=sales_orders_data.guest_count
@@ -1874,8 +1879,8 @@ def save_cash_payment(request):
                     q_no=QueNo,
                     paid='N',
                     active='Y',
-                    terminal_no=TerminalNo,
-                    site_code=int(machineInfo.site_no)
+                     terminal_no=int(float(machineInfo.terminal_no)),
+                    site_code=int(float(machineInfo.site_no))
                 )
 
                 # Check if there are any matching objects
@@ -2040,6 +2045,7 @@ def save_sales_order_payment(request):
             DiscountData= received_data.get('DiscountData')
             customer_data= received_data.get('customer')
             doctype = received_data.get('doctype')
+            PaymentMethod= received_data.get('PaymentType')
             doc_no = get_sales_transaction_id(TerminalNo,doctype)
             print('customer_data',customer_data) 
             current_datetime = timezone.now()
@@ -2057,6 +2063,10 @@ def save_sales_order_payment(request):
             waiterid = 0
             waitername = ''
             paymenttype = ''
+            document_type = 'SI'
+
+            if PaymentMethod == 'CHARGE':
+                document_type = 'CI'
 
      
             if customer_data:
@@ -2117,7 +2127,7 @@ def save_sales_order_payment(request):
                 SaveOrderToDetails = PosSalesTransDetails(
                     sales_trans_id = int(float(doc_no)),
                     datetime_stamp = datetime_stamp,
-                    document_type = 'SI',
+                    document_type = document_type,
                     terminal_no = TerminalNo,
                     site_code = int(machineInfo.site_no),
                     cashier_id = cashier_id,
@@ -2153,7 +2163,7 @@ def save_sales_order_payment(request):
                 datetime_stamp = datetime_stamp,
                 bagger = '',
                 amount_tendered = amountT,
-                document_type = 'SI',
+                document_type = document_type,
                 amount_disc = float(str(Amt_Discount).replace(',', '')),
                 lvl1_disc = 0,
                 lvl2_disc= 0,
@@ -3055,7 +3065,7 @@ def save_credit_card_payment(request):
                     table_no=table_no,
                     paid='N',
                     active='Y',
-                    terminal_no=TerminalNo,
+                    terminal_no=int(float(machineInfo.terminal_no)),
                     site_code=int(machineInfo.site_no)
                 ).first()
 
@@ -3068,7 +3078,7 @@ def save_credit_card_payment(request):
                     table_no=table_no,
                     paid='N',
                     active='Y',
-                    terminal_no=TerminalNo,
+                    terminal_no=int(float(machineInfo.terminal_no)),
                     site_code=int(machineInfo.site_no)
                 )
 
@@ -3083,7 +3093,7 @@ def save_credit_card_payment(request):
                     q_no=QueNo,
                     paid='N',
                     active='Y',
-                    terminal_no=TerminalNo,
+                     terminal_no=int(float(machineInfo.terminal_no)),
                     site_code=int(machineInfo.site_no)
                 ).first()
 
@@ -3096,7 +3106,7 @@ def save_credit_card_payment(request):
                     q_no=QueNo,
                     paid='N',
                     active='Y',
-                    terminal_no=TerminalNo,
+                     terminal_no=int(float(machineInfo.terminal_no)),
                     site_code=int(machineInfo.site_no)
                 )
 
@@ -3716,7 +3726,7 @@ def save_debit_card_payment(request):
                             table_no=table_no,
                             paid='N',
                             active='Y',
-                            terminal_no=TerminalNo,
+                             terminal_no=int(float(machineInfo.terminal_no)),
                             site_code=int(machineInfo.site_no)
                         ).first()
 
@@ -3729,7 +3739,7 @@ def save_debit_card_payment(request):
                             table_no=table_no,
                             paid='N',
                             active='Y',
-                            terminal_no=TerminalNo,
+                            terminal_no=int(float(machineInfo.terminal_no)),
                             site_code=int(machineInfo.site_no)
                         )
 
@@ -3744,7 +3754,7 @@ def save_debit_card_payment(request):
                             q_no=QueNo,
                             paid='N',
                             active='Y',
-                            terminal_no=TerminalNo,
+                             terminal_no=int(float(machineInfo.terminal_no)),
                             site_code=int(machineInfo.site_no)
                         ).first()
 
@@ -3757,7 +3767,7 @@ def save_debit_card_payment(request):
                             q_no=QueNo,
                             paid='N',
                             active='Y',
-                            terminal_no=TerminalNo,
+                             terminal_no=int(float(machineInfo.terminal_no)),
                             site_code=int(machineInfo.site_no)
                         )
 
@@ -4443,7 +4453,7 @@ def save_multiple_payment(request):
                             table_no=table_no,
                             paid='N',
                             active='Y',
-                            terminal_no=TerminalNo,
+                             terminal_no=int(float(machineInfo.terminal_no)),
                             site_code=int(machineInfo.site_no)
                         ).first()
 
@@ -4456,7 +4466,7 @@ def save_multiple_payment(request):
                     table_no=table_no,
                     paid='N',
                     active='Y',
-                    terminal_no=TerminalNo,
+                    terminal_no=int(float(machineInfo.terminal_no)),
                     site_code=int(machineInfo.site_no)
                 )
 
@@ -4472,7 +4482,7 @@ def save_multiple_payment(request):
                     q_no=QueNo,
                     paid='N',
                     active='Y',
-                    terminal_no=TerminalNo,
+                     terminal_no=int(float(machineInfo.terminal_no)),
                     site_code=int(machineInfo.site_no)
                 ).first()
 
@@ -4485,7 +4495,7 @@ def save_multiple_payment(request):
                     q_no=QueNo,
                     paid='N',
                     active='Y',
-                    terminal_no=TerminalNo,
+                     terminal_no=int(float(machineInfo.terminal_no)),
                     site_code=int(machineInfo.site_no)
                 )
 
@@ -4589,7 +4599,7 @@ def save_charge_payment(request):
             doctype = received_data.get('doctype')
             doc_no = get_sales_transaction_id(TerminalNo,doctype)
             # CreditCardPaymentListData = CreditCard.get("CreditCardPaymentList")
-            
+            Guest_Count = 0
 
             waiterName=''
             
@@ -4928,7 +4938,7 @@ def save_charge_payment(request):
                     cashier_id = cashier_id,
                     doc_date = datetime_stamp,
                     doc_no = doc_no,
-                    doc_type = 'POS-SI',
+                    doc_type = 'POS-CI',
                     line_number = items['line_no'],
                     bar_code =items['barcode'],
                     alternate_code = 0,
@@ -5175,11 +5185,24 @@ def save_charge_payment(request):
                     waiterID = None  # or any default value or error handling
                     waiterName = None  # or any default value or error handling
             
+                sales_orders_data = PosSalesOrder.objects.filter(
+                            table_no=table_no,
+                            paid='N',
+                            active='Y',
+                             terminal_no=int(float(machineInfo.terminal_no)),
+                            site_code=int(machineInfo.site_no)
+                        ).first()
+
+                if sales_orders_data:
+                    Guest_Count=sales_orders_data.guest_count
+                    QueNo = sales_orders_data.q_no
+                    table_no = sales_orders_data.table_no
+                    
                 sales_orders_to_update = PosSalesOrder.objects.filter(
                     table_no=table_no,
                     paid='N',
                     active='Y',
-                    terminal_no=TerminalNo,
+                    terminal_no=int(float(machineInfo.terminal_no)),
                     site_code=int(machineInfo.site_no)
                 )
 
@@ -5189,6 +5212,38 @@ def save_charge_payment(request):
                     sales_orders_to_update.update(paid='Y')
                     
                     pass
+
+            else:
+                sales_orders_data = PosSalesOrder.objects.filter(
+                    q_no=QueNo,
+                    paid='N',
+                    active='Y',
+                     terminal_no=int(float(machineInfo.terminal_no)),
+                    site_code=int(machineInfo.site_no)
+                ).first()
+
+                if sales_orders_data:
+                    Guest_Count=sales_orders_data.guest_count
+                    QueNo = sales_orders_data.q_no
+                    table_no = sales_orders_data.table_no
+
+                sales_orders_to_update = PosSalesOrder.objects.filter(
+                    q_no=QueNo,
+                    paid='N',
+                    active='Y',
+                     terminal_no=int(float(machineInfo.terminal_no)),
+                    site_code=int(machineInfo.site_no)
+                )
+
+                # Check if there are any matching objects
+                if sales_orders_to_update.exists():
+                    # Update all matching objects to set 'paid' to 'Y'
+                    sales_orders_to_update.update(paid='Y')
+                    
+                    pass  
+
+
+
 
             UpdateINVRef = InvRefNo.objects.filter(description=doctype,terminalno=TerminalNo).first()
             UpdateINVRef.next_no = doc_no
@@ -5227,6 +5282,18 @@ def save_charge_payment(request):
                 'Charge':Charge_payments,
                 'SeniorDiscountDataList':DiscountDataList,
             } 
+            cus_Data = {
+                'CustomerName' :CustomerName,
+                'CusTIN' :CusTIN,
+                'CusAddress' :CusAddress,
+                'CusBusiness' : CusBusiness,
+                'TableNo':table_no,
+                'Guest_Count':Guest_Count,
+                'QueNo':QueNo
+                }
+
+            PDFChargeReceipt(doc_no,'POS-CI',cus_Data)
+     
 
             # transaction.commit()
             return Response({'data':data}, status=200)

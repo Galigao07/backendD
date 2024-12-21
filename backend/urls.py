@@ -1,6 +1,6 @@
 
 from django.urls import path
-from .views import (user_login_api,get_csrf_token,verification_account,user_logout_api,user_endshift_api,call_onscreen_keyboard_windows,unlock_terminal,CheckTerminalLogIn,
+from .views import (download_charge_receipt_pdf, user_login_api,get_csrf_token,verification_account,user_logout_api,user_endshift_api,call_onscreen_keyboard_windows,unlock_terminal,CheckTerminalLogIn,
                     download_pdf,download_sales_order_pdf)
 from .Restaurant.restaurantviews import (get_product_data, get_productCategory_data,product_list_by_category,table_list_view,save_sales_order,
                                          get_sales_order_list,get_sales_order_listing,get_add_order_view,save_cash_payment,get_customer_list,
@@ -65,6 +65,7 @@ urlpatterns = [
     path('cleared-table/', cleared_table_dinein_order_and_pay, name='cleared_table_dinein_order_and_pay'), 
     path('receipt-pdf/', download_pdf, name='download_pdf'),
     path('sales-order-pdf/', download_sales_order_pdf, name='download_sales_order_pdf'),
+    path('charge-receipt-pdf/', download_charge_receipt_pdf, name='download_charge_receipt_pdf'),
     path('check-que-no/', Check_Que_No, name='Check_Que_No'),
 
     

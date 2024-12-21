@@ -606,6 +606,7 @@ class PosCashiersLogin(models.Model):
     site_code = models.DecimalField(max_digits=15, decimal_places=3, default=0.000)
     id_code = models.IntegerField(null=True, default=None)
     name_stamp = models.CharField(max_length=100, null=True, default=None)
+    user_rank = models.CharField(max_length=100, null=True, default=None)
     date_stamp = models.CharField(max_length=30, null=True, default=None)
     change_fund = models.DecimalField(max_digits=15, decimal_places=3, default=0.000)
     borrowed_fund = models.DecimalField(max_digits=15, decimal_places=3, default=0.000)
@@ -861,7 +862,7 @@ class PosSalesOrder(models.Model):
     customer_type = models.CharField(max_length=1, default='W')
     customer_name = models.CharField(max_length=150, null=True, default=None)
     table_no = models.IntegerField(null=True, default=None)
-    q_no = models.DecimalField(max_digits=15, decimal_places=3, default=0.000)
+    q_no = models.IntegerField(null=True, default=None)
     dinein_takeout = models.CharField(max_length=15, default=' ')
     dinein_order_and_pay =models.CharField(max_length=6, default=None)
     guest_count = models.IntegerField(null=True, default=None)
@@ -1079,9 +1080,12 @@ class PosSalesInvoiceList(models.Model):
     total_eps = models.DecimalField(max_digits=15, decimal_places=3, default=0.000)
     total_credit_card = models.DecimalField(max_digits=15, decimal_places=3, default=0.000)
     total_credit_sales = models.DecimalField(max_digits=15, decimal_places=3, default=0.000)
+    online_payment = models.DecimalField(max_digits=15, decimal_places=3, default=0.000)
+    gift_check = models.DecimalField(max_digits=15, decimal_places=3, default=0.000)
     other_payment = models.DecimalField(max_digits=15, decimal_places=3, default=0.000)
     total_adv = models.DecimalField(max_digits=15, decimal_places=3, default=0.000)
     total_qty = models.DecimalField(max_digits=15, decimal_places=3, default=0.000)
+    other_income = models.DecimalField(max_digits=15, decimal_places=3, default=0.000)
     discount = models.DecimalField(max_digits=21, decimal_places=9, default=0.000000000)
     vat = models.DecimalField(max_digits=21, decimal_places=9, default=0.000000000)
     vat_exempt = models.DecimalField(max_digits=21, decimal_places=9, default=0.000000000)
@@ -1175,6 +1179,7 @@ class POSSettings(models.Model):
     credit = models.CharField(max_length=5, null=True)
     PO = models.CharField(max_length=5, null=True)
     gift_check = models.CharField(max_length=5, null=True)
+    gift_check_with_serial_no = models.CharField(max_length=1, default='N')
     credit_sales = models.CharField(max_length=5, null=True)
     stale = models.CharField(max_length=5, null=True)
     bankcard = models.CharField(max_length=5, null=True)
@@ -1381,3 +1386,84 @@ class PosSalesTransCustomer(models.Model):
     class Meta:
         db_table = 'tbl_pos_sales_trans_customer'
         managed = False
+
+
+class POSSalesTransGiftCheck(models.Model):
+    autonum = models.BigAutoField(primary_key=True)
+    sales_trans_id = models.DecimalField(max_digits=15, decimal_places=3, default=0.000)
+    ul_code = models.BigIntegerField(default=0)
+    site_code = models.BigIntegerField(default=0)
+    terminal_no = models.BigIntegerField(default=0)
+    cashier_id = models.BigIntegerField(default=0)
+    datetime_stamp = models.CharField(max_length=50, default='')
+    doc_type = models.CharField(max_length=5, default='')
+    gift_check_no = models.DecimalField(max_digits=9, decimal_places=3, default=0.000)
+    gift_check_count = models.DecimalField(max_digits=9, decimal_places=3, default=0.000)
+    amount = models.DecimalField(max_digits=9, decimal_places=3, default=0.000)
+
+    class Meta:
+        db_table = 'tbl_pos_sales_trans_gift_check'
+
+
+class POSSalesTransOnlinePayment(models.Model):
+    autonum = models.BigAutoField(primary_key=True)
+    sales_trans_id = models.IntegerField(default=0)
+    ul_code = models.IntegerField(default=0)
+    site_code = models.IntegerField(default=0)
+    terminal_no = models.IntegerField(default=0)
+    cashier_id = models.IntegerField(default=0)
+    date_credited = models.CharField(max_length=50, default='')
+    date_stamp = models.CharField(max_length=50, default='')
+    acct_code = models.CharField(max_length=50, default='')
+    acct_title = models.CharField(max_length=225, default='')
+    sl_code = models.CharField(max_length=50, default='')
+    sl_name = models.CharField(max_length=225, default='')
+    sl_type = models.CharField(max_length=2, default='')
+    reference_no = models.CharField(max_length=50, default='')
+    total_amount = models.DecimalField(max_digits=9, decimal_places=3, default=0.000)
+    remarks = models.CharField(max_length=225, default='')
+
+    class Meta:
+        db_table = 'tbl_pos_sales_trans_online_payment'
+
+class POSSalesTransOtherPayment(models.Model):
+    autonum = models.BigAutoField(primary_key=True)
+    sales_trans_id = models.IntegerField(default=0)
+    ul_code = models.IntegerField(default=0)
+    site_code = models.IntegerField(default=0)
+    terminal_no = models.IntegerField(default=0)
+    cashier_id = models.IntegerField(default=0)
+    particular = models.CharField(max_length=250, default='')
+    date_stamp = models.CharField(max_length=50, default='')
+    sl_code = models.CharField(max_length=50, default='')
+    sl_name = models.CharField(max_length=225, default='')
+    sl_type = models.CharField(max_length=2, default='')
+    total_amount = models.DecimalField(max_digits=9, decimal_places=3, default=0.000)
+
+    class Meta:
+        db_table = 'tbl_pos_sales_trans_other_payment'
+
+class POSGiftCheckDenomination(models.Model):
+    autonum = models.BigAutoField(primary_key=True)
+    code = models.BigIntegerField(default=0)
+    denomination_amount = models.DecimalField(max_digits=15, decimal_places=3, default=0.000)
+
+    class Meta:
+        db_table = 'tbl_pos_gift_check_denomination'
+
+class POSGiftCheckSeries(models.Model):
+    autonum = models.BigAutoField(primary_key=True)
+    ul_code = models.BigIntegerField(default=0)
+    site_code = models.BigIntegerField(default=0)
+    trans_no = models.DecimalField(max_digits=9, decimal_places=3, default=0.000)
+    series_from = models.DecimalField(max_digits=15, decimal_places=3, default=0.000)
+    series_to = models.DecimalField(max_digits=15, decimal_places=3, default=0.000)
+    validity_date_from = models.CharField(max_length=25, default='')
+    validity_date_to = models.CharField(max_length=25, default='')
+    amount = models.DecimalField(max_digits=15, decimal_places=3, default=0.000)
+    prepared_by = models.CharField(max_length=50, default='')
+
+    class Meta:
+        db_table = 'tbl_pos_gift_check_series'
+
+

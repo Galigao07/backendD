@@ -3,7 +3,7 @@ from backend.Reference.referenceviews import (add_user,view_user,update_user,get
                                               view_table,add_table,delete_table,update_table,UploadVideo,terminal_setup,lead_setup,Client_setup,
                                               CustomerDetails,CustomerSearchResults,SupplierDetails,get_cahiers_login,get_cash_count_cash_breakdown,
                                               get_cahiers_login_for_xread,generate_data_xread,get_product_profile,product_printer_category,printer_list,
-                                              get_product_Category_setup)
+                                              get_product_Category_setup,Gift_Check_Denomination,Gift_Check_series)
 
 
 urlpatterns = [
@@ -36,8 +36,6 @@ urlpatterns = [
     path('printer-categories/', product_printer_category, name='product_printer_category'),
     path('printer-list/', printer_list, name='printer_list'),
     path('product-category-setup/', get_product_Category_setup, name='get_product_Category_setup'),
-    
-
-   
-
+    path('gift-check-series/', Gift_Check_series, name='Gift_Check_series'),
+    path('gift-check-denomination/', Gift_Check_Denomination, name='Gift_Check_Denomination'),
 ]
