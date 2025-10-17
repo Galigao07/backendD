@@ -1,11 +1,5 @@
 from rest_framework import serializers
-from .models import (Product, PosRestTable,PosSalesOrder,User,POS_Terminal,PosSalesTransDetails,PosSalesTrans,PosSalesInvoiceList,PosSalesInvoiceListing,
-                     CompanySetup,Customer,PosWaiterList,PosPayor,Employee,SeniorCitizenDiscount,PosExtended,LeadSetup,PosClientSetup,
-                     PosCashiersLogin,PosCashBreakdown,BankCompany,TSetup,OtherAccount,ProductCategorySetup,BankCard,SalesTransCreditCard,
-                     SalesTransEPS,PosSalesTransSeniorCitizenDiscount,AcctSubsidiary,RCCDetails,CCCDetails,ProductSiteSetup,PosPriceTypeSiteSetup,
-                     PosMultiplePriceTypeSiteSetup,ProductCategorySales,PosSetup,AcctList,POSSettings,SLCategory,PosSalesTransCreditSale,
-                     PosSuspendList,PosSuspendListing,PosCashPullout,PosCashPulloutDetails,PosVideo,POSProductPrinter,POSGiftCheckDenomination,
-                     POSGiftCheckSeries,POSSalesTransGiftCheck)
+from .models import *
 
 
 class POSSalesTransGiftCheckSerializer(serializers.ModelSerializer):
@@ -84,6 +78,39 @@ class AcctListSerializer(serializers.ModelSerializer):
         model =  AcctList
         fields = '__all__'
 
+class AcctSubsidiaryTitleSerializer(serializers.ModelSerializer):
+    code = serializers.SerializerMethodField()
+    acct_title = serializers.SerializerMethodField()
+
+    class Meta:
+        model = AcctSubsidiary
+        fields = ['code', 'acct_title', 'sl_type']  # only include these 3
+
+    def _get_acctlist(self, obj):
+        """Helper to fetch matching AcctList record."""
+        return AcctList.objects.filter(
+            primary_code=obj.primary_code,
+            secondary_code=obj.secondary_code,
+            acct_code=obj.acct_code,
+            subsidiary_code=obj.subsidiary_code
+        ).first()
+
+    def get_code(self, obj):
+        acct = self._get_acctlist(obj)
+        return acct.code if acct else None
+
+    def get_acct_title(self, obj):
+        acct = self._get_acctlist(obj)
+        return acct.acct_title if acct else None
+
+class AcctSubsidiarySerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = AcctSubsidiary
+        fields = '__all__'  # includes model fields
+        # You can also explicitly list them:
+        # fields = ['autonum', 'primary_code', 'secondary_code', 'acct_code', 'subsidiary_code', 'acct_title', 'under', 'acct_code_from_list']
+
 class PosSetupSerializer(serializers.ModelSerializer):
     class Meta:
         model =  PosSetup
@@ -120,10 +147,7 @@ class CCCDetailsSerializer(serializers.ModelSerializer):
         model =  CCCDetails
         fields = '__all__'
 
-class AcctSubsidiarySerializer(serializers.ModelSerializer):
-    class Meta:
-        model =  AcctSubsidiary
-        fields = '__all__'
+
 
 
 class PosSalesTransSeniorCitizenDiscountSerializer(serializers.ModelSerializer):
@@ -280,6 +304,36 @@ class PosSalesInvoiceListingSerializer(serializers.ModelSerializer):
         model =  PosSalesInvoiceListing
         fields = '__all__'
 
+
+class PosOtherPmtSetupSerialize(serializers.ModelSerializer):
+    class Meta:
+        model = PosOtherPmtSetup
+        fields = '__all__'
+
+class PosOtherPmtSetupPaymentSerializer(serializers.ModelSerializer):
+    sl_type = serializers.SerializerMethodField()
+
+    class Meta:
+        model = PosOtherPmtSetup
+        fields = ['pmt_desc','acct_code', 'acct_title', 'sl_type','remarks']
+
+    def get_sl_type(self, obj):
+        """
+        Step 1: Get matching AcctList to retrieve codes
+        Step 2: Use those codes to find matching AcctSubsidiary
+        """
+        acct_list = AcctList.objects.filter(code=int(float(obj.acct_code))).first()
+        if not acct_list:
+            return None
+
+        acct_sub = AcctSubsidiary.objects.filter(
+            primary_code=acct_list.primary_code,
+            secondary_code=acct_list.secondary_code,
+            acct_code=acct_list.acct_code,
+            subsidiary_code=acct_list.subsidiary_code
+        ).first()
+
+        return acct_sub.sl_type if acct_sub else None
 
 
 

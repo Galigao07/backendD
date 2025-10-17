@@ -27,16 +27,19 @@ import traceback
 from django.db import transaction
 from django.db.models import  F, Value
 from django.db.models.functions import Concat
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated
 
 @api_view(['GET','POST'])
+@permission_classes([IsAuthenticated])
 def systemSettings(request):
     if request.method == 'GET':
         try:
-            serial_number = get_serial_number()
+            serial_number = getattr(request, "SERIALNO", None)
+            # serial_number = get_serial_number()
             machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number).first()
             pos_settings = POSSettings.objects.filter(terminal_no=machineInfo.terminal_no,site_no = machineInfo.site_no)
             serialize = POSSettingsSerializer(pos_settings,many=True)
-            print('Check POS setting  ',serialize.data)
             return Response(serialize.data)
         except Exception as e:
             print(e)
@@ -46,9 +49,8 @@ def systemSettings(request):
         try:
             recieve_data = json.loads(request.body)
             data = recieve_data.get('data')
-            print('data',data)
-            print('data', data['withHotel'])
-            serial_number = get_serial_number()
+            serial_number = getattr(request, "SERIALNO", None)
+            # serial_number = get_serial_number()
             machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number).first()
             # pdb.set_trace()
             pos_settings = POSSettings.objects.filter(terminal_no=machineInfo.terminal_no,site_no = machineInfo.site_no).first()

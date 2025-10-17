@@ -4,9 +4,12 @@ from django.http import JsonResponse
 from django.contrib.auth import authenticate
 from django.views.decorators.csrf import csrf_protect
 import pytz
-from backend.models import (CompanySetup, User,POS_Terminal,PosCashiersLogin,PosSalesTransSeniorCitizenDiscount,SalesTransCreditCard,SalesTransEPS,PosSalesTransCreditSale,BankCompany)
-from backend.serializers import (UserSerializer,POS_TerminalSerializer,PosCashiersLoginpSerializer,PosSalesTransSeniorCitizenDiscountSerializer)
+# from backend.models import (CompanySetup, User,POS_Terminal,PosCashiersLogin,PosSalesTransSeniorCitizenDiscount,SalesTransCreditCard,SalesTransEPS,PosSalesTransCreditSale,BankCompany)
+# from backend.serializers import (UserSerializer,POS_TerminalSerializer,PosCashiersLoginpSerializer,PosSalesTransSeniorCitizenDiscountSerializer)
+from backend.models import *
+from backend.serializers import *
 from rest_framework.decorators import api_view
+
 from django.middleware.csrf import get_token
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.backends import default_backend
@@ -14,12 +17,13 @@ from django.contrib.auth.hashers import make_password, check_password
 from django.http import JsonResponse
 import json
 import base64 
-
+from rest_framework_simplejwt.tokens import RefreshToken
+from django.contrib.auth import authenticate
 from django.contrib.auth.hashers import make_password, check_password
 
 import platform
 import subprocess
-from datetime import date
+from datetime import date, timedelta
 from django.db.models import Max
 # Get current date
 from backend.globalFunction import GetPHilippineDate,GetPHilippineDateTime,GetCompanyConfig
@@ -29,8 +33,7 @@ from django.db import IntegrityError
 from django_user_agents.utils import get_user_agent
 from cryptography.hazmat.primitives import padding
 from pyprinter import Printer
-import win32print
-import win32api
+
 
 from django.test import TestCase
 from reportlab.lib.units import mm,cm
@@ -41,14 +44,34 @@ import textwrap
 from backend.models import (Employee,User,POSSettings,POSProductPrinter,PosSalesInvoiceList,PosSalesInvoiceListing,PosSalesTrans,PosClientSetup,LeadSetup)
 from backend.serializers import (POSSettingsSerializer,PosSalesInvoiceListSerializer,PosSalesInvoiceListingSerializer,PosSalesTransSerializer)
 import os
-import fitz  # PyMuPDF
-import win32ui
-import win32com.client
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated,AllowAny
+from django.http import FileResponse
 import subprocess
-import winreg
-from PyPDF2 import PdfReader
+from django.conf import settings
 from django.http import JsonResponse,FileResponse
 from rest_framework.response import Response
+from django.db import connection
+
+from rest_framework_simplejwt.tokens import AccessToken, TokenError
+from rest_framework import status, permissions
+
+from rest_framework.decorators import api_view
+from rest_framework.response import Response
+from backend.auth.authentication import CookieJWTAuthentication
+from rest_framework_simplejwt.exceptions import InvalidToken
+
+@api_view(['GET'])
+def check_access_token(request):
+    auth = CookieJWTAuthentication()
+    try:
+        user, token = auth.authenticate(request)
+        if user:
+            return Response({"valid": True})
+        else:
+            return Response({"valid": False})
+    except InvalidToken:
+        return Response({"valid": False})
 
 def getCompanyData():
     # first_autonum = CompanySetup.objects.values_list('autonum', flat=True).first()
@@ -91,7 +114,7 @@ def PDFSalesOrder(data,SO,TableNo,QueNo,GuestCount,Customer,order_type,cashierID
         height = (len(data) + 20) * line_height + 2 * margin  # Adding 3 for header, footer, and hyphen lines
 
         # Create a canvas with calculated size
-        c = canvas.Canvas("SalesOrder.pdf", pagesize=(width, height))
+        c = canvas.Canvas(f"SalesOrder{cashierID}.pdf", pagesize=(width, height))
 
         # Set up a font and size
      
@@ -212,22 +235,19 @@ def PDFSalesOrderaLL(data,SO,TableNo,QueNo,GuestCount,Customer,order_type,cashie
         
         total_qty = 0
         hyphen_line = "-" * 55  # 55 hyphens in a row
-        x_start = 10 * mm  # Starting x-coordinate
-        x_end = x_start + 55 * mm  # Ending x-coordinate (55 characters long)
-
-       
-        # Determine the width and height based on the data length
-      
+        margin_right = 10 * mm
+        x_start = 2 * mm  # Starting x-coordinate
+        x_end = x_start + 85 * mm  # Ending x-coordinate (55 characters long)
         line_height = 0.4 * cm
         margin = 0.1 * cm  # Adjust margins as needed
-        width = 79 * mm  # Width adjusted for 79 mm roll paper
+        width = 85 * mm  # Width adjusted for 79 mm roll paper
         # Set the initial height for the first page
 
         # Calculate the required height based on the data length
         height = (len(data) + 20) * line_height + 2 * margin  # Adding 3 for header, footer, and hyphen lines
 
         # Create a canvas with calculated size
-        c = canvas.Canvas("SalesOrderaLL.pdf", pagesize=(width, height))
+        c = canvas.Canvas(f"SalesOrderaLL{cashierID}.pdf", pagesize=(width, height))
 
         # Set up a font and size
      
@@ -249,19 +269,20 @@ def PDFSalesOrderaLL(data,SO,TableNo,QueNo,GuestCount,Customer,order_type,cashie
             # Right align "Guest Count"
             guest_count_text = f"Guest Count: {GuestCount}"
             text_width = c.stringWidth(guest_count_text, "Helvetica", 12)  # Use appropriate font and size
-            c.drawRightString(width - margin, y_position, guest_count_text)
+            c.drawRightString(width - margin_right, y_position, guest_count_text)
+
         #     y_position -= line_height
         #     c.drawString(10 * mm, y_position, "Table No.: " f'{TableNo}')
         #     y_position -= line_height
         #     c.drawString(10 * mm, y_position, "Guest Count: " f'{GuestCount}')
         
         
-        if QueNo != 0:
+        if QueNo != 0 and QueNo != '' and QueNo != '0':
             y_position -= line_height
             c.drawString(10 * mm, y_position, "QueNo: " f'{QueNo}')
             guest_count_text = f"Guest Count: {GuestCount}"
             text_width = c.stringWidth(guest_count_text, "Helvetica", 12)  # Use appropriate font and size
-            c.drawRightString(width - margin, y_position, guest_count_text)
+            c.drawRightString(width - margin_right, y_position, guest_count_text)
         y_position -= line_height
         y_position -= line_height
         text_width = c.stringWidth(order_type, "Helvetica-Bold", 10)
@@ -501,7 +522,7 @@ def print_pdf_salesOrder():
         traceback.print_exc()
 
 
-def PDFReceipt(doc_no,doc_type,cusData):
+def PDFReceipt(request,doc_no,doc_type,cusData):
         try:
             margin_left = 2 * mm
             margin_right = 10 * mm
@@ -548,16 +569,22 @@ def PDFReceipt(doc_no,doc_type,cusData):
             credit_card_payment = 0
             debit_card_payment = 0
             gcash_payment = 0
+            gift_check_payment = 0
+            online_payment = 0
             other_payment = 0
             multiple_payment = 0
             payment_method = 'CASH'
             is_credit_card_payment = False
             is_debit_card_payment = False
             is_cash_payment = False
+            is_gift_check_payment = False
+            is_online_payment = False
+            is_other_payment = False
+            
 
 
 
-            serial_number = get_serial_number()
+            serial_number = getattr(request, "SERIALNO", None)
             machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number.strip()).first()
             
 
@@ -579,6 +606,15 @@ def PDFReceipt(doc_no,doc_type,cusData):
                     is_debit_card_payment = True
                 if data_list.total_cash !=  0:
                     cash_payment = data_list.total_cash
+                if data_list.gift_check != 0:
+                    gift_check_payment = data_list.gift_check 
+                    is_gift_check_payment = True
+                if data_list.online_payment != 0:
+                    online_payment = data_list.online_payment
+                    is_online_payment = True
+                if data_list.other_payment != 0:
+                    other_payment = data_list.other_payment
+                    is_other_payment  = True
                 # data_tmp = PosSalesInvoiceListSerializer(data_list,many=True).data
 
                 # if data_tmp:
@@ -622,7 +658,7 @@ def PDFReceipt(doc_no,doc_type,cusData):
             height = ((len(data)* 2) + 60 + card_height) * line_height + 2 * margin  # Adding 3 for header, footer, and hyphen lines
 
             # Create a canvas with calculated size
-            c = canvas.Canvas("Receipt.pdf", pagesize=(width, height))
+            c = canvas.Canvas(f"Receipt{int(float(doc_no))}.pdf", pagesize=(width, height))
 
             # Set up a font and size
         
@@ -864,14 +900,14 @@ def PDFReceipt(doc_no,doc_type,cusData):
             if is_cash_payment:
                 y_position -= line_height
                 c.drawString(10 * mm, y_position,'CASH:')
-                if is_credit_card_payment or is_debit_card_payment: 
+                if is_credit_card_payment or is_debit_card_payment or is_other_payment or is_online_payment or is_gift_check_payment: 
                     
                     c.drawRightString(width - margin_right, y_position, f'{float(cash_payment):,.2f}')
                 else:
                     cash_payment = Amount_Tendered
                     c.drawRightString(width - margin_right, y_position, f'{float(cash_payment):,.2f}')
                 y_position -= line_height
-                if is_credit_card_payment | is_debit_card_payment:
+                if is_credit_card_payment | is_debit_card_payment | is_other_payment | is_online_payment | is_gift_check_payment:
                     pass
                 else:
                     c.drawString(10 * mm, y_position,'CHANGE:')
@@ -927,10 +963,33 @@ def PDFReceipt(doc_no,doc_type,cusData):
                         c.drawString(10 * mm, y_position,'Card Holder:')
                         c.drawRightString(width - margin_right, y_position, f'{item.card_holder}')
                         y_position -= line_height
+
+            if is_gift_check_payment:
+                # y_position -= line_height
+                c.drawString(10 * mm, y_position,'GIFT CHCEK:')
+                c.drawRightString(width - margin_right, y_position, f'{float(gift_check_payment):,.2f}')
+                y_position -= line_height
+            
+            if is_online_payment:
+                # y_position -= line_height
+                c.drawString(10 * mm, y_position,'ONLINE:')
+                c.drawRightString(width - margin_right, y_position, f'{float(online_payment):,.2f}')
+                y_position -= line_height
+
+            if is_other_payment:
+                # y_position -= line_height
+                c.drawString(10 * mm, y_position,'OTHER:')
+                c.drawRightString(width - margin_right, y_position, f'{float(other_payment):,.2f}')
+                y_position -= line_height
+
             if payment_method =='CREDIT SALES':
                 y_position -= line_height
                 c.drawString(10 * mm, y_position,'CHARGE:')
                 c.drawRightString(width - margin_right, y_position, f'{float(credit_card_payment):,.2f}')
+            if is_credit_card_payment | is_debit_card_payment | is_other_payment | is_online_payment | is_gift_check_payment:
+                c.drawString(10 * mm, y_position,'CHANGE:')
+                change_amount = (cash_payment + online_payment + other_payment + gift_check_payment + debit_card_payment + credit_card_payment)- Total_due
+                c.drawRightString(width - margin_right, y_position, f'{float(change_amount):,.2f}')
 
             y_position -= line_height
             y_position -= line_height
@@ -1088,8 +1147,207 @@ def PDFReceipt(doc_no,doc_type,cusData):
             print(e)
             traceback.print_exc()
 
+def PDFCashBreakDown(request,login_record):
+    try:
+            margin_left = 2 * mm
+            margin_right = 10 * mm
+            margin_top = 2 * mm
+            margin_bottom = 2 * mm
+            x_start = 2 * mm  # Starting x-coordinate
+            x_end = x_start + 85 * mm  # Ending x-coordinate (55 characters long)
+            GTotal = 0
+            terminaNo = 0
+            print('Cash BreakDown',request.user.id_code)
+            print('Cash BreakDown',request.user.fullname)
+            Cashier_ID = request.user.id_code
+            Cashier_name = request.user.fullname
 
-def PDFChargeReceipt(doc_no,doc_type,cusData):
+            serial_number = getattr(request, "SERIALNO", None)
+            machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number.strip()).first()
+            
+            companyCode = getCompanyData()
+            clientSetup = getClientSetup()
+
+            # Determine the width and height based on the data length
+            line_height = 0.4 * cm
+            line_height_dash = 0.1 * cm
+            margin = 0.1 * cm  # Adjust margins as needed
+            width = 85 * mm  # Width adjusted for 79 mm roll paper
+            # Set the initial height for the first page
+            card_height= 0
+            data = [
+                {"denomination": "Php 1,000.00", "qty": 0, "total": '0.00'},
+                {"denomination": "Php 500.00", "qty": 0, "total": '0.00'},
+                {"denomination": "Php 200.00", "qty": 0, "total": '0.00'},
+                {"denomination": "Php 100.00", "qty": 0, "total": '0.00'},
+                {"denomination": "Php 50.00", "qty": 0, "total": '0.00'},
+                {"denomination": "Php 20.00", "qty": 0, "total": '0.00'},
+                {"denomination": "Php 10.00", "qty": 0, "total": '0.00'},
+                {"denomination": "Php 5.00", "qty": 0, "total": '0.00'},
+                {"denomination": "Php 1.00", "qty": 0, "total": '0.00'},
+                {"denomination": "Php 0.25", "qty": 0, "total": '0.00'},
+                {"denomination": "Php 0.05", "qty": 0, "total": '0.00'},
+            ]
+
+
+
+
+            # Calculate the required height based on the data length
+            height = ((len(data)* 2) + 20 + card_height) * line_height + 2 * margin  # Adding 3 for header, footer, and hyphen lines
+
+            # Create a canvas with calculated size
+            c = canvas.Canvas(f"CashCount{int(float(Cashier_ID))}.pdf", pagesize=(width, height))
+
+            # Set up a font and size
+            c.setFont("Helvetica", 8.5)
+            y_position = height - margin - line_height 
+
+            text_width = c.stringWidth(f'{clientSetup.company_name}', "Helvetica", 8.5)
+            x_center = (width - text_width) / 2
+            c.drawString(x_center, y_position, f'{clientSetup.company_name}')
+            y_position -= line_height
+
+            text_width = c.stringWidth(f'{clientSetup.company_address}', "Helvetica",  8.5)
+            x_center = (width - text_width) / 2
+            c.drawString(x_center, y_position, f'{clientSetup.company_address}')
+            y_position -= line_height
+
+            text_width = c.stringWidth(f'{clientSetup.company_address2}', "Helvetica",  8.5)
+            x_center = (width - text_width) / 2
+            c.drawString(x_center, y_position, f'{clientSetup.company_address2}')
+            y_position -= line_height
+
+            text_width = c.stringWidth(f'{clientSetup.tin}', "Helvetica",  8.5)
+            x_center = (width - text_width) / 2
+            c.drawString(x_center, y_position, f'{clientSetup.tin}')
+            y_position -= line_height
+
+            text_width = c.stringWidth(f'{clientSetup.tel_no}', "Helvetica",  8.5)
+            x_center = (width - text_width) / 2
+            c.drawString(x_center, y_position, f'{clientSetup.tel_no}')
+            y_position -= line_height
+
+            text_width = c.stringWidth(f'{machineInfo.Machine_no}', "Helvetica",  8.5)
+            x_center = (width - text_width) / 2
+            c.drawString(x_center, y_position, f'{machineInfo.Machine_no}')
+            y_position -= line_height
+
+            text_width = c.stringWidth(f'{machineInfo.Serial_no}', "Helvetica", 10)
+            x_center = (width - text_width) / 2
+            c.drawString(x_center, y_position, f'{machineInfo.Serial_no}')
+            y_position -= line_height
+            y_position -= line_height
+    
+     
+
+
+       
+
+            date_time = GetPHilippineDateTime()
+            text_width = c.stringWidth(date_time, "Helvetica",  8.5)
+            # Draw the date and time
+            c.drawString(x_start, y_position, f'{date_time}')
+            y_position -= line_height
+
+            text_width = c.stringWidth(f'Terminal No.:{terminaNo}', "Helvetica",  8.5)
+            c.drawString(x_start, y_position, f'Terminal No.:{terminaNo}')
+            y_position -= line_height
+            y_position -= line_height
+
+                   # Calculate x-coordinate for center alignment of "SALES INVOICE"
+            text_width = c.stringWidth("CASH COUNT", "Helvetica-Bold",  10)
+            c.setFont("Helvetica-Bold", 10)
+            x_center = (width - text_width) / 2
+            c.drawString(x_center, y_position, "CASH COUNT")
+            y_position -= line_height
+            y_position -= line_height
+            c.setFont("Helvetica", 8.5)
+
+            text_width = c.stringWidth(f'CASHIER NAME:{Cashier_name}', "Helvetica",  8.5)
+            c.drawString(x_start, y_position, f'CASHIER NAME:{Cashier_name}')
+            y_position -= line_height_dash
+            c.setDash(3, 2)
+            c.line(x_start, y_position, x_end, y_position)
+            y_position -= line_height
+
+            text_width = c.stringWidth(f'Qty', "Helvetica",  8.5)
+            c.drawString(x_start, y_position, f'Qty')
+
+            text_width = c.stringWidth(f'Denomination', "Helvetica",  8.5)
+            x_center = (width - text_width) / 2
+            x_center_deno = x_center
+            c.drawString(x_center, y_position, f'Denomination')
+
+            text_width = c.stringWidth(f'Total', "Helvetica",  8.5)
+            c.drawRightString(width - margin_right, y_position, f'Total')
+            y_position -= line_height_dash
+            c.line(x_start, y_position, x_end, y_position)
+            for item in data:
+                y_position -= line_height
+                result = PosCashBreakdown.objects.filter(login_record=login_record,denomination = item["denomination"]).first()
+                if result:
+                    print('results',result)
+            
+                    text_width = c.stringWidth(f'{result.quantity}', "Helvetica",  8.5)
+                    c.drawString(x_start, y_position, f'{result.quantity}')
+
+                    text_width = c.stringWidth(f'{result.denomination}', "Helvetica",  8.5)
+                    c.drawString(x_center_deno, y_position, f'{result.denomination}')
+                    formatted = f"{result.total:,.2f}"
+                    text_width = c.stringWidth(formatted, "Helvetica",  8.5)
+                    c.drawRightString(width - margin_right, y_position, formatted)
+                    GTotal += float(result.total)
+                else:
+                    text_width = c.stringWidth(f'{item["qty"]}', "Helvetica",  8.5)
+                    c.drawString(x_start, y_position, f'{item["qty"]}')
+
+                    text_width = c.stringWidth(f'{item["denomination"]}', "Helvetica",  8.5)
+                    c.drawString(x_center_deno, y_position, f'{item["denomination"]}')
+
+                    text_width = c.stringWidth(f'{item["total"]}', "Helvetica",  8.5)
+                    c.drawRightString(width - margin_right, y_position, f'{item["total"]}')
+            
+            y_position -= line_height_dash
+            c.line(x_start, y_position, x_end, y_position)
+            y_position -= line_height
+            text_width = c.stringWidth(f'Grand Total:', "Helvetica",  8.5)
+            c.drawString(x_start, y_position, f'Grand Total:')
+            formatted = f"{GTotal:,.2f}" 
+            text_width = c.stringWidth(formatted, "Helvetica",  8.5)
+            c.drawRightString(width - margin_right, y_position, formatted)
+            y_position -= line_height_dash
+            c.line(x_start, y_position, x_end, y_position)
+            y_position -= line_height_dash
+            c.line(x_start, y_position, x_end, y_position)
+            y_position -= line_height
+            y_position -= line_height
+
+            c.setDash(3,0)
+            c.line(x_start, y_position, x_end, y_position)
+            y_position -= line_height
+            text_width = c.stringWidth(f'Terminal Cashier', "Helvetica",  8.5)
+            x_center = (width - text_width) / 2
+            c.drawString(x_center, y_position, f'Terminal Cashier')
+            y_position -= line_height
+            y_position -= line_height
+
+            c.line(x_start, y_position, x_end, y_position)
+            y_position -= line_height
+            text_width = c.stringWidth(f'Teasury Personnel', "Helvetica",  8.5)
+            x_center = (width - text_width) / 2
+            c.drawString(x_center, y_position, f'Teasury Personnel')
+            print('already save pdf CashCOunt')
+            c.save() 
+            
+
+
+
+    except Exception as e:
+        print('error',e)
+        traceback.print_exc()
+
+
+def PDFChargeReceipt(request,doc_no,doc_type,cusData):
         try:
             margin_left = 2 * mm
             margin_right = 10 * mm
@@ -1131,7 +1389,7 @@ def PDFChargeReceipt(doc_no,doc_type,cusData):
             non_vat = 0
 
 
-            serial_number = get_serial_number()
+            serial_number = getattr(request, "SERIALNO", None)
             machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number.strip()).first()
             
 
@@ -1171,7 +1429,7 @@ def PDFChargeReceipt(doc_no,doc_type,cusData):
             height = ((len(data)* 2) + 60 + card_height) * line_height + 2 * margin  # Adding 3 for header, footer, and hyphen lines
 
             # Create a canvas with calculated size
-            c = canvas.Canvas("ChargeReceipt.pdf", pagesize=(width, height))
+            c = canvas.Canvas(f"ChargeReceipt{int(float(doc_no))}.pdf", pagesize=(width, height))
 
             # Set up a font and size
         
@@ -1617,55 +1875,159 @@ def PDFChargeReceipt(doc_no,doc_type,cusData):
             traceback.print_exc()
 
 
+
 @api_view(['GET'])
 def download_pdf(request):
-    if request.method == 'GET':
-        try:
-            # Get the absolute path of the file
-            # file_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'backendD', 'Receipt.pdf'))
-            file_path ='Receipt.pdf'
-            # Check if the file exists
-            print('file_path',file_path)
-            if not os.path.isfile(file_path):
-                print('xxxxxx')
-                return Response({'error': 'File not found.'}, status=404)
+    try:
+        OR_no = request.GET.get('or', '')
+        file_path = f"Receipt{int(float(OR_no))}.pdf"  # ✅ Correct f-string
 
-            # Open the file and return it as a response
-            f = open(file_path, 'rb')
-            response = FileResponse(f, as_attachment=True, filename='Receipt.pdf')
+        print('file_path:', file_path)
+
+        if not os.path.isfile(file_path):
+            print('File not found')
+            return Response({'error': 'File not found.'}, status=404)
+
+        # Open the file in binary read mode
+        f = open(file_path, 'rb')
+        response = FileResponse(f, as_attachment=True, filename=f"Receipt{OR_no}.pdf")
+
+        # ✅ Attach a callback to delete the file after the response is closed
+        def cleanup_file(response):
+            try:
+                f.close()
+                os.remove(file_path)
+                print(f"Deleted temporary file: {file_path}")
+            except Exception as e:
+                print(f"Error deleting file: {e}")
             return response
-            # return FileResponse(open(file_path, 'rb'), as_attachment=True, filename='Receipt.pdf')
-        
-        except Exception as e:
-            print(e)
-            traceback.print_exc()
-            return Response({'error': 'An error occurred while processing the request.'}, status=500)
+
+        response.close = lambda *args, **kwargs: cleanup_file(response)
+
+        return response
+
+    except Exception as e:
+        print(f"Error: {e}")
+        return Response({'error': str(e)}, status=500)
 
 @api_view(['GET'])
-def download_sales_order_pdf(request):
-    if request.method == 'GET':
-        try:
-            # Get the absolute path of the file
-            # file_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'backendD', 'Receipt.pdf'))
-            file_path ='SalesOrderaLL.pdf'
-            # Check if the file exists
-            print('file_path',file_path)
-            if not os.path.isfile(file_path):
-                print('xxxxxx')
-                return Response({'error': 'File not found.'}, status=404)
+def download_pdf_cash_count(request):
+    try:
+        id = request.user.id_code
+        file_path = f"CashCount{int(id)}.pdf"  # ✅ Correct f-string
 
-            # Open the file and return it as a response
-            f = open(file_path, 'rb')
-            response = FileResponse(f, as_attachment=True, filename='SalesOrderaLL.pdf')
+        if not os.path.isfile(file_path):
+            print('File not found')
+            return Response({'error': 'File not found.'}, status=404)
+
+        # Open the file in binary read mode
+        f = open(file_path, 'rb')
+        response = FileResponse(f, as_attachment=True, filename=f"CashCount{id}.pdf")
+
+        # ✅ Attach a callback to delete the file after the response is closed
+        def cleanup_file(response):
+            try:
+                f.close()
+                os.remove(file_path)
+                print(f"Deleted temporary file: {file_path}")
+            except Exception as e:
+                print(f"Error deleting file: {e}")
             return response
+
+        response.close = lambda *args, **kwargs: cleanup_file(response)
+
+        return response
+
+    except Exception as e:
+        print(f"Error: {e}")
+        return Response({'error': str(e)}, status=500)
+
+# @api_view(['GET'])
+# def download_pdf(request):
+#     if request.method == 'GET':
+#         try:
+#             OR_no = request.GET.get('or','')
+#             # Get the absolute path of the file
+#             # file_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'backendD', 'Receipt.pdf'))
+#             file_path ='Receipt{OR_no}.pdf'
+#             # Check if the file exists
+#             print('file_path',file_path)
+#             if not os.path.isfile(file_path):
+#                 print('xxxxxx')
+#                 return Response({'error': 'File not found.'}, status=404)
+
+#             # Open the file and return it as a response
+#             f = open(file_path, 'rb')
+#             response = FileResponse(f, as_attachment=True, filename='Receipt.pdf')
+#             return response
             # return FileResponse(open(file_path, 'rb'), as_attachment=True, filename='Receipt.pdf')
         
-        except Exception as e:
-            print(e)
-            traceback.print_exc()
-            return Response({'error': 'An error occurred while processing the request.'}, status=500)
+        # except Exception as e:
+        #     print(e)
+        #     traceback.print_exc()
+        #     return Response({'error': 'An error occurred while processing the request.'}, status=500)
 
+# @api_view(['GET'])
+# @permission_classes([AllowAny])
+# def download_sales_order_pdf(request):
+#     if request.method == 'GET':
+#         try:
+#             CashierID = request.GET.get('CashierID','')
+#             # Get the absolute path of the file
+#             # file_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'backendD', 'Receipt.pdf'))
+#             file_path =f'SalesOrderaLL{CashierID}.pdf'
+#             # Check if the file exists
+#             print('file_path',file_path)
+#             if not os.path.isfile(file_path):
+#                 print('xxxxxx')
+#                 return Response({'error': 'File not found.'}, status=404)
 
+#             # Open the file and return it as a response
+#             f = open(file_path, 'rb')
+#             response = FileResponse(f, as_attachment=True, filename='SalesOrderaLL.pdf')
+#             return response
+#             # return FileResponse(open(file_path, 'rb'), as_attachment=True, filename='Receipt.pdf')
+        
+#         except Exception as e:
+#             print(e)
+#             traceback.print_exc()
+#             return Response({'error': 'An error occurred while processing the request.'}, status=500)
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def download_sales_order_pdf(request):
+    try:
+        CashierID = request.GET.get('CashierID', '')
+        file_path = f"SalesOrderaLL{CashierID}.pdf"
+
+        print('file_path:', file_path)
+
+        if not os.path.isfile(file_path):
+            print('File not found')
+            return Response({'error': 'File not found.'}, status=404)
+
+        f = open(file_path, 'rb')
+        response = FileResponse(f, as_attachment=True, filename='SalesOrderaLL.pdf')
+
+        # ✅ Attach cleanup logic
+        def cleanup_file(response):
+            try:
+                f.close()  # close file first
+                os.remove(file_path)  # delete file
+                print(f"✅ Deleted file: {file_path}")
+            except Exception as e:
+                print(f"⚠️ Error deleting file: {e}")
+            return response
+
+        # Override close method to call cleanup after sending
+        response.close = lambda *args, **kwargs: cleanup_file(response)
+
+        return response
+
+    except Exception as e:
+        print("❌ Exception:", e)
+        traceback.print_exc()
+        return Response({'error': str(e)}, status=500)
 @api_view(['GET'])
 def download_charge_receipt_pdf(request):
     if request.method == 'GET':
@@ -1699,57 +2061,116 @@ def check_mobile(request):
     }
     return JsonResponse(response_data)
 
-@api_view(['GET'])
+@api_view(['POST'])
+@permission_classes([AllowAny])
 def user_login_api(request):
     try:
-        if request.method == 'GET':
-            # testPrint()
-
-            username = request.GET.get('username')
-            password = request.GET.get('password')
+        if request.method == 'POST':
+            username = request.data.get('username')
+            password = request.data.get('password')
+            serial_number = request.data.get('SERIALNO')
             hashed_password = make_password(password)
+            print('login')
 
             password1 = 'Lsi#1288'
             current_date = date.today()
 
             day_of_month = str(current_date.day).zfill(2)
-            password_with_date = password1 + day_of_month
-            serial_number = get_serial_number()
+            yesterday = current_date - timedelta(days=1)
+
+            # Format as YYYY-MM-DD
+            last_day_stamp = yesterday.strftime("%Y-%m-%d")
+
+            password_with_date = password1 + day_of_month 
+
+
+            # serial_number = get_serial_number()
             # pdb.set_trace()
         
             # CHECK IF MOBILE DEVICE
             user_agent = get_user_agent(request)
             is_mobile = user_agent.is_mobile
-            print('is mobile',is_mobile)
-            # pdb.set_trace()
 
-            if (username=='Admin') & (password==password_with_date):
-                print('yy',serial_number)
+            if (username.lower()=='Admin') & (password==password_with_date):
+                # print('yy',serial_number)
                 if is_mobile == False:
-                    if (serial_number =='N9YC13A28A07691'):
                             infolist ={
                                 'UserRank': 'Admin',
-                                'FullName':'Admin',
-                                'UserID':'9999999',
+                                'FullName':'Super Admin',
+                                'UserID':'9999',
                                 'UserName':'Admin',
                                 'TerminalNo':0,
                                 'SiteCode': 0,
-                                'PTU': 0
-                                
+                                'PTU': 0 
                             }
-                            print('infolist',infolist)
+                            # is_delete = User.objects.get(id_code='9999',sys_type ='POS')
+                            # if is_delete:
+                            #     is_delete.delete()
+                            with connection.cursor() as cursor:
+                                sql = "DELETE FROM tbl_user WHERE id_code = %s AND sys_type = %s"
+                                cursor.execute(sql, ['9999', 'POS'])
+                            user, created = User.objects.get_or_create(
+                            user_name=username,
+                            defaults={
+                                'password':make_password(password_with_date),
+                                'fullname': 'Super Admin',
+                                'user_rank': 'Super Admin',
+                                'id_code': '9999',
+                                'sys_type': 'POS',
+                                'active': 'Y' })
                             
-                            return JsonResponse({'Info':infolist}, status=200)
+
+                            user = authenticate(request, username=username, password=password_with_date)
+                            if user is None:
+                                return Response({"error": "Invalid username or password"}, status=401)
+
+                            try:
+                                # Create JWT refresh token
+                                try:
+                                    refresh = RefreshToken.for_user(user)
+                                except Exception as e:
+                                    print(e)
+                                # refresh = RefreshToken.for_user(user)
+                                refresh['id_code'] = user.autonum  # or any custom claim
+                                # Add custom claims
+                                refresh['SERIALNO'] = serial_number
+                              
+                            except Exception as e:
+                                return Response({"error": "Failed to create token", "detail": str(e)}, status=500)
+
+                            # Create response with user info
+                            try:
+                                response = Response({"Info": infolist})
+                                # Set HttpOnly cookies
+                                response.set_cookie(
+                                    key="access_token",
+                                    value=str(refresh.access_token),
+                                    httponly=True,
+                                    samesite=getattr(settings, "JWT_COOKIE_SAMESITE", "Lax"),
+                                    secure=getattr(settings, "JWT_COOKIE_SECURE", False),
+                                    path="/"
+                                )
+
+                                response.set_cookie(
+                                    key="refresh_token",
+                                    value=str(refresh),
+                                    httponly=True,
+                                    samesite=getattr(settings, "JWT_COOKIE_SAMESITE", "Lax"),
+                                    secure=getattr(settings, "JWT_COOKIE_SECURE", False),
+                                 path="/"
+                                )
+                                return response
+                            except Exception as e:
+                                print(e)
                 else:
                     return JsonResponse({'message':'Error'},status=404)
                     
-            user = User.objects.filter(user_name=username).first()
-            stored_hashed_password = user.password
-            # pdb.set_trace()
+            user = authenticate(request, username=username, password=password)
             if user is not None:
+                stored_hashed_password = user.password
+                # stored_hashed_password = make_password(password_with_date)
                 if check_password(password, stored_hashed_password):
                     # pdb.set_trace()
-                    serial_number = get_serial_number()
                     machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number.strip()).first()
                     latest_trans_id = PosCashiersLogin.objects.aggregate(max_trans_id=Max('trans_id'))['max_trans_id']
                     new_trans_id = 0
@@ -1757,44 +2178,58 @@ def user_login_api(request):
                         if user.user_rank =='Cashier':
                             current_date_ph = GetPHilippineDate()
                             current_datetime_ph = GetPHilippineDateTime()   
+
+                            check_if_cashier_login_last_day = PosCashiersLogin.objects.filter(id_code = user.id_code,islogout='YES',
+                                                                                            isshift_end = 'YES',isxread='NO')  
+                            if check_if_cashier_login_last_day.exists(): 
+                                return JsonResponse({'message':'Zread is Required'},status=200)                                    
+                            
                             check_if_cashier_login = PosCashiersLogin.objects.filter(id_code = user.id_code,islogout='YES',
                                                                                     isshift_end = 'NO',isxread='NO')
-                                                                                    #  date_stamp = current_date_ph)
+                                               #  date_stamp = current_date_ph)
                             if check_if_cashier_login.exists():
                                 cashier_login = check_if_cashier_login.first()  # or cashier_login = check_if_cashier_login.get()
-                                print(machineInfo.terminal_no,cashier_login.terminal_no)
                                 if int(cashier_login.terminal_no) == int(machineInfo.terminal_no):
                                     cashier_login.islogout = 'NO'
+                                    new_trans_id = cashier_login.trans_id
                                     cashier_login.save()
                                 else:
                                     return JsonResponse({'message':'Cashier Already login in Terminal No. ' + cashier_login.terminal_no},status=200)
                             else:
-                                current_date_ph = GetPHilippineDate()
-                                current_datetime_ph = GetPHilippineDateTime()
-                                if latest_trans_id is None:
-                                    new_trans_id = 1
+                                check_if_cashier_login_unexpected = PosCashiersLogin.objects.filter(id_code = user.id_code,islogout='NO',
+                                                                                    isshift_end = 'NO',isxread='NO')
+                                if check_if_cashier_login_unexpected.exists():
+                                    cashier_login = check_if_cashier_login_unexpected.first()  # or cashier_login = check_if_cashier_login.get()
+                                    if int(cashier_login.terminal_no) == int(machineInfo.terminal_no):
+                                        cashier_login.islogout = 'NO'
+                                        new_trans_id = cashier_login.trans_id
+                                        cashier_login.save()
+                                        
                                 else:
-                                    new_trans_id = latest_trans_id + 1
-
-                                cashier_data = PosCashiersLogin(
-                                    trans_id=new_trans_id,
-                                    terminal_no=machineInfo.terminal_no,
-                                    site_code=machineInfo.site_no,
-                                    id_code=user.id_code,
-                                    name_stamp=user.fullname,
-                                    user_rank = 'Cashier',
-                                    date_stamp=current_date_ph,
-                                    change_fund=0.0,
-                                    borrowed_fund=0.0,
-                                    time_login=current_datetime_ph,
-                                    time_logout='',
-                                    islogout='NO',
-                                    isshift_end='NO',
-                                    isxread='NO',
-                                )
-
-                                # Save the instance
-                                cashier_data.save()
+                                    current_date_ph = GetPHilippineDate()
+                                    current_datetime_ph = GetPHilippineDateTime()
+                                    if latest_trans_id is None:
+                                        new_trans_id = 1
+                                    else:
+                                        new_trans_id = latest_trans_id + 1
+        
+                                    cashier_data = PosCashiersLogin(
+                                        trans_id=new_trans_id,
+                                        terminal_no=machineInfo.terminal_no,
+                                        site_code=machineInfo.site_no,
+                                        id_code=user.id_code,
+                                        name_stamp=user.fullname,
+                                        user_rank = 'Cashier',
+                                        date_stamp=current_date_ph,
+                                        # change_fund=0.0,
+                                        # borrowed_fund=0.0,
+                                        time_login=current_datetime_ph,
+                                        time_logout='',
+                                        islogout='NO',
+                                        isshift_end='NO',
+                                        isxread='NO',
+                                    )
+                                    cashier_data.save()
                             infolist ={
                                 'UserRank': user.user_rank,
                                 'FullName':user.fullname,
@@ -1805,10 +2240,53 @@ def user_login_api(request):
                                 'PTU': machineInfo.PTU_no,
                                 'TransID':new_trans_id
                             }
+                            
+                            if user is None:
+                                return Response({"error": "Invalid username or password"}, status=401)
+
+                            try:
+                                # Create JWT refresh token
+                                try:
+                                    refresh = RefreshToken.for_user(user)
+                                except Exception as e:
+                                    print(e)
+                                refresh['id_code'] = user.autonum  # or any custom claim
+                                refresh['SERIALNO'] = serial_number
+                                refresh['trans_id'] = new_trans_id
+
+                              
+                            except Exception as e:
+                                return Response({"error": "Failed to create token", "detail": str(e)}, status=500)
+
+                            # Create response with user info
+                            try:
+                                access_token = str(refresh.access_token)
+                                response = Response({"Info": infolist})
+                                # Set HttpOnly cookies
+                                print('refresh',access_token)
+                                response.set_cookie(
+                                    key="access_token",
+                                    value=access_token,
+                                    httponly=True,
+                                    samesite=getattr(settings, "JWT_COOKIE_SAMESITE", "Lax"),
+                                    secure=getattr(settings, "JWT_COOKIE_SECURE", False),    # adjust based on your frontend
+                                    path="/"
+                                )
+
+                                response.set_cookie(
+                                    key="refresh_token",
+                                    value=str(refresh),
+                                    httponly=True,
+                                    samesite=getattr(settings, "JWT_COOKIE_SAMESITE", "Lax"),
+                                    secure=getattr(settings, "JWT_COOKIE_SECURE", False),
+                                    path="/"
+                                )
+                                return response
+                            except Exception as e:
+                                print(e)
                         
-                            return JsonResponse({'Info':infolist}, status=200)
+                            # return JsonResponse({'Info':infolist}, status=200)
                         else:
-                            print('is not mobile')
                             if user.user_rank =='Salesman':
                                 current_date_ph = GetPHilippineDate()
                                 current_datetime_ph = GetPHilippineDateTime()   
@@ -1816,11 +2294,6 @@ def user_login_api(request):
                                                                                         #  date_stamp = current_date_ph)
                                 if check_if_cashier_login.exists():
                                     cashier_login = check_if_cashier_login.first()  # or cashier_login = check_if_cashier_login.get()
-                                    # print(machineInfo.terminal_no,cashier_login.terminal_no)
-                                    # if int(cashier_login.terminal_no) == int(machineInfo.terminal_no):
-                                    #     cashier_login.islogout = 'NO'
-                                    #     cashier_login.save()
-                                    # else:
                                     return JsonResponse({'message':'Salesman already login in different device. '},status=200)
                                 else:
                                     current_date_ph = GetPHilippineDate()
@@ -1846,10 +2319,7 @@ def user_login_api(request):
                                         isshift_end='NO',
                                         isxread='NO',
                                     )
-
-                                    # Save the instance
                                     cashier_data.save()
-
                                 infolist ={
                                     'UserRank': user.user_rank,
                                     'FullName':user.fullname,
@@ -1860,23 +2330,112 @@ def user_login_api(request):
                                     'PTU': machineInfo.PTU_no,
                                     'TransID':new_trans_id
                                 }
+                                # user = authenticate(request, username=username, password=password_with_date)
+                                if user is None:
+                                    return Response({"error": "Invalid username or password"}, status=401)
 
+                                try:
+                                    # Create JWT refresh token
+                                    try:
+                                        refresh = RefreshToken.for_user(user)
+                                    except Exception as e:
+                                        print(e)
+                                    # refresh = RefreshToken.for_user(user)
+                                    refresh['id_code'] = user.autonum  # or any custom claim
+                                    # Add custom claims
+                                    refresh['SERIALNO'] = serial_number
+                                
+                                except Exception as e:
+                                    return Response({"error": "Failed to create token", "detail": str(e)}, status=500)
 
-                                return JsonResponse({'Info':infolist}, status=200)
+                                # Create response with user info
+                                try:
+                                    response = Response({"Info": infolist})
+                                    # Set HttpOnly cookies
+                                    response.set_cookie(
+                                        key="access_token",
+                                        value=str(refresh.access_token),
+                                        httponly=True,
+                                        samesite=getattr(settings, "JWT_COOKIE_SAMESITE", "Lax"),
+                                        secure=getattr(settings, "JWT_COOKIE_SECURE", False),    # adjust based on your frontend
+                                        path="/"
+                                    )
+
+                                    response.set_cookie(
+                                        key="refresh_token",
+                                        value=str(refresh),
+                                        httponly=True,
+                                        samesite=getattr(settings, "JWT_COOKIE_SAMESITE", "Lax"),
+                                        secure=getattr(settings, "JWT_COOKIE_SECURE", False),
+                                        path="/"
+                                    )
+                                    print(response)
+                                    return response
+                                except Exception as e:
+                                    print(e)
+                                # return JsonResponse({'Info':infolist}, status=200)
+                            else:
+                                infolist ={
+                                    'UserRank': user.user_rank,
+                                    'FullName':user.fullname,
+                                    'UserID':user.id_code,
+                                    'UserName':user.user_name,
+                                    'TerminalNo': machineInfo.terminal_no,
+                                    'SiteCode': machineInfo.site_no,
+                                    'PTU': machineInfo.PTU_no,
+                                    'TransID':new_trans_id
+                                }
+                                # user = authenticate(request, username=username, password=password_with_date)
+                                if user is None:
+                                    return Response({"error": "Invalid username or password"}, status=401)
+
+                                try:
+                                    # Create JWT refresh token
+                                    try:
+                                        refresh = RefreshToken.for_user(user)
+                                    except Exception as e:
+                                        print(e)
+                                    # refresh = RefreshToken.for_user(user)
+                                    refresh['id_code'] = user.autonum  # or any custom claim
+                                    # Add custom claims
+                                    refresh['SERIALNO'] = serial_number
+                                
+                                except Exception as e:
+                                    return Response({"error": "Failed to create token", "detail": str(e)}, status=500)
+
+                                # Create response with user info
+                                try:
+                                    response = Response({"Info": infolist})
+                                    # Set HttpOnly cookies
+                                    response.set_cookie(
+                                        key="access_token",
+                                        value=str(refresh.access_token),
+                                        httponly=True,
+                                        samesite=getattr(settings, "JWT_COOKIE_SAMESITE", "Lax"),
+                                        secure=getattr(settings, "JWT_COOKIE_SECURE", False),    # adjust based on your frontend
+                                        path="/"
+                                    )
+
+                                    response.set_cookie(
+                                        key="refresh_token",
+                                        value=str(refresh),
+                                        httponly=True,
+                                        samesite=getattr(settings, "JWT_COOKIE_SAMESITE", "Lax"),
+                                        secure=getattr(settings, "JWT_COOKIE_SECURE", False),
+                                        path="/"
+                                    )
+                                    return response
+                                except Exception as e:
+                                    print(e)
+                                    traceback.print_exc()
 
                     else:
-                    
                         current_date_ph = GetPHilippineDate()
                         current_datetime_ph = GetPHilippineDateTime()   
                         check_if_cashier_login = PosCashiersLogin.objects.filter(id_code = user.id_code,islogout='NO',
                                                                                     date_stamp = current_date_ph)
                         if check_if_cashier_login.exists():
                                 cashier_login = check_if_cashier_login.first()  # or cashier_login = check_if_cashier_login.get()
-                                # print(machineInfo.terminal_no,cashier_login.terminal_no)
-                                # if int(cashier_login.terminal_no) == int(machineInfo.terminal_no):
-                                #     cashier_login.islogout = 'NO'
-                                #     cashier_login.save()
-                                # else:
                                 return JsonResponse({'message':'Salesman Already login in Terminal No. ' + cashier_login.terminal_no},status=200)
                         else:
                                 current_date_ph = GetPHilippineDate()
@@ -1916,8 +2475,52 @@ def user_login_api(request):
                                 'PTU': machineInfo.PTU_no,
                                 'TransID':new_trans_id
                             }
+                       
 
+                        # user = authenticate(request, username=username, password=password_with_date)
+                        if user is None:
+                            return Response({"error": "Invalid username or password"}, status=401)
 
+                        try:
+                                # Create JWT refresh token
+                            try:
+                                refresh = RefreshToken.for_user(user)
+                            except Exception as e:
+                                print(e)
+                                # refresh = RefreshToken.for_user(user)
+                            refresh['id_code'] = user.autonum  # or any custom claim
+                                # Add custom claims
+                            refresh['SERIALNO'] = serial_number
+                            refresh['id_code'] = 9999
+                              
+                        except Exception as e:
+                            return Response({"error": "Failed to create token", "detail": str(e)}, status=500)
+
+                            # Create response with user info
+                        try:
+                            response = Response({"Info": infolist})
+                                # Set HttpOnly cookies
+                            response.set_cookie(
+                                key="access_token",
+                                    value=str(refresh.access_token),
+                                    httponly=True,
+                                    samesite=getattr(settings, "JWT_COOKIE_SAMESITE", "Lax"),
+                                    secure=getattr(settings, "JWT_COOKIE_SECURE", False),    # adjust based on your frontend
+                                    path="/"
+                                )
+
+                            response.set_cookie(
+                                    key="refresh_token",
+                                    value=str(refresh),
+                                    httponly=True,
+                                    samesite=getattr(settings, "JWT_COOKIE_SAMESITE", "Lax"),
+                                    secure=getattr(settings, "JWT_COOKIE_SECURE", False),
+                                    path="/"
+                                )
+                            print(response)
+                            return response
+                        except Exception as e:
+                            print(e)
                         return JsonResponse({'Info':infolist}, status=200)
 
                 else:
@@ -1930,40 +2533,40 @@ def user_login_api(request):
         print(e)
         traceback.print_exc()
 
-def testPrint():  
-    try:
-        # Initialize the Printer object with the specific printer name
-        print('qqqqqqqqqqqqqqqqqqqq')
+# def testPrint():  
+#     try:
+#         # Initialize the Printer object with the specific printer name
+#         print('qqqqqqqqqqqqqqqqqqqq')
         
-        # Specify the name of the printer
-        printer_name = 'EPSON TM-U220 Receipt'
+#         # Specify the name of the printer
+#         printer_name = 'EPSON TM-U220 Receipt'
         
-        # Text to be printed
-        text_to_print = (
-        "Hello, world!\nThis is a test print.\nPrinting on multiple lines.\n"
-        )
+#         # Text to be printed
+#         text_to_print = (
+#         "Hello, world!\nThis is a test print.\nPrinting on multiple lines.\n"
+#         )
         
     
-        print(printer_name)
+#         print(printer_name)
         
-        # Open a handle to the printer
-        printer_handle = win32print.OpenPrinter(printer_name)
+#         # Open a handle to the printer
+#         printer_handle = win32print.OpenPrinter(printer_name)
         
-        # Start a document
-        job_id = win32print.StartDocPrinter(printer_handle, 1, ("Test Job", None, "RAW"))
-        win32print.StartPagePrinter(printer_handle)
+#         # Start a document
+#         job_id = win32print.StartDocPrinter(printer_handle, 1, ("Test Job", None, "RAW"))
+#         win32print.StartPagePrinter(printer_handle)
         
-        # Print the text
+#         # Print the text
 
-        win32print.WritePrinter(printer_handle, text_to_print.encode('utf-8'))
-        cut_command = b'\x1d\x56\x42\x00'
-        win32print.WritePrinter(printer_handle, cut_command)       
-        # End the document and close the printer handle
-        win32print.EndPagePrinter(printer_handle)
-        win32print.EndDocPrinter(printer_handle)
-        win32print.ClosePrinter(printer_handle)
-    except Exception as e:
-        print(e)
+#         win32print.WritePrinter(printer_handle, text_to_print.encode('utf-8'))
+#         cut_command = b'\x1d\x56\x42\x00'
+#         win32print.WritePrinter(printer_handle, cut_command)       
+#         # End the document and close the printer handle
+#         win32print.EndPagePrinter(printer_handle)
+#         win32print.EndDocPrinter(printer_handle)
+#         win32print.ClosePrinter(printer_handle)
+#     except Exception as e:
+#         print(e)
         
 
 
@@ -1974,7 +2577,7 @@ def CheckTerminalLogIn(request):
         pdb.set_trace()
     
         try:
-            serial_number = get_serial_number()
+            serial_number = getattr(request, "SERIALNO", None)
             machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number.strip()).first()
 
             checkLogin = PosCashiersLogin.objects.filter(terminal_no=machineInfo.terminal_no,isshift_end = 'NO',isxread = 'NO',islogout='NO').first()
@@ -2002,12 +2605,12 @@ def CheckTerminalLogIn(request):
             
 
 
-@api_view(["GET"])
+@api_view(["POST"])
 def user_logout_api(request):
-    if request.method =='GET':
+    if request.method =='POST':
         try:
-            UserID = request.query_params.get("UserID")
-            TransID = request.query_params.get("TransID")
+            UserID = request.data.get("UserID")
+            TransID = request.data.get("TransID")
             # UserID = request.Get.get("UserID")
             # TransID = request.Get.get("TransID")
             print('UserID',UserID,TransID)
@@ -2015,14 +2618,16 @@ def user_logout_api(request):
 
             user = User.objects.filter(id_code=UserID).first()
 
-            serial_number = get_serial_number()
+            serial_number = getattr(request, "SERIALNO", None)
             machine = POS_Terminal.objects.filter(Serial_no=serial_number.strip()).first()
 
             current_date_ph = GetPHilippineDate()
             current_datetime_ph = GetPHilippineDateTime()
             if user.user_rank == 'Cashier':
-                cashier_data = PosCashiersLogin.objects.get(id_code=UserID,islogout='NO')
-
+    
+                # cashier_data = PosCashiersLogin.objects.get(id_code=UserID,islogout='NO')
+                cashier_data = PosCashiersLogin.objects.get(id_code=UserID,trans_id=TransID)
+                
                 if cashier_data:
 
                     cashier_data.time_logout = current_datetime_ph
@@ -2035,8 +2640,13 @@ def user_logout_api(request):
                     cashier_data.time_logout = current_datetime_ph
                     cashier_data.islogout = "YES"
                     cashier_data.save()
-
-            return JsonResponse({"message": "Logout Successfully"}, status=200)
+            response = JsonResponse({'message': 'Logged out successfully'})
+    
+            response.delete_cookie("access_token", path="/")
+            response.delete_cookie("refresh_token", path="/")
+            response.delete_cookie("csrftoken", path="/")
+            return response
+            # return JsonResponse({"message": "Logout Successfully"}, status=200)
 
         except (User.DoesNotExist, IntegrityError):
             return JsonResponse({"message": "Invalid credentials"}, status=401)
@@ -2050,16 +2660,18 @@ def user_logout_api(request):
             return JsonResponse({"message": "Method not allowed"}, status=405)
 
 
-@api_view(["GET"])
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
 def user_endshift_api(request):
-    if request.method =='GET':
+    if request.method =='POST':
         try:
+
             # pdb.set_trace()
-            UserID = request.query_params.get("UserID")
-            TransID = request.query_params.get("TransID")
+            UserID = request.data.get("UserID")
+            TransID = request.data.get("TransID")
             user = User.objects.filter(id_code=UserID).first()
 
-            serial_number = get_serial_number()
+            serial_number = getattr(request, "SERIALNO", None)
             machine = POS_Terminal.objects.filter(Serial_no=serial_number.strip()).first()
 
             current_date_ph = GetPHilippineDate()
@@ -2075,13 +2687,17 @@ def user_endshift_api(request):
             return JsonResponse({"message": "Logout Successfully"}, status=200)
 
         except (User.DoesNotExist, IntegrityError):
+            traceback.print_exc()
             return JsonResponse({"message": "Invalid credentials"}, status=401)
 
         except PermissionDenied:
+            traceback.print_exc()
             return JsonResponse({"message": "Permission denied"}, status=403)
 
         except Exception:
+            traceback.print_exc()
             return JsonResponse({"message": "Method not allowed"}, status=405)
+        
 
 
 

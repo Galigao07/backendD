@@ -13,7 +13,7 @@ from backend.serializers import (BankCompanySerializer,TSetupSerializer,AcctSubs
                                  CustomerSerializer,RCCDetailsSerializer,CCCDetailsSerializer,ProductCategorySetupSerializer,ProductSiteSetupSerializer,
                                  PosPriceTypeSiteSetupSerializer,PosMultiplePriceTypeSiteSetupSerializer,ProductCategorySalesSerializer,PosSetupSerializer,
                                  AcctListSerializer)
-from rest_framework.decorators import api_view
+from rest_framework.decorators import api_view,permission_classes
 from rest_framework.views import APIView
 from django.db.models import Min,Max
 from django.utils import timezone
@@ -33,6 +33,7 @@ from django.db.models import  F, Value
 from django.db.models.functions import Concat
 
 @api_view(['GET','POST','DELETE'])
+@permission_classes([IsAuthenticated])
 def Setup(request):
     if request.method == 'GET':
         try:
@@ -99,7 +100,58 @@ def Setup(request):
                     }
 
                     setupData.append(list_data)
-
+            elif TransType =='CASH SHORTAGE AND CASH OVERAGE':
+                dataList = [
+                    "CASH SHORTAGE",
+                    'CASH OVERAGE']
+                
+                for item in dataList:
+                    setups = TSetup.objects.filter(event_name=item)
+                    if setups:
+                        for setup in setups:
+                            listdata ={
+                                'event':item,
+                                 'accttitle':setup.acct_title,
+                                'slacct':setup.sl_acct,
+                                'slid': setup.sl_id,
+                                 'sl_type': setup.sl_type,
+                                    }
+                            setupData.append(listdata)
+                    else:
+                        listdata ={
+                                'event':item,
+                                'accttitle':'',
+                                'slacct':'',
+                                'slid': '0',
+                                'sl_type': '',
+                            }
+                        setupData.append(listdata)
+            elif TransType =='GIFT CHECK EXCESS':
+                dataList = [
+                    "Gift Check Excess"]
+                
+                for item in dataList:
+                    setups = TSetup.objects.filter(event_name=item)
+                    if setups:
+                        for setup in setups:
+                            listdata ={
+                                'event':item,
+                                 'accttitle':setup.acct_title,
+                                'slacct':setup.sl_acct,
+                                'slid': setup.sl_id,
+                                 'sl_type': setup.sl_type,
+                                    }
+                            setupData.append(listdata)
+                    else:
+                        listdata ={
+                                'event':item,
+                                'accttitle':'',
+                                'slacct':'',
+                                'slid': '0',
+                                'sl_type': '',
+                            }
+                        setupData.append(listdata)
+    
             else:
                 if Transaction == 'Setp-up of Debit account for Sales Transaction':
                     dataList = [
@@ -219,6 +271,7 @@ def Setup(request):
         return Response('Success')
 
 @api_view(['GET'])
+@permission_classes([IsAuthenticated])
 def get_account_title(request):
     if request.method == 'GET':
         try:
@@ -240,6 +293,7 @@ def get_account_title(request):
             return Response({"message": "An error occurred while saving the sales order"}, status=500)
         
 @api_view(['GET'])
+@permission_classes([IsAuthenticated])
 def get_SL_account(request):
     if request.method == 'GET':
         try:
@@ -307,6 +361,7 @@ def get_SL_account(request):
 
 @api_view(['POST'])
 @transaction.atomic
+@permission_classes([IsAuthenticated])
 def setup_configure(request):
     if request.method =='POST':
         try:
@@ -344,6 +399,7 @@ def setup_configure(request):
 
 @api_view(['POST','GET'])
 @transaction.atomic
+@permission_classes([IsAuthenticated])
 def get_cost_of_sales(request):
     if request.method == 'GET':
         try:
@@ -358,6 +414,7 @@ def get_cost_of_sales(request):
 
 @api_view(['POST','GET'])
 @transaction.atomic     
+@permission_classes([IsAuthenticated])
 def get_allowed_price_type(request):
     if request.method == 'GET':
         try:
@@ -394,6 +451,7 @@ def get_allowed_price_type(request):
 
 @api_view(['POST','GET'])
 @transaction.atomic  
+@permission_classes([IsAuthenticated])
 def get_tagging_category_list(request):
     if request.method == 'GET':
         try:
@@ -489,6 +547,7 @@ def get_tagging_category_list(request):
 
 @api_view(['POST','GET'])
 @transaction.atomic 
+@permission_classes([IsAuthenticated])
 def get_tagging_per_terminal(request):
     if request.method =='GET':
         try:

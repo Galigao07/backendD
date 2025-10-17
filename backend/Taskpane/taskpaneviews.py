@@ -8,7 +8,7 @@ from backend.models import (Product,PosRestTable,PosSalesOrder,PosSalesTransDeta
 from backend.serializers import (ProductSerializer,ProductCategorySerializer,PosSalesOrderSerializer,PosSalesTransDetailsSerializer,PosSalesTransSerializer,
                                  PosSalesInvoiceListing,PosSalesInvoiceList,CustomerSerializer,PosWaiterListSerializer,PosPayorSerializer,PosSalesInvoiceListSerializer,
                                  UserSerializer,EmployeeSetupSerializer)
-from rest_framework.decorators import api_view
+from rest_framework.decorators import api_view, permission_classes
 from django.db.models import Min,Max
 from django.utils import timezone
 from backend.views import get_serial_number
@@ -16,8 +16,10 @@ from datetime import datetime, timedelta
 from datetime import datetime
 from django.contrib.auth.hashers import make_password
 from django.db.models import Q
+from rest_framework.permissions import IsAuthenticated
 
 @api_view(['POST'])
+@permission_classes([IsAuthenticated])
 def add_user(request):
     if request.method == 'POST':
         try:
@@ -47,6 +49,7 @@ def add_user(request):
     return JsonResponse({'error': 'Invalid request method'}, status=400)
 
 @api_view(['GET'])
+@permission_classes([IsAuthenticated])
 def view_user(request):
     if request.method == 'GET':
         data = User.objects.all().order_by('-autonum')
@@ -55,6 +58,7 @@ def view_user(request):
     
 
 @api_view(['GET'])
+@permission_classes([IsAuthenticated])
 def get_employee_list(request):
     if request.method == 'GET':
         name = request.GET.get('employee')
@@ -65,6 +69,7 @@ def get_employee_list(request):
     
     
 @api_view(['POST'])
+@permission_classes([IsAuthenticated])
 def update_user(request):
     if request.method == 'POST':
         received_data = request.data
@@ -105,6 +110,7 @@ def update_user(request):
       
 
 @api_view(['DELETE'])  
+@permission_classes([IsAuthenticated])
 def delete_user(request):
     if request.method == 'DELETE':
         received_data = json.loads(request.body.decode('utf-8'))  # Decode and load JSON data
@@ -134,6 +140,7 @@ def delete_user(request):
 
 
 @api_view(['GET'])
+@permission_classes([IsAuthenticated])
 def view_waiter(request):
     if request.method == 'GET':
         data = PosWaiterList.objects.all().order_by('-autonum')
@@ -142,6 +149,7 @@ def view_waiter(request):
 
 
 @api_view(['POST'])
+@permission_classes([IsAuthenticated])
 def add_waiter(request):
     if request.method == 'POST':
         try:
@@ -172,6 +180,7 @@ def add_waiter(request):
     return JsonResponse({'error': 'Invalid request method'}, status=400)
 
 @api_view(['POST'])
+@permission_classes([IsAuthenticated])
 def update_waiter(request):
     if request.method == 'POST':
         received_data = request.data
@@ -202,6 +211,7 @@ def update_waiter(request):
 
 
 @api_view(['DELETE'])  
+@permission_classes([IsAuthenticated])
 def delete_waiter(request):
     if request.method == 'DELETE':
         received_data = json.loads(request.body.decode('utf-8'))  # Decode and load JSON data

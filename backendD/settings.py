@@ -12,7 +12,8 @@ https://docs.djangoproject.com/en/4.2/ref/settings/
 import os
 from pathlib import Path
 from django.conf import settings
- 
+import pymysql
+pymysql.install_as_MySQLdb()
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 # BASE_DIR = Path(__file__).resolve().parent.parent
@@ -27,13 +28,25 @@ SECRET_KEY = 'django-insecure-q(#tia376$n+1ugieitp!znvus1!!q0v(vz#(-da5m&ot!w53y
 # SECURITY WARNING: don't run with debug turned on in production!
 # DEBUG = True
 
-# ALLOWED_HOSTS = []
-# ALLOWED_HOSTS = ['localhost', '127.0.0.1', '0.0.0.0','192.168.68.106','192.168.43.155']
-ALLOWED_HOSTS = ['*']
-# ALLOWED_HOSTS = ['0.0.0.0','192.168.68.106']
-DEBUG = False
 
+ALLOWED_HOSTS = ["*", "192.168.1.3", "localhost","192.168.68.120"]
+
+DEBUG = True
+
+
+
+from datetime import timedelta
 # Application definition
+AUTH_USER_MODEL = 'backend.User'
+
+SIMPLE_JWT = {
+    "USER_ID_FIELD": "autonum",    # Must be the actual database PK field
+    "USER_ID_CLAIM": "user_id",    # Claim stored in JWT
+    "AUTH_HEADER_TYPES": ("Bearer",),
+}
+AUTHENTICATION_BACKENDS = [
+    'backend.auth_backend.CustomUserBackend',  # Adjust path
+]
 
 INSTALLED_APPS = [
     'django_user_agents',
@@ -41,7 +54,8 @@ INSTALLED_APPS = [
     'backend',
     'channels',
     'channels_redis',
-    'django.contrib.admin',
+    # 'django.contrib.admin',
+    'django_extensions',
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.sessions',
@@ -49,9 +63,11 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'rest_framework',  # Add this line for Django REST Framework
     'corsheaders',
+    'rest_framework_simplejwt.token_blacklist',
 ]
 
 MIDDLEWARE = [
+  
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
@@ -61,6 +77,8 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    #   'backend.middleware.ThreadLocalMiddleware',
+    
 ]
 
 ROOT_URLCONF = 'backendD.urls'
@@ -93,24 +111,55 @@ WSGI_APPLICATION = 'backendD.wsgi.application'
 ASGI_APPLICATION = 'backendD.asgi.application'
 CORS_ALLOW_ALL_ORIGINS = True
 CORS_ORIGIN_ALLOW_ALL = True
-# CORS_ALLOWED_ORIGINS = [
-#     'http://localhost:3000',
-#     'http://localhost:5173',
-#     'http://localhost:5174',
-#     'http://192.168.68.106:5173',
-#     'http://192.168.43.155:5173',
-#     'http://192.168.43.155:8081', 
-#     'http://192.168.43.155:8000',
-#     'http://192.168.43.155:8001',
-#     'http://192.168.68.108:8081',
-#     'http://192.168.68.108:8000',
- 
-#     # Add other allowed origins as needed
-# ]
+
+
+# ****** FOR DEVELOPMENT SETUP *****
+SESSION_COOKIE_SAMESITE = "Lax"
+SESSION_COOKIE_SECURE = False
+CSRF_COOKIE_SAMESITE = "Lax"
+CSRF_COOKIE_SECURE = False
+JWT_COOKIE_SECURE = False
+JWT_COOKIE_SAMESITE = "Lax"
+
+# ****** FOR PRODUCTION SETUP *****
+# JWT_COOKIE_SECURE = True
+# JWT_COOKIE_SAMESITE = "None"
+# SESSION_COOKIE_SAMESITE = "None"   # allow cross-site (important for HTTPS + frontend)
+# SESSION_COOKIE_SECURE = True       # cookies sent only over HTTPS
+# CSRF_COOKIE_SAMESITE = "None"
+# CSRF_COOKIE_SECURE = True
+
+
 CORS_ALLOW_ORIGIN_REGEX = r'^https?://\w+(\.\w+)+(:\d{1,5})?$'  # Regex to match origins
 # CORS_ALLOW_HEADERS = ['Content-Type', 'Authorization']  # Allowed headers
 CORS_ALLOW_METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'] 
+# REST_FRAMEWORK = {
+#     'DEFAULT_AUTHENTICATION_CLASSES': (
+#         'backend.auth.authentication.CookieJWTAuthentication',  # Your custom cookie handler
+#         'rest_framework_simplejwt.authentication.JWTAuthentication',  # Fallback
+#     ),
+# }
 
+REST_FRAMEWORK = {
+    "DEFAULT_AUTHENTICATION_CLASSES": (
+        "backend.auth.authentication.CookieJWTAuthentication",
+    ),
+    "DEFAULT_PERMISSION_CLASSES": (
+        "rest_framework.permissions.IsAuthenticated",
+    )
+}
+
+
+# JWT_COOKIE_SECURE = not DEBUG         # True in prod, False in dev
+# JWT_COOKIE_SAMESITE = "None" if JWT_COOKIE_SECURE else "Lax"
+
+SIMPLE_JWT = {
+    'ACCESS_TOKEN_LIFETIME': timedelta(days=1),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=1),
+    'ROTATE_REFRESH_TOKENS': False,
+    'BLACKLIST_AFTER_ROTATION': False,
+    'AUTH_HEADER_TYPES': ('Bearer',),
+}
 
 APPEND_SLASH = False
 CORS_ALLOW_HEADERS = [
@@ -130,64 +179,40 @@ CORS_EXPOSE_HEADERS = [
     "X-CSRFToken",
     "Content-Disposition",  # Important for downloads
 ]
-# Database
-# https://docs.djangoproject.com/en/4.2/ref/settings/#databases
+CORS_ALLOW_CREDENTIALS = True
+# CORS_ALLOWED_ORIGINS = ["app://.", "file://","http://localhost:5173","http://localhost:3000","http://192.168.137.1:3000"]  # adjust for your frontend
 
-# DATABASES = {
-#     'default': {
-#         'ENGINE': 'django.db.backends.sqlite3',
-#         'NAME': BASE_DIR / 'db.sqlite3',
-#     }
-# }
 
-# DATABASES = {
-#     'default': {
-#         'ENGINE': 'django.db.backends.mysql',
-#         'NAME': 'db_restaurant',
-#         'USER': 'root',
-#         'PASSWORD': 'lsi2010',
-#         'HOST': 'localhost',
-#         'PORT': '3308'
-#     }
-# }
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "app://.",
+    "file://",
+    "http://192.168.68.120:3000"
+]
+
+CORS_ALLOWED_ORIGIN_REGEXES = [
+    r"^app://.*$",
+    r"^file://.*$",
+    r"^http://localhost.*$",
+    r"^http://192\.168\.1\.3.*$",
+    r"^http://192\.168\.68\.120.*$"
+]
+
+CSRF_TRUSTED_ORIGINS = ["http://localhost:3000", "app://.","http://192.168.68.120:3000"]
+
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.mysql',
-        'NAME': 'db_gerry_bels_posV2',
+        'NAME': 'db_gerry_bels2Q25v2',
         'USER': 'root',
         'PASSWORD': 'lsi2010',
-        'HOST': 'localhost',  # Use the service name
-        'PORT': '3308'    # MySQL default port
+        'HOST': '192.168.68.120',  # Use the service name
+        'PORT': '3309'    # MySQL default port
 
     }
 }
 
-
-
-
-# DATABASES = {
-#     'default': {
-#         'ENGINE': 'django.db.backends.mysql',
-#         'NAME': 'db_restaurant',
-#         'USER': 'root',
-#         'PASSWORD': 'lsi2010',
-#         'HOST': 'localhost',
-#         'PORT': '3307',
-    
-#     }
-# }
-
-# DATABASES = {
-#     'default': {
-#         'ENGINE': 'django.db.backends.posgresql',
-#         'NAME': 'db_restaurant',
-#         'USER': 'root',
-#         'PASSWORD': 'lsi2010',
-#         'HOST': 'localhost',
-#         'PORT': '3307',
-    
-#     }
-# }
 
 
 
@@ -215,12 +240,12 @@ AUTH_PASSWORD_VALIDATORS = [
 
 LANGUAGE_CODE = 'en-us'
 
-TIME_ZONE = 'UTC'
+
 
 USE_I18N = True
 
 USE_TZ = True
-
+TIME_ZONE = 'Asia/Manila'
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/4.2/howto/static-files/
@@ -228,10 +253,14 @@ USE_TZ = True
 STATIC_URL = 'static/'
 MEDIA_URL = 'media/'
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
-# Define the absolute filesystem path to the directory that will hold media.
-MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+# MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+MEDIA_ROOT = '/home/galigao/backendD_media' # Folder for media files in WSL
+STATICFILES_DIRS = [os.path.join(BASE_DIR, 'static')]
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field
 
+
+DATA_UPLOAD_MAX_MEMORY_SIZE = 104857600  # 100 * 1024 * 1024
+FILE_UPLOAD_MAX_MEMORY_SIZE = 104857600
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'

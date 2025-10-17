@@ -5,50 +5,50 @@ import locale
 import os
 import pdb
 from django.http import JsonResponse,FileResponse
+from prompt_toolkit import Application
 from rest_framework.response import Response
-from backend.models import (POSProductPrinter, Product,PosRestTable,PosSalesOrder,PosSalesTransDetails,InvRefNo,POS_Terminal,PosSalesTrans,PosSalesInvoiceList,PosSalesInvoiceListing,
-                            CompanySetup,Customer,PosWaiterList,PosPayor,SeniorCitizenDiscount,PosExtended,PosCashBreakdown,
-                            ProductCategorySetup,BankCompany,BankCard,SalesTransCreditCard,SalesTransEPS,PosSalesTransSeniorCitizenDiscount,
-                            SLCategory,PosSalesTransCreditSale,PosSuspendList,PosSuspendListing,PosCashPullout,PosCashPulloutDetails,PosCashiersLogin,
-                            PosSalesTransCustomer)
-from backend.serializers import (ProductSerializer,ProductCategorySerializer,PosSalesOrderSerializer,PosSalesTransDetailsSerializer,PosSalesTransSerializer,
-                                 PosSalesInvoiceListing,PosSalesInvoiceList,CustomerSerializer,PosWaiterListSerializer,PosPayorSerializer,PosSalesInvoiceListSerializer,
-                                 SeniorCitizenDiscountSerializer,PosExtendedSerializer,PosCashBreakdownSerializer,ProductCategorySetupSerializer,
-                                 BankCompanySerializer,BankCardSerializer,SalesTransCreditCardSerializer,SalesTransEPSSerializer,PosSalesTransSeniorCitizenDiscountSerializer,
-                                 SLCategorySerializer,PosSalesTransCreditSaleSerializer,PosSuspendListSerializer,PosSuspendListingSerializer,PosCashPulloutDetailsSerializer,
-                                 PosCashPulloutSerializer)
+from backend.models import *
+from backend.serializers import *
 from rest_framework.decorators import api_view
 from django.db.models import Min,Max
 from django.utils import timezone
-from backend.views import PDFChargeReceipt, PDFReceipt, PDFSalesOrderaLL, get_serial_number,PDFSalesOrder,print_pdf_salesOrder
-from datetime import datetime, timedelta
-from datetime import datetime
+from backend.views import *
+from datetime import datetime, timedelta,date
+import datetime as dt
+from django.utils import timezone
+import pytz
 from django.db.models import Q
 from django.utils import timezone
 import pytz
 from django.core.exceptions import ObjectDoesNotExist
 import time
 import logging
-from backend.globalFunction import GetCompanyConfig, GetPHilippineDate,GetPHilippineDateTime
+from backend.globalFunction import *
 from django.db import transaction
 from pyprinter import Printer
-
-
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated
+# from pywinauto.findwindows import ElementNotFoundError
 import traceback
-@api_view(['GET','POST','PUT','DELETE'])
+from decimal import Decimal
+from django.db.models.functions import Concat
+from django.db.models import F, CharField, Value, Q, Func, Value, Subquery, OuterRef, DecimalField
+from django.db.models.functions import Cast, Coalesce
 
+@api_view(['GET','POST','PUT','DELETE'])
+@permission_classes([IsAuthenticated])
 def print_electron(request):
     max_attempts = 1000
     attempts = 0
     
     while attempts < max_attempts:
-        try:
+        try :
             app = Application().connect(title="Print")
             print_dialog = app.window(class_name="#32770")
             print_dialog.print_button.click()
             return JsonResponse({"message": "Print Success"}, status=200)
         
-        except ElementNotFoundError:
+        except Exception as e:
             attempts += 1
             print(f"Attempt {attempts}: Print dialog not found. Retrying...")
             time.sleep(2)  # Wait for 2 seconds before retrying
@@ -59,54 +59,80 @@ def print_electron(request):
      
 ##********** EXTENDED MONITOR TRANSACTION ********##
 @api_view(['GET','POST','PUT','DELETE'])
+@permission_classes([IsAuthenticated])
 def pos_extended(request):
     if request.method == 'GET':
         data = request.GET.get('data')
-        serial_number = get_serial_number()
+        serial_number = getattr(request, "SERIALNO", None)
         machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number.strip()).first()
         data_list = PosExtended.objects.filter(serial_no = machineInfo.Serial_no)
         serialize = PosExtendedSerializer(data_list,many=True)
         return Response(serialize.data)
     elif request.method == 'PUT':
         try:
-            data = json.loads(request.body)
-            print('uPDATE')
-            serial_number = get_serial_number()
-            machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number.strip()).first()
-            # data = data['data']
-            TableNo = data['TableNo']
-            orderType = data['OrderType']
-            quantity = data['data']['quantity']
-            description = data['data']['description']
-            price = data['data']['price']
-            total_amount = data['data']['totalAmount']
-            barcode = data['data']['barcode']
-            lineno = data['data']['lineno']
-            if TableNo =='':
-                TableNo = 0
-            data_exist_queryset = PosExtended.objects.filter(serial_no=serial_number, barcode=barcode,line_no = lineno)
-            # Check if any records exist in the queryset
-            if data_exist_queryset.exists():
-                # Access the first instance in the queryset (assuming there's only one matching record)
-                data_exist_instance = data_exist_queryset.first()
-                
-                # Update the fields of the instance
-                data_exist_instance.qty = float(quantity)
-                data_exist_instance.amount = float(str(total_amount).replace(',',''))
-                data_exist_instance.price =  float(str(price).replace(',',''))
-                
-                # Save the changes to the instance
-                data_exist_instance.save()
+                data = request.data.get('data', {})
+                print(data)
+                serial_number = getattr(request, "SERIALNO", None)
+                print(serial_number)
 
-                return JsonResponse({'success': True, 'message': 'Data received successfully'}, status=200)
-        except json.JSONDecodeError:
+                if not serial_number:
+                    return JsonResponse({"success": False, "message": "Serial number missing"}, status=400)
+
+                machine_info = POS_Terminal.objects.filter(Serial_no=serial_number.strip()).first()
+                if not machine_info:
+                    return JsonResponse({"success": False, "message": "Machine not found"}, status=404)
+
+                # Safely get inner data
+                TableNo = request.data.get('TableNo') or 0
+                OrderType = request.data.get('OrderType')
+
+                quantity = data.get('quantity', 0)
+                description = data.get('description', '')
+                price = data.get('price', 0)
+                total_amount = data.get('totalAmount', 0)
+                barcode = data.get('barcode')
+                lineno = data.get('lineno')
+
+                # Print each value
+                print("TableNo:", TableNo)
+                print("OrderType:", OrderType)
+                print("quantity:", quantity)
+                print("description:", description)
+                print("price:", price)
+                print("total_amount:", total_amount)
+                print("barcode:", barcode)
+                print("lineno:", lineno)
+                if not barcode or lineno is None:
+                    print
+                    return JsonResponse({'success': False, 'message': 'Barcode or line number missing'}, status=400)
+
+                # Update existing record
+                pos_item = PosExtended.objects.filter(
+                    serial_no=serial_number,
+                    barcode=barcode,
+                    line_no=lineno
+                ).first()
+
+                if pos_item:
+                    pos_item.qty = float(quantity)
+                    pos_item.price = float(str(price).replace(',', ''))
+                    pos_item.amount = float(str(total_amount).replace(',', ''))
+                    pos_item.save()
+
+                    return JsonResponse({'success': True, 'message': 'Data updated successfully'}, status=200)
+                else:
+                    return JsonResponse({'success': False, 'message': 'Record not found'}, status=404)
+
+        except Exception as e:
             traceback.print_exc()
-            return JsonResponse({'success': False, 'message': 'Invalid JSON data'}, status=400)
+            return JsonResponse({'success': False, 'message': f'Invalid data: {str(e)}'}, status=400)
+    
     elif request.method == 'POST':
         try:
-            print('sAVE')
+
             data = json.loads(request.body)
-            serial_number = get_serial_number()
+            serial_number = getattr(request, "SERIALNO", None)
+            # serial_number = get_serial_number()
             machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number.strip()).first()
             # data = data['data']
             TableNo = data['TableNo']
@@ -120,22 +146,7 @@ def pos_extended(request):
             if TableNo =='':
                 TableNo = 0
             data_exist_queryset = PosExtended.objects.filter(serial_no=serial_number, barcode=barcode)
-            # Check if any records exist in the queryset
-            # if data_exist_queryset.exists():
-            #     # Access the first instance in the queryset (assuming there's only one matching record)
-            #     data_exist_instance = data_exist_queryset.first()
-                
-            #     # Update the fields of the instance
-            #     data_exist_instance.qty = quantity
-            #     data_exist_instance.amount = total_amount
-            #     data_exist_instance.price = price
-                
-            #     # Save the changes to the instance
-            #     data_exist_instance.save()
-
-
-            # else:
-     
+    
             saveExtended = PosExtended(
                     barcode=barcode,
                     qty=quantity,
@@ -157,20 +168,17 @@ def pos_extended(request):
         try:
     # Parse the JSON data sent in the request body
             data = json.loads(request.body)  # Decode and load JSON data
-            serial_number = get_serial_number()
+            serial_number = getattr(request, "SERIALNO", None)
+            # serial_number = get_serial_number()
             machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number.strip()).first()
             if 'deleteData' in data:
                 quantity = data['deleteData']['quantity']
                 description = data['deleteData']['description']
                 price = data['deleteData']['price']
-                # total_amount = data['deleteData']['totalAmount']
                 total_amount = data['deleteData'].get('totalAmount') if 'deleteData' in data else None
                 lineno = data['deleteData'].get('lineno') if 'deleteData' in data else None
 
                 barcode = data['deleteData']['barcode']
-                # lineno = data['deleteData']['lineno']
-                
-                print('total_amount',total_amount)
                 if total_amount is None:
                     PosExtended.objects.filter(serial_no=serial_number).delete()
                     return Response('Delete Successfully')
@@ -180,7 +188,6 @@ def pos_extended(request):
 
                 # Check if any records exist in the queryset
                 if data_exist_queryset.exists():
-                    # Delete all matching records from the database
                     data_exist_queryset.delete()
                     return Response('Delete Successfully')
             else:
@@ -191,12 +198,14 @@ def pos_extended(request):
             print("An error occurred:", e)
    
 @api_view(['GET','POST','PUT','DELETE'])
+@permission_classes([IsAuthenticated])
 def pos_extended_delete_all(request):
     if request.method == 'DELETE':
-        print('delete')
+       
         try:
             # pdb.set_trace()
-            serial_number = get_serial_number()
+            serial_number = getattr(request, "SERIALNO", None)
+            # serial_number = get_serial_number()
             machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number.strip()).first()
             data_exist_queryset = PosExtended.objects.filter(serial_no=serial_number.strip())
             if data_exist_queryset.exists():
@@ -208,8 +217,9 @@ def pos_extended_delete_all(request):
             print("An error occurred:", e)
 
 
-def pos_extended_save_from_listing(data,TableNo,QueNO):
-    serial_number = get_serial_number()
+def pos_extended_save_from_listing(request,data,TableNo,QueNO):
+    serial_number = getattr(request, "SERIALNO", None)
+            # serial_number = get_serial_number()
     machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number.strip()).first()
     check_data = PosExtended.objects.filter(serial_no=machineInfo.Serial_no)
     # pdb.set_trace()
@@ -244,6 +254,7 @@ def pos_extended_save_from_listing(data,TableNo,QueNO):
 
 ## ********************* END HERE  ************************##
 @api_view(['GET'])
+@permission_classes([IsAuthenticated])
 def get_product_data(request):
     if request.method == 'GET':
         try:
@@ -256,22 +267,23 @@ def get_product_data(request):
 
 
 @api_view(['GET'])
+@permission_classes([IsAuthenticated])
 def get_productCategory_data(request):
     # Assuming 'category' is a field in the Product model
     # distinct_categories = Product.objects.values('category').distinct()
         # serializer = ProductCategorySerializer(distinct_categories, many=True)
     try:
-        print('ddddddd')
-
         distinct_categories = ProductCategorySetup.objects.filter(pos_category='Y')
         serializer = ProductCategorySetupSerializer(distinct_categories, many=True)
 
-        # print(serializer.data)
+
+       
         return Response(serializer.data)
     except Exception as e:
         print(e)
         traceback.print_exc()
 @api_view(['GET'])
+@permission_classes([IsAuthenticated])
 def product_list_by_category(request):
     if request.method == 'GET':
         try:
@@ -302,11 +314,13 @@ def product_list_by_category(request):
             traceback.print_exc()
 
 @api_view(['GET'])
+@permission_classes([IsAuthenticated])
 def table_list_view(request):
     try:
-        print('xxxxx')
+        serial_number = getattr(request, "SERIALNO", None)
+            # serial_number = get_serial_number()
         site_code = request.GET.get('site_code', None)  # Assuming site_code is passed as a query parameter
-        serial_number = get_serial_number()
+        # serial_number = get_serial_number()
         machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number.strip()).first()
         if site_code is None:
 
@@ -358,13 +372,15 @@ def table_list_view(request):
         traceback.print_exc()
 
 @api_view(['POST'])
+@permission_classes([IsAuthenticated])
 def cleared_table_dinein_order_and_pay(request):
         try:
             recieve_data = json.loads(request.body)
             table_no = recieve_data.get('TableNo')
-            print('table_no',table_no)
          
-            serial_number = get_serial_number()
+         
+            serial_number = getattr(request, "SERIALNO", None)
+            # serial_number = get_serial_number()
             machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number.strip()).first()
             if table_no:
                 clear_table_data = PosSalesOrder.objects.filter(table_no = table_no,paid = 'Y',active = 'Y' ,dinein_order_and_pay = 'Y',
@@ -384,6 +400,7 @@ def cleared_table_dinein_order_and_pay(request):
 
 #***************** GET WAITER NAME ************************
 @api_view(['GET'])
+@permission_classes([IsAuthenticated])
 def get_waiter_name(request):
     if request.method == 'GET':
      
@@ -401,6 +418,7 @@ def get_waiter_name(request):
         return Response(serializer.data)
 
 @api_view(['GET'])
+@permission_classes([IsAuthenticated])
 def queing_list_view(request):
     if request.method == 'GET':
         site_code = request.GET.get('site_code', None)  # Assuming site_code is passed as a query parameter
@@ -408,16 +426,17 @@ def queing_list_view(request):
             return Response({"error": "Site code is missing"}, status=400)
 
                 
-        serial_number = get_serial_number()
+        serial_number = getattr(request, "SERIALNO", None)
+            # serial_number = get_serial_number()
         machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number.strip()).first()
         que_list=[]        
         paid = PosSalesOrder.objects.filter(
-            q_no__isnull=False,  # Exclude records where q_no is null
+            q_no__isnull=False,
             paid='N',
             active='Y',
             terminal_no=machineInfo.terminal_no,
             site_code=int(machineInfo.site_no)
-        ).exclude(q_no='0.000')
+        ).exclude(q_no=Decimal('0.000'))
         if paid.exists():
             serializer = PosSalesOrderSerializer(paid, many=True)
             for item in serializer.data:
@@ -429,29 +448,31 @@ def queing_list_view(request):
 
 
 @api_view(['GET'])
+@permission_classes([IsAuthenticated])
 def get_sales_order_list(request):
     if request.method == 'GET':
         tableno = request.GET.get('tableno')
         queno = request.GET.get('queno')
-        print(tableno,queno)
 
+        serial_number = getattr(request, "SERIALNO", None)
+            # serial_number = get_serial_number()
         if tableno is not None:
             if tableno == 0:
-                serial_number = get_serial_number()
+                # serial_number = get_serial_number()
                 machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number.strip()).first()
                 paid = PosSalesOrder.objects.filter(paid = 'N',active='Y',terminal_no = machineInfo.terminal_no,site_code = int(machineInfo.site_no))
                 if paid.exists():
                     serializer = PosSalesOrderSerializer(paid, many=True)
                     return Response(serializer.data)
             else:
-                serial_number = get_serial_number()
+                # serial_number = get_serial_number()
                 machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number.strip()).first()
                 paid = PosSalesOrder.objects.filter(paid = 'N',active='Y',terminal_no = machineInfo.terminal_no,site_code = int(machineInfo.site_no) ,table_no =tableno)
                 if paid.exists():
                     serializer = PosSalesOrderSerializer(paid, many=True)
                     return Response(serializer.data)
         else:
-            serial_number = get_serial_number()
+            # serial_number = get_serial_number()
             machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number.strip()).first()
             paid = PosSalesOrder.objects.filter(paid = 'N',active='Y',terminal_no = machineInfo.terminal_no,site_code = int(machineInfo.site_no) ,q_no = queno)
             if paid.exists():
@@ -460,6 +481,7 @@ def get_sales_order_list(request):
                   
 
 @api_view(['GET'])
+@permission_classes([IsAuthenticated])
 def get_sales_order_listing(request):
     # document_no = request.GET.get('document_no[]')
     # pdb.set_trace()
@@ -468,7 +490,9 @@ def get_sales_order_listing(request):
         TableNo = request.GET.get('tableno')
         so_no = request.GET.get('so_no')
 
-        serial_number = get_serial_number()
+        # serial_number = get_serial_number()
+        serial_number = getattr(request, "SERIALNO", None)
+            # serial_number = get_serial_number()
         machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number.strip()).first()
         queno = request.GET.get('queno')
         print('queno',queno)
@@ -496,7 +520,7 @@ def get_sales_order_listing(request):
                         params=[item.document_no]  
                     )
                     result.extend(list(matched_records.values()))
-                pos_extended_save_from_listing(result ,TableNo,queno)   
+                pos_extended_save_from_listing(request,result ,TableNo,queno)   
             else:
                 pos_sales_order_data = PosSalesOrder.objects.filter(paid = 'N',terminal_no = machineInfo.terminal_no,site_code = int(machineInfo.site_no) ,table_no =TableNo,active ='Y')
                 result = []
@@ -517,7 +541,7 @@ def get_sales_order_listing(request):
                         params=[item.document_no]  
                     )
                     result.extend(list(matched_records.values()))
-                pos_extended_save_from_listing(result ,TableNo,queno)   
+                pos_extended_save_from_listing(request,result ,TableNo,queno)   
         else:
             pos_sales_order_data = PosSalesOrder.objects.filter(paid = 'N',terminal_no = machineInfo.terminal_no,site_code = int(machineInfo.site_no) ,q_no =queno)
             result = []
@@ -536,7 +560,7 @@ def get_sales_order_listing(request):
                 )
                 result.extend(list(matched_records.values()))
                 print('result',result)
-            pos_extended_save_from_listing(result ,TableNo,queno)  
+            pos_extended_save_from_listing(request,result ,TableNo,queno)  
         return Response(result)
     except Exception as e:
         print(e) 
@@ -545,29 +569,31 @@ def get_sales_order_listing(request):
 
 ## **************** CANCELLED SALES ORDER TRANSACTION *****************
 @api_view(['GET'])
+@permission_classes([IsAuthenticated])
 def get_sales_order_list_cancelled(request):
     if request.method == 'GET':
         tableno = request.GET.get('tableno')
         queno = request.GET.get('queno')
         print(tableno,queno)
-
+        serial_number = getattr(request, "SERIALNO", None)
+            # serial_number = get_serial_number()
         if tableno is not None:
             if tableno == 0:
-                serial_number = get_serial_number()
+   
                 machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number.strip()).first()
                 paid = PosSalesOrder.objects.filter(paid = 'N',active='N',terminal_no = machineInfo.terminal_no,site_code = int(machineInfo.site_no))
                 if paid.exists():
                     serializer = PosSalesOrderSerializer(paid, many=True)
                     return Response(serializer.data)
             else:
-                serial_number = get_serial_number()
+
                 machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number.strip()).first()
                 paid = PosSalesOrder.objects.filter(paid = 'N',active='N',terminal_no = machineInfo.terminal_no,site_code = int(machineInfo.site_no) ,table_no =tableno)
                 if paid.exists():
                     serializer = PosSalesOrderSerializer(paid, many=True)
                     return Response(serializer.data)
         else:
-            serial_number = get_serial_number()
+
             machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number.strip()).first()
             paid = PosSalesOrder.objects.filter(paid = 'N',active='N',terminal_no = machineInfo.terminal_no,site_code = int(machineInfo.site_no))
             if paid.exists():
@@ -576,13 +602,15 @@ def get_sales_order_list_cancelled(request):
                   
 
 @api_view(['GET'])
+@permission_classes([IsAuthenticated])
 def get_sales_order_listing_cancelled(request):
     # document_no = request.GET.get('document_no[]')
     # pdb.set_trace()
     TableNo = request.GET.get('tableno')
     so_no = request.GET.get('so_no')
 
-    serial_number = get_serial_number()
+    serial_number = getattr(request, "SERIALNO", None)
+            # serial_number = get_serial_number()
     machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number.strip()).first()
     queno = request.GET.get('queno')
     print('queno',queno)
@@ -610,7 +638,7 @@ def get_sales_order_listing_cancelled(request):
                     params=[item.document_no]  
                 )
                 result.extend(list(matched_records.values()))
-            pos_extended_save_from_listing(result ,TableNo,queno)   
+            pos_extended_save_from_listing(request,result ,TableNo,queno)   
         else:
             pos_sales_order_data = PosSalesOrder.objects.filter(paid = 'N',terminal_no = machineInfo.terminal_no,site_code = int(machineInfo.site_no) ,table_no =TableNo,active ='N')
             result = []
@@ -631,12 +659,12 @@ def get_sales_order_listing_cancelled(request):
                     params=[item.document_no]  
                 )
                 result.extend(list(matched_records.values()))
-            pos_extended_save_from_listing(result ,TableNo,queno)   
+            pos_extended_save_from_listing(request,result ,TableNo,queno)   
     else:
 
         pos_sales_order_data = PosSalesOrder.objects.filter(paid = 'N',terminal_no = machineInfo.terminal_no,site_code = int(machineInfo.site_no) ,active ='N')
         result = []
-        print('eeeeeeeeeeeeeeeeeeeee')
+
         for item in pos_sales_order_data:
             matched_records = PosSalesTransDetails.objects.extra(
                 select={
@@ -652,12 +680,13 @@ def get_sales_order_listing_cancelled(request):
             )
             result.extend(list(matched_records.values()))
             print('result',result)
-        pos_extended_save_from_listing(result ,TableNo,queno)   
+        pos_extended_save_from_listing(request,result ,TableNo,queno)   
     return Response(result)
 #*********************** END *******************************************
 
 
 @api_view(['GET'])
+@permission_classes([IsAuthenticated])
 def get_customer_category(request):
     if request.method == 'GET':
         try:
@@ -689,6 +718,7 @@ def get_customer_category(request):
             traceback.print_exc()
 
 @api_view(['GET'])
+@permission_classes([IsAuthenticated])
 def get_customer_with_category(request):
     if request.method == 'GET':
         try:
@@ -706,12 +736,12 @@ def get_customer_with_category(request):
 
 
 @api_view(['GET'])
+@permission_classes([IsAuthenticated])
 def get_add_order_view(request):
-    
-    
     # Query the Product model based on the category received in the URL
     tableNo = request.GET.get('tableNo')
-    serial_number = get_serial_number()
+    serial_number = getattr(request, "SERIALNO", None)
+            # serial_number = get_serial_number()
     machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number.strip()).first()
     paid = PosSalesOrder.objects.filter(paid = 'N',active='Y',terminal_no = machineInfo.terminal_no,site_code = int(machineInfo.site_no),table_no = tableNo)
     serializer = PosSalesOrderSerializer(paid, many=True)
@@ -719,6 +749,7 @@ def get_add_order_view(request):
 
 
 @api_view(['GET'])
+@permission_classes([IsAuthenticated])
 def get_customer_list(request):
     if request.method == 'GET':
         try:
@@ -727,7 +758,6 @@ def get_customer_list(request):
             if customer:
                 customers = Customer.objects.filter(trade_name__icontains=customer)[:30]
                 serialized_data = CustomerSerializer(customers, many=True).data
-                print('serialized_data',serialized_data)
                 return Response({"customers": serialized_data})
             else:
 
@@ -740,8 +770,10 @@ def get_customer_list(request):
         except Exception as e:
             print(e)
             traceback.print_exc()
+            return Response({"message": "Request Failed"}, status=400)
 
 @api_view(['GET'])
+@permission_classes([IsAuthenticated])
 def get_waiter_list(request):
     waiter = request.GET.get('waiter')
     print('waiter',waiter)
@@ -759,9 +791,12 @@ def get_waiter_list(request):
 
 
 @api_view(['GET'])  
+@permission_classes([IsAuthenticated])
 def get_company_details(request):
     companyCode = getCompanyData()
-    serial_number = get_serial_number()
+    # serial_number = get_serial_number()
+    serial_number = getattr(request, "SERIALNO", None)
+            # serial_number = get_serial_number()
     machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number.strip()).first()
     data = []
     data = {
@@ -784,6 +819,7 @@ def get_company_details(request):
 ##*******************GET Bank Card *******************##
 
 @api_view(['GET'])
+@permission_classes([IsAuthenticated])
 def get_bank_card(request):
     if request.method =='GET':
         data = BankCard.objects.filter(active='Y')
@@ -794,6 +830,7 @@ def get_bank_card(request):
 ##*******************GET Bank Company *******************##
 
 @api_view(['GET'])
+@permission_classes([IsAuthenticated])
 def get_bank_list(request):
     if request.method =='GET':
         data = BankCompany.objects.filter(active='Y')
@@ -802,6 +839,7 @@ def get_bank_list(request):
      
 ##**********GET TRANSACTION FOR REPRINT ********##
 @api_view(['GET'])
+@permission_classes([IsAuthenticated])
 def get_reprint_transaction(request):
     if request.method == 'GET':
         DateFrom = request.GET.get('datefrom')  # Get the 'datefrom' parameter
@@ -827,11 +865,13 @@ def get_reprint_transaction(request):
 
 
 @api_view(['GET'])
+@permission_classes([IsAuthenticated])
 def get_reprint_transaction_for_receipt(request):
     if request.method == 'GET':
         DocNo = request.GET.get('DocNo')  # Get the 'datefrom' parameter
         DocType = request.GET.get('DocType') 
-        serial_number = get_serial_number()
+        serial_number = getattr(request, "SERIALNO", None)
+            # serial_number = get_serial_number()
         machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number.strip()).first()
         list = PosSalesTransDetails.objects.filter(sales_trans_id=DocNo,terminal_no = machineInfo.terminal_no,site_code = int(machineInfo.site_no))
         listing = PosSalesTransDetailsSerializer(list,many=True).data
@@ -880,15 +920,15 @@ def get_reprint_transaction_for_receipt(request):
 ##********** TRANSFER TABLE ********##
 
 @api_view(['POST'])
+@permission_classes([IsAuthenticated])
 def transfer_table(request):
     if request.method =='POST':
         try:
             recieve_data = json.loads(request.body)
             TableNOfrom = recieve_data.get('TableFrom')
             TableNOTo = recieve_data.get('TableTo')
-            print('TableNOfrom',TableNOfrom)
-            print('TableNOTo',TableNOTo)
-            serial_number = get_serial_number()
+            serial_number = getattr(request, "SERIALNO", None)
+            # serial_number = get_serial_number()
             machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number.strip()).first()
             if TableNOfrom:
                 if TableNOTo:
@@ -928,6 +968,7 @@ def get_sales_transaction_id(TerminalNo, DocType):
 ##********** GET THE COMPANY DETAILS IN tbl_po********##
 
 def getCompanyData():
+
     # first_autonum = CompanySetup.objects.values_list('autonum', flat=True).first()
     first_autonum = CompanySetup.objects.first()
     return first_autonum
@@ -937,11 +978,13 @@ def getCompanyData():
 ###***************CHECK QUE NO IF EXIST *******************
 
 @api_view(['GET'])
+@permission_classes([IsAuthenticated])
 def Check_Que_No(request):
     if request.method == 'GET':
         try:
             QueNo = request.GET.get('QueNo')
-            serial_number = get_serial_number()
+            serial_number = getattr(request, "SERIALNO", None)
+            # serial_number = get_serial_number()
             machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number.strip()).first()
             Check_Que_No_if_exist = PosSalesOrder.objects.filter(
                     q_no=QueNo,
@@ -965,6 +1008,7 @@ def Check_Que_No(request):
 
 @api_view(['POST'])
 @transaction.atomic
+@permission_classes([IsAuthenticated])
 def save_sales_order(request):
     if request.method == 'POST':
         try:
@@ -991,7 +1035,6 @@ def save_sales_order(request):
             elif QueNo is None:
                 QueNo = 0
 
-            print('Order And Pay',payment_type)
 
             if table_no == '':
                 table_no = 0
@@ -1021,17 +1064,19 @@ def save_sales_order(request):
                 # 'YYYY-MM-DD HH:MM:SS'.
 
             # current_datetime = timezone.now()
-            current_datetime_utc = datetime.utcnow()
-            # Set the target timezone to Asia/Manila
-            target_timezone = pytz.timezone('Asia/Manila')
-            # Convert UTC datetime to the Philippines timezone
-            current_datetime = current_datetime_utc.replace(tzinfo=pytz.utc).astimezone(target_timezone)
-            datetime_stamp = current_datetime.strftime('%Y-%m-%d %H:%M:%S')
-            # Convert the formatted string back to a datetime object
-            formatted_datetime = datetime.strptime(datetime_stamp, '%Y-%m-%d %H:%M:%S')
-            # Extracting date and time separately
-            formatted_date = formatted_datetime.date()  # Extracts the date
-            formatted_time = formatted_datetime.time()  # Extracts the time
+            # Get current datetime in UTC
+            current_datetime_utc = timezone.now()
+
+            # Convert to Asia/Manila
+            target_timezone = pytz.timezone("Asia/Manila")
+            current_datetime = current_datetime_utc.astimezone(target_timezone)
+
+            # Extract date and time directly (no need to format and parse back)
+            formatted_date = current_datetime.date()
+            formatted_time = current_datetime.time()
+
+            # If you still want a formatted string
+            datetime_stamp = current_datetime.strftime("%Y-%m-%d %H:%M:%S")
             
             # min_sales_trans_id = PosSalesTransDetails.objects.aggregate(sales_trans_id=Min('sales_trans_id')).filter(document_type='SO')['sales_trans_id'] or 0
             
@@ -1049,14 +1094,14 @@ def save_sales_order(request):
             
             line_no = 0 
 
-            serial_number = get_serial_number()
+            serial_number = getattr(request, "SERIALNO", None)
             machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number.strip()).first()
             
             #**** PRINT SALES ORDER USING BACKEND***
 
             printer_setup = GetCompanyConfig('multiple_printer')
 
-            print('printer_setup',printer_setup)
+
             PDFSalesOrderaLL(cart_items,so_no,table_no,QueNo,guest_count,customer,OrderType,cashier_id,'','Cashier')
             if printer_setup == False:
                 PDFSalesOrder(cart_items,so_no,table_no,QueNo,guest_count,customer,OrderType,cashier_id,'','Cashier')
@@ -1236,6 +1281,7 @@ def save_sales_order(request):
 
 @api_view(['POST','GET'])
 @transaction.atomic
+@permission_classes([IsAuthenticated])
 def suspend_save_sales_order(request):
     if request.method == 'POST':
         try:
@@ -1263,7 +1309,8 @@ def suspend_save_sales_order(request):
                 QueNo=0
 
 
-            serial_number = get_serial_number()
+            serial_number = getattr(request, "SERIALNO", None)
+            # serial_number = get_serial_number()
             machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number.strip()).first()
             
 
@@ -1314,7 +1361,8 @@ def suspend_save_sales_order(request):
         try:
 
             TableNo = request.GET.get('TableNo')
-            serial_number = get_serial_number()
+            serial_number = getattr(request, "SERIALNO", None)
+            # serial_number = get_serial_number()
             machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number.strip()).first()
             Susppend_list = PosSuspendList.objects.filter(table_no=TableNo,site_no=int(machineInfo.site_no),terminal_no = machineInfo.terminal_no).first()
             Susppend_list2 = PosSuspendList.objects.filter(table_no=TableNo,site_no=int(machineInfo.site_no),terminal_no = machineInfo.terminal_no)
@@ -1334,6 +1382,7 @@ def suspend_save_sales_order(request):
 ###************ CASH PAYMENT ----DINE IN---- SAVE TO TBL_POS_SALES_INVOICE_LIST AND LISTING**********************
 @api_view(['POST'])
 @transaction.atomic
+@permission_classes([IsAuthenticated])
 def save_cash_payment(request):
     if request.method == 'POST':
         try:
@@ -1352,15 +1401,16 @@ def save_cash_payment(request):
             Discounted_by= received_data.get('Discounted_by')
             QueNo= received_data.get('QueNo')
             doctype = received_data.get('doctype')
-            print('discount type',DiscountType)
+           
             doc_no = get_sales_transaction_id(TerminalNo,doctype)
             if table_no =='':
                 table_no = 0
         
             current_datetime = timezone.now()
             datetime_stamp = current_datetime.strftime('%Y-%m-%d %H:%M:%S')
-            serial_number = get_serial_number()
+            serial_number = getattr(request, "SERIALNO", None)
             machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number.strip()).first()
+            # serial_number = get_serial_number()            machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number.strip()).first()
             companyCode = getCompanyData()
             waiterName=''
     
@@ -1426,13 +1476,13 @@ def save_cash_payment(request):
         
             
             tmp_cart_item_discount = cart_items
-            print(cart_items)
+
             for items in cart_items:
                 disc_amt = 0
                 desc_rate= 0
                 vat_amt = 0
                 vat_exempt = 0
-                print(items['barcode'] + ' - ' +  items['description'])
+
                 productInfo = Product.objects.filter(bar_code=items['barcode']).first()
                 
                 if productInfo is not None:
@@ -1442,8 +1492,6 @@ def save_cash_payment(request):
                     total_sub_total = total_sub_total + (quantity * price)
                     if price !=0:
                         if DiscountType == 'SC':
-                            print(DiscountData)
-                            print(DiscountData.get('SAmountCovered').replace(',',''))
                             SCAmmountCovered = float(DiscountData.get('SAmountCovered').replace(',',''))
                             SLess20SCDiscount = float(DiscountData.get('SLess20SCDiscount').replace(',',''))
                             SLessVat12 =  float(DiscountData.get('SLessVat12').replace(',',''))
@@ -1459,16 +1507,7 @@ def save_cash_payment(request):
                             net_total = (totalItem) - (disc_amt + vat_exempt)
                             vat_amt =(totalItem / (0.12 + 1 ) * 0.12) * (SVatSales -SCAmmountCovered) / SVatSales
                             Vatable_Amount = SVatSales - SCAmmountCovered
-                            # NetSale =  totalItem / (0.12 + 1 )
-                            # vat_exempt = (SCAmmountCovered - SLess20SCDiscount) - SLessVat12
-                            # disc_amt  = SLess20SCDiscount
-                            # net_total = (quantity * price) - (disc_amt + vat_exempt)
-                            # vat_amt = ((SVatSales - SCAmmountCovered) * 12) / 112
-                            # Vatable_Amount = (SVatSales - SCAmmountCovered) - vat_amt
-                            print('NetSale',NetSale)
-                            print('vat_exempt',vat_exempt)
-                            print('disc_amt',disc_amt)
-                            print('net_total',net_total)
+    
                         
                         elif DiscountType =='ITEM':
                             for dis in DiscountData:
@@ -1478,9 +1517,7 @@ def save_cash_payment(request):
                                         lineNO = dis.get('LineNo', 0)  # Use 'lineno' with a default value of 0 if 'line_no' is None
                                     else:
                                         lineNO = dis['line_no']
-                                    
-                                    print(lineNO, items['line_no'])
-                                    print(dis['Barcode'] ,items['barcode'] )
+
 
                                     if dis['Barcode'] == items['barcode'] and lineNO == items['line_no']:
                                         
@@ -1502,7 +1539,7 @@ def save_cash_payment(request):
                                     print(e)
                                     traceback.print_exc()
                         elif DiscountType =='TRANSACTION':
-                            print(DiscountData)
+
                             for dis in DiscountData:
                                 lineNO = 0
                                 if dis.get('line_no') is None:
@@ -1552,7 +1589,7 @@ def save_cash_payment(request):
                 # total_disc_amt = total_disc_amt + float(disc_amt)
                 # total_desc_rate= total_desc_rate + desc_rate
                 # total_vat_amt = total_vat_amt + vat_amt
-                # print('tmp_cart_item_discount',tmp_cart_item_discount)
+
                 if DiscountType == 'SC':
                     total_vat_exempt = vat_exempt + total_vat_exempt
                     total_disc_amt = float(disc_amt) +float(total_disc_amt)
@@ -1576,7 +1613,7 @@ def save_cash_payment(request):
                         so_no = so_no + ', ' + items['sales_trans_id']
 
                 so_doc_no = so_no
-                print('count',countxx + 1)
+
 
                 SaveToPOSSalesInvoiceListing = PosSalesInvoiceListing(
                     company_code = f"{companyCode.autonum:0>4}",
@@ -1936,7 +1973,7 @@ def save_cash_payment(request):
                 'QueNo':QueNo
                 }
 
-            PDFReceipt(doc_no,'POS-SI',cus_Data)
+            PDFReceipt(request,doc_no,'POS-SI',cus_Data)
             # transaction.commit()
             return Response({'data':data}, status=200)     
         except Exception as e:
@@ -1948,13 +1985,15 @@ def save_cash_payment(request):
         
 ###******************** CANCEL SALES ORDER    ***************************    
 @api_view(['POST'])
+@permission_classes([IsAuthenticated])
 def cancel_sales_order(request):
     if request.method == 'POST':
         tableno = request.data.get('params', {}).get('tableno')
         so_no = request.data.get('params', {}).get('so_no')
         
         print('table',tableno)
-        serial_number = get_serial_number()
+        serial_number = getattr(request, "SERIALNO", None)
+            # serial_number = get_serial_number()       
         machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number.strip()).first()
 
         if not machineInfo:
@@ -1988,13 +2027,14 @@ def cancel_sales_order(request):
         
 ###******************** UNCANCEL SALES ORDER    ***************************    
 @api_view(['POST'])
+@permission_classes([IsAuthenticated])
 def uncancelled_sales_order(request):
     if request.method == 'POST':
         tableno = request.data.get('params', {}).get('tableno')
         so_no = request.data.get('params', {}).get('so_no')
         
-        print('table',tableno)
-        serial_number = get_serial_number()
+        serial_number = getattr(request, "SERIALNO", None)
+            # serial_number = get_serial_number()
         machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number.strip()).first()
 
         if not machineInfo:
@@ -2030,10 +2070,10 @@ def uncancelled_sales_order(request):
 ###*************** SAVE SALES ORDER ---TAKE OUT-----*******************
 @api_view(['POST'])
 @transaction.atomic
+@permission_classes([IsAuthenticated])
 def save_sales_order_payment(request):
     if request.method == 'POST':
         try:
-            print('payment sales order save') 
         # pdb.set_trace()
             received_data = json.loads(request.body)
             cart_items = received_data.get('data', [])
@@ -2048,15 +2088,17 @@ def save_sales_order_payment(request):
             PaymentMethod= received_data.get('PaymentType')
             doc_no = get_sales_transaction_id(TerminalNo,doctype)
             print('customer_data',customer_data) 
-            current_datetime = timezone.now()
-            datetime_stamp = current_datetime.strftime('%Y-%m-%d %H:%M:%S')
-            # pdb.set_trace()
-            # Convert the formatted string back to a datetime object
-            formatted_datetime = datetime.strptime(datetime_stamp, '%Y-%m-%d %H:%M:%S')
+            current_datetime_utc = timezone.now()
 
-            # Extracting date and time separately
-            formatted_date = formatted_datetime.date()  # Extracts the date
-            formatted_time = formatted_datetime.time()  # Extracts the time
+            # Convert to Asia/Manila
+            target_timezone = pytz.timezone("Asia/Manila")
+            current_datetime = current_datetime_utc.astimezone(target_timezone)
+
+            # Extract date and time directly (no need to format and parse back)
+            formatted_date = current_datetime.date()
+            formatted_time = current_datetime.time()
+            # If you still want a formatted string
+            datetime_stamp = current_datetime.strftime("%Y-%m-%d %H:%M:%S")
 
             customername = ''
             guestcount = 0
@@ -2083,7 +2125,8 @@ def save_sales_order_payment(request):
             
             line_no = 0 
 
-            serial_number = get_serial_number()
+            serial_number = getattr(request, "SERIALNO", None)
+            # serial_number = get_serial_number()
             machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number.strip()).first()
             Amt_Discount = 0
             so_no = ''
@@ -2162,7 +2205,7 @@ def save_sales_order_payment(request):
                 cashier_id = cashier_id,
                 datetime_stamp = datetime_stamp,
                 bagger = '',
-                amount_tendered = amountT,
+                amount_tendered = float(str(amountT).replace(',','')),
                 document_type = document_type,
                 amount_disc = float(str(Amt_Discount).replace(',', '')),
                 lvl1_disc = 0,
@@ -2202,6 +2245,7 @@ def save_sales_order_payment(request):
 
 ###************ CREDIT CARD PAYMENT ----DINE IN---- SAVE TO TBL_POS_SALES_INVOICE_LIST AND LISTING**********************
 @api_view(['POST'])
+@permission_classes([IsAuthenticated])
 def save_credit_card_payment2(request):
     if request.method == 'POST':
         received_data = json.loads(request.body)
@@ -2216,7 +2260,8 @@ def save_credit_card_payment2(request):
         doc_no = get_sales_transaction_id(TerminalNo,'POS SI')
         current_datetime = timezone.now()
         datetime_stamp = current_datetime.strftime('%Y-%m-%d %H:%M:%S')
-        serial_number = get_serial_number()
+        serial_number = getattr(request, "SERIALNO", None)
+            # serial_number = get_serial_number()
         machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number.strip()).first()
         companyCode = getCompanyData()
         waiterName=''
@@ -2488,28 +2533,31 @@ def save_credit_card_payment2(request):
 ##************ CREDIT CARD PAYMENT ----DINE IN---- SAVE TO TBL_POS_SALES_INVOICE_LIST AND LISTING**********************
 @api_view(['POST'])
 @transaction.atomic
+@permission_classes([IsAuthenticated])
 def save_credit_card_payment(request):
     if request.method == 'POST':
         # pdb.set_trace()
         try:
             received_data = json.loads(request.body)
-            cart_items = received_data.get('data', [])
-            data_from_modal = received_data.get('CustomerPaymentData')
-            table_no = received_data.get('TableNo')
-            cashier_id = received_data.get('CashierID')
-            TerminalNo = received_data.get('TerminalNo')
-            AmountDue = received_data.get('AmountDue')
-            CashierName =  received_data.get('CashierName')
-            OrderType =  received_data.get('OrderType')
-            Discounted_by= received_data.get('Discounted_by')
-            # doc_no = get_sales_transaction_id(TerminalNo,'POS CI')
-            DiscountDataList = received_data.get('DiscountDataList')
-            DiscountType = received_data.get('DiscountType')
-            DiscountData= received_data.get('DiscountData')
-            QueNo= received_data.get('QueNo')
-            CreditCard = received_data.get('CreditCard')
-            doctype = received_data.get('doctype')
-            doc_no = get_sales_transaction_id(TerminalNo,doctype)
+            try:
+                cart_items = received_data.get('data', [])
+                data_from_modal = received_data.get('CustomerPaymentData')
+                table_no = received_data.get('TableNo')
+                cashier_id = received_data.get('CashierID')
+                TerminalNo = received_data.get('TerminalNo')
+                AmountDue = received_data.get('AmountDue')
+                CashierName =  received_data.get('CashierName')
+                OrderType =  received_data.get('OrderType')
+                Discounted_by= received_data.get('Discounted_by')
+                DiscountDataList = received_data.get('DiscountDataList')
+                DiscountType = received_data.get('DiscountType')
+                DiscountData= received_data.get('DiscountData')
+                QueNo= received_data.get('QueNo')
+                CreditCard = received_data.get('CreditCard')
+                doctype = received_data.get('doctype')
+                doc_no = get_sales_transaction_id(TerminalNo,doctype)
+            except Exception as e:
+                print('Error',e)
             # CreditCardPaymentListData = CreditCard.get("CreditCardPaymentList")
             # pdb.set_trace()
             Guest_Count = 0
@@ -2519,12 +2567,15 @@ def save_credit_card_payment(request):
             BankName = ''
             if table_no =='':
                 table_no = 0
-        
-            current_datetime = timezone.now()
-            datetime_stamp = current_datetime.strftime('%Y-%m-%d %H:%M:%S')
-            serial_number = get_serial_number()
-            machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number.strip()).first()
-            companyCode = getCompanyData()
+            try:
+                current_datetime = timezone.now()
+                datetime_stamp = current_datetime.strftime('%Y-%m-%d %H:%M:%S')
+                serial_number = getattr(request, "SERIALNO", None)
+                machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number.strip()).first()
+                companyCode = getCompanyData()
+            except Exception as e:
+                print('error',e)
+
             waiterName=''
 
             last_details_id = 0
@@ -2539,69 +2590,80 @@ def save_credit_card_payment(request):
             # Increment the last_details_id by 1
             new_details_id = last_details_id + 1
 
-            
-            credit_card_payments = CreditCard['CreditCardPaymentList']
-            for payment in credit_card_payments:
-                card_no = payment['CardNo']
-                acquire_bank = payment['AcquireBank']
-                card_issuer = payment['CardIssuer']
-                card_holder = payment['CardHolder']
-                approval_no = payment['ApprovalNo']
-                expiry_month = payment['ExpiryMonth']
-                expiry_year = payment['ExpiryYear']
-                amount_due = payment['AmountDue']
+            print(1)
 
-                # Format the datetime object as "January 1, 2024"
-                expiry_date = datetime(int(expiry_year), int(expiry_month), 1)
-                formatted_expiry_date = expiry_date.strftime("%B %d, %Y")
+            try:
+                credit_card_payments = CreditCard['CreditCardPaymentList']
+                print('credit_card_payments',credit_card_payments)
+                for payment in credit_card_payments:
 
-                bank_query = BankCompany.objects.filter(company_description=acquire_bank)
-                bank_id_code=0
+                    card_no = payment['CardNo']
+                    acquire_bank = payment['AcquireBank']
+                    card_issuer = payment['CardIssuer']
+                    card_holder = payment['CardHolder']
+                    approval_no = payment['ApprovalNo']
+                    expiry_month = int(payment['ExpiryMonth'])
+                    expiry_year = int(payment['ExpiryYear'])
+                    amount_due = payment['AmountDue']
 
-                # If a bank with the given description exists, get its id_code
-                if bank_query.exists():
-                    bank_object = bank_query.first()  # Get the first matching bank object
-                    bank_id_code = bank_object.id_code
-                else:
-                    # Handle the case where no bank with the given description exists
-                    bank_id_code = 0
+                    print('expiry_month',expiry_month)
+                    print('expiry_year',expiry_year)
 
-                bankID = str(bank_id_code) + str(bankID)
-                BankName = acquire_bank + ',' + BankName
-                save_creditcardSales = SalesTransCreditCard (
-                    sales_trans_id = int(float(doc_no)),
-                    terminal_no = TerminalNo,
-                    cashier_id = cashier_id,
-                    document_type = 'SI',
-                    details_id = new_details_id,
-                    card_no=card_no,
-                    card_name = card_issuer,
-                    bank = bank_id_code,
-                    card_holder = card_holder,
-                    approval_no = approval_no,
-                    amount = amount_due,
-                    expiry_date = formatted_expiry_date,
-                )
 
-                save_creditcardSales.save()
+                    # Format the datetime object as "January 1, 2024"
+                    expiry_date = dt.datetime(expiry_year, expiry_month, 1)
+                    formatted_expiry_date = expiry_date.strftime("%B %d, %Y")
 
+                    bank_query = BankCompany.objects.filter(company_description=acquire_bank)
+                    bank_id_code=0
+
+                    # If a bank with the given description exists, get its id_code
+                    if bank_query.exists():
+                        bank_object = bank_query.first()  # Get the first matching bank object
+                        bank_id_code = bank_object.id_code
+                    else:
+                        # Handle the case where no bank with the given description exists
+                        bank_id_code = 0
+                    print('bank ID',bank_id_code)
+                    bankID = str(bank_id_code) + str(bankID)
+                    BankName = acquire_bank + ',' + BankName
+                    save_creditcardSales = SalesTransCreditCard (
+                        sales_trans_id = int(float(doc_no)),
+                        terminal_no = TerminalNo,
+                        cashier_id = cashier_id,
+                        document_type = 'SI',
+                        details_id = new_details_id,
+                        card_no=card_no,
+                        card_name = card_issuer,
+                        bank = bank_id_code,
+                        card_holder = card_holder,
+                        approval_no = approval_no,
+                        amount = amount_due,
+                        expiry_date = formatted_expiry_date,
+                    )
+
+                    save_creditcardSales.save()
+            except Exception as e:
+                print('error',e)
+                traceback.print_exc()
 
             if table_no =='':
                 table_no = 0
         
             
-            
+            print(2)
             current_datetime = timezone.now()
             datetime_stamp = current_datetime.strftime('%Y-%m-%d %H:%M:%S')
             
-            
-            serial_number = get_serial_number()
+            print(3)
+            serial_number = getattr(request, "SERIALNO", None)
+            # serial_number = get_serial_number()
             machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number.strip()).first()
             companyCode = getCompanyData()
             waiterName=''
     
 
-
+            print(4)
             if data_from_modal.get('Customer') != '':
                 if data_from_modal.get('customerType').upper() == "WALK-IN":
                     try:
@@ -2641,7 +2703,7 @@ def save_credit_card_payment(request):
                 CusTIN =""
                 CusAddress =""
                 CusBusiness =""
-                
+            print(5)
             so_no = ''
             so_doc_no = ''
             disc_amt = 0
@@ -2675,8 +2737,6 @@ def save_credit_card_payment(request):
                     total_sub_total = total_sub_total + (quantity * price)
                     
                     if DiscountType == 'SC':
-                        print(DiscountData)
-                        print(DiscountData.get('SAmountCovered'))
                         SCAmmountCovered = float(DiscountData.get('SAmountCovered').replace(',',''))
                         SLess20SCDiscount = float(DiscountData.get('SLess20SCDiscount').replace(',',''))
                         SLessVat12 =  float(DiscountData.get('SLessVat12').replace(',',''))
@@ -2692,17 +2752,7 @@ def save_credit_card_payment(request):
                         net_total = (totalItem) - (disc_amt + vat_exempt)
                         vat_amt =(totalItem / (0.12 + 1 ) * 0.12) * (SVatSales -SCAmmountCovered) / SVatSales
                         Vatable_Amount = SVatSales - SCAmmountCovered
-                        # NetSale =  totalItem / (0.12 + 1 )
-                        # vat_exempt = (SCAmmountCovered - SLess20SCDiscount) - SLessVat12
-                        # disc_amt  = SLess20SCDiscount
-                        # net_total = (quantity * price) - (disc_amt + vat_exempt)
-                        # vat_amt = ((SVatSales - SCAmmountCovered) * 12) / 112
-                        # Vatable_Amount = (SVatSales - SCAmmountCovered) - vat_amt
-                        print('NetSale',NetSale)
-                        print('vat_exempt',vat_exempt)
-                        print('disc_amt',disc_amt)
-                        print('net_total',net_total)
-                    
+
                     elif DiscountType =='ITEM':
                         for dis in DiscountData:
 
@@ -2729,7 +2779,6 @@ def save_credit_card_payment(request):
                                 unit_cost = (totalItem) 
                                 Vatable_Amount = (totalItem + Vatable_Amount) - disc_amt
                     elif DiscountType =='TRANSACTION':
-                        print(DiscountData)
                         for dis in DiscountData:
                             lineNO = 0
                             if dis.get('line_no') is None:
@@ -2772,7 +2821,7 @@ def save_credit_card_payment(request):
                 # total_disc_amt = total_disc_amt + float(disc_amt)
                 # total_desc_rate= total_desc_rate + desc_rate
                 # total_vat_amt = total_vat_amt + vat_amt
-                print('tmp_cart_item_discount',tmp_cart_item_discount)
+   
                 if DiscountType == 'SC':
                     total_vat_exempt = vat_exempt + total_vat_exempt
                     total_disc_amt = float(disc_amt) +float(total_disc_amt)
@@ -2834,7 +2883,7 @@ def save_credit_card_payment(request):
                 )
                 SaveToPOSSalesInvoiceListing.save()
 
-
+            print(6)
             if DiscountType == 'ITEM' or DiscountType == 'TRANSACTION':
                 for items in tmp_cart_item_discount:
                     productInfo = Product.objects.filter(bar_code=items['barcode']).first()
@@ -2977,64 +3026,59 @@ def save_credit_card_payment(request):
             AmountDue_formatted = f"{AmountDue_float:.3f}"
 
             print('cus-address',CusAddress)
-            # pdb.set_trace()
-            total_disc_amt = float(str(total_disc_amt).replace(',', ''))
-            total_desc_rate = float(str(total_desc_rate).replace(',', ''))
-            total_vat_exempt = float(str(total_vat_exempt).replace(',', ''))
-            SaveToPOSSalesInvoiceList = PosSalesInvoiceList (
-                    company_code = f"{companyCode.autonum:0>4}",
-                    ul_code = machineInfo.ul_code,
-                    site_code = int(machineInfo.site_no),
-                    trans_type = 'Cash Sales',
-                    discount_type = DiscountType,
-                    doc_no = doc_no,
-                    doc_type = 'POS-SI',
-                    terminal_no = TerminalNo,
-                    cashier_id = cashier_id,
-                    so_no =items['sales_trans_id'],
-                    so_doc_no =items['sales_trans_id'],
-                    doc_date = datetime_stamp,
-                    customer_code = customer_code,
-                    customer_name = CustomerName,
-                    customer_address = CusAddress,
-                    business_unit = CusBusiness,
-                    customer_type = cust_type,
-                    salesman_id = '0',
-                    salesman = '',
-                    collector_id = bankID,
-                    collector = BankName,
-                    pricing = '',
-                    terms = 0,
-                    remarks = '',
-                    ServiceCharge_TotalAmount = 0 ,
-                    total_credit_card =  AmountDue_formatted,
-                    total_qty = totalQty,
-                    discount = float(str(total_disc_amt).replace(',', '')),
-                    vat = float(str(total_vat_amt).replace(',', '')),
-                    vat_exempted = float(str(vat_exempted).replace(',', '')),
-                    net_vat = float(str(net_vat).replace(',', '')),
-                    net_discount = float(str(net_discount).replace(',', '')),
-                    sub_total = float(str(total_sub_total).replace(',', '')),
-                    # discount =  f"{total_disc_amt:.3f}" ,
-                    # vat = f"{total_vat_amt:.3f}",
-                    # vat_exempted =  f"{total_vat_exempt:.3f}",
-                    # net_vat = f"{net_vat:.3f}",
-                    # net_discount = f"{net_discount:.3f}",
-                    # sub_total = f"{total_sub_total:.3f}",
-                    lvl1_disc = '0',
-                    lvl2_disc = '0',
-                    lvl3_disc = '0',
-                    lvl4_disc = '0',
-                    lvl5_disc = '0',
-                    HMO = '',
-                    PHIC = '',
-                    status = 'S',
-                    prepared_id = cashier_id,
-                    prepared_by = CashierName,
-                    )
-            
-            SaveToPOSSalesInvoiceList.save()
-            
+            try:
+                total_disc_amt = float(str(total_disc_amt).replace(',', ''))
+                total_desc_rate = float(str(total_desc_rate).replace(',', ''))
+                total_vat_exempt = float(str(total_vat_exempt).replace(',', ''))
+                SaveToPOSSalesInvoiceList = PosSalesInvoiceList (
+                        company_code = f"{companyCode.autonum:0>4}",
+                        ul_code = machineInfo.ul_code,
+                        site_code = int(machineInfo.site_no),
+                        trans_type = 'Cash Sales',
+                        discount_type = DiscountType,
+                        doc_no = doc_no,
+                        doc_type = 'POS-SI',
+                        terminal_no = TerminalNo,
+                        cashier_id = cashier_id,
+                        so_no =items['sales_trans_id'],
+                        so_doc_no =items['sales_trans_id'],
+                        doc_date = datetime_stamp,
+                        customer_code = customer_code,
+                        customer_name = CustomerName,
+                        customer_address = CusAddress,
+                        business_unit = CusBusiness,
+                        customer_type = cust_type,
+                        salesman_id = '0',
+                        salesman = '',
+                        collector_id = bankID,
+                        collector = BankName,
+                        pricing = '',
+                        terms = 0,
+                        remarks = '',
+                        ServiceCharge_TotalAmount = 0 ,
+                        total_credit_card =  AmountDue_formatted,
+                        total_qty = totalQty,
+                        discount = float(str(total_disc_amt).replace(',', '')),
+                        vat = float(str(total_vat_amt).replace(',', '')),
+                        vat_exempted = float(str(vat_exempted).replace(',', '')),
+                        net_vat = float(str(net_vat).replace(',', '')),
+                        net_discount = float(str(net_discount).replace(',', '')),
+                        sub_total = float(str(total_sub_total).replace(',', '')),
+                        lvl1_disc = '0',
+                        lvl2_disc = '0',
+                        lvl3_disc = '0',
+                        lvl4_disc = '0',
+                        lvl5_disc = '0',
+                        HMO = '',
+                        PHIC = '',
+                        status = 'S',
+                        prepared_id = cashier_id,
+                        prepared_by = CashierName,
+                        )
+                
+                SaveToPOSSalesInvoiceList.save()
+            except Exception as e:
+                print('error',e)
 
             if OrderType == 'DINE IN':
                 GetWaiterID = PosSalesOrder.objects.filter(
@@ -3164,7 +3208,7 @@ def save_credit_card_payment(request):
                 'QueNo':QueNo
                 }
             # transaction.commit()
-            PDFReceipt(doc_no,'POS-SI',cus_Data)
+            PDFReceipt(request,doc_no,'POS-SI',cus_Data)
             return Response({'data':data}, status=200)
         except Exception as e:
                 # If any error occurs during the save operations, rollback the transaction
@@ -3179,6 +3223,7 @@ def save_credit_card_payment(request):
 ##************ DEBIT CARD  OR EPS PAYMENT ----DINE IN---- SAVE TO TBL_POS_SALES_INVOICE_LIST AND LISTING**********************
 @api_view(['POST'])
 @transaction.atomic
+@permission_classes([IsAuthenticated])
 def save_debit_card_payment(request):
     if request.method == 'POST':
         try:
@@ -3267,7 +3312,8 @@ def save_debit_card_payment(request):
             datetime_stamp = current_datetime.strftime('%Y-%m-%d %H:%M:%S')
             
             
-            serial_number = get_serial_number()
+            serial_number = getattr(request, "SERIALNO", None)
+            # serial_number = get_serial_number()
             machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number.strip()).first()
             companyCode = getCompanyData()
             waiterName=''
@@ -3445,7 +3491,7 @@ def save_debit_card_payment(request):
                 # total_disc_amt = total_disc_amt + float(disc_amt)
                 # total_desc_rate= total_desc_rate + desc_rate
                 # total_vat_amt = total_vat_amt + vat_amt
-                print('tmp_cart_item_discount',tmp_cart_item_discount)
+          
                 if DiscountType == 'SC':
                     total_vat_exempt = vat_exempt + total_vat_exempt
                     total_disc_amt = float(disc_amt) +float(total_disc_amt)
@@ -3827,7 +3873,7 @@ def save_debit_card_payment(request):
                 'QueNo':QueNo
                 }
             # transaction.commit()
-            PDFReceipt(doc_no,'POS-SI',cus_Data)
+            PDFReceipt(request,doc_no,'POS-SI',cus_Data)
 
             # transaction.commit()
             return Response({'data':data}, status=200)
@@ -3843,6 +3889,7 @@ def save_debit_card_payment(request):
 ##************ Multiple PAYMENT ----DINE IN---- SAVE TO TBL_POS_SALES_INVOICE_LIST AND LISTING**********************
 @api_view(['POST'])
 @transaction.atomic
+@permission_classes([IsAuthenticated])
 def save_multiple_payment(request):
     if request.method == 'POST':
         # pdb.set_trace()
@@ -3865,13 +3912,24 @@ def save_multiple_payment(request):
             QueNo= received_data.get('QueNo')
             DebitCard = received_data.get('DebitCard')
             CreditCard = received_data.get('CreditCard')
+            Online = received_data.get('Online')
+            GiftCheck = received_data.get('GiftCheck')
+            Other = received_data.get('Other')
             CashAmount = received_data.get('CashAmount') 
             doctype = received_data.get('doctype')
             doc_no = get_sales_transaction_id(TerminalNo,doctype)
+            serial_number = getattr(request, "SERIALNO", None)
+            machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number.strip()).first()
+            companyCode = getCompanyData()
+            current_datetime = timezone.now()
+            datetime_stamp = current_datetime.strftime('%Y-%m-%d %H:%M:%S')
             # CreditCardPaymentListData = CreditCard.get("CreditCardPaymentList")
             Guest_Count = 0
             bankID = ''
             BankName = ''
+            OnlineAmount=0
+            OtherAmount =0
+            GiftCheckAmount = 0
             CreditCardAmount = 0
             DebitCardAmount = 0
             credit_card_payments = ''
@@ -3904,7 +3962,7 @@ def save_multiple_payment(request):
 
                     CreditCardAmount = float(amount_due) + float(CreditCardAmount)
                     # Format the datetime object as "January 1, 2024"
-                    expiry_date = datetime(int(expiry_year), int(expiry_month), 1)
+                    expiry_date = dt.datetime(int(expiry_year), int(expiry_month), 1)
                     formatted_expiry_date = expiry_date.strftime("%B %d, %Y")
 
                     bank_query = BankCompany.objects.filter(company_description=acquire_bank)
@@ -3935,8 +3993,6 @@ def save_multiple_payment(request):
                     )
 
                     save_creditcardSales.save()
-
-
 
             if DebitCard:
                 last_details_id = 0
@@ -3988,25 +4044,124 @@ def save_multiple_payment(request):
                     )
 
                     save_debitcardSales.save()
+            
+            if GiftCheck:
+                try:
+                    GiftCheck_payments = GiftCheck['GiftCheckPaymentList']
+                    for payment in GiftCheck_payments:
 
-    
+                        gift_check_no = payment['gift_check_no']
+                        gift_check_count = payment['gift_check_count']
+                        amount_due = payment['amount']
+                        isIncome = payment['isIncome']
+                        if gift_check_no == '':
+                            gift_check_no = 0
+                        if gift_check_count == '':
+                            gift_check_count = 0
+
+                        GiftCheckAmount += amount_due 
+                        save_gift_check = POSSalesTransGiftCheck (
+                            sales_trans_id = int(float(doc_no)),
+                            ul_code = machineInfo.ul_code,
+                            site_code = int(machineInfo.site_no),
+                            terminal_no = TerminalNo,
+                            cashier_id = cashier_id,
+                            doc_type = 'SI',
+                            datetime_stamp = datetime_stamp,
+                            gift_check_no = gift_check_no,
+                            gift_check_count = gift_check_count,
+                            amount = amount_due,
+                        )
+
+                        save_gift_check.save()
+                except Exception as e:
+                    print('error',e)
+                    traceback.print_exc()
+            if Online:
+                try:
+                    raw = Online.get('OnlinekPaymentList',[])
+                    online_payments = [raw] if isinstance(raw, dict) else raw
+                    for payment in online_payments:
+
+                        date_credited = payment.get('date_credited', None)
+                        acct_title = payment.get('acct_title', '')
+                        acct_code = payment.get('acct_code', 0)
+                        reference_no = payment.get('reference_no', '')
+                        sl_type = payment.get('sl_type', '')
+                        sl_name = payment.get('sl_name', '')
+                        sl_code = payment.get('sl_code', '')
+                        remarks = payment.get('remarks', '')
+                        total_amount = payment.get('total_amount', 0)
+
+                        OnlineAmount += float(total_amount) 
+                        save_online_payment = POSSalesTransOnlinePayment (
+                            sales_trans_id = int(float(doc_no)),
+                            ul_code = machineInfo.ul_code,
+                            site_code = int(machineInfo.site_no),
+                            terminal_no = TerminalNo,
+                            cashier_id = cashier_id,
+                            date_credited=date_credited,
+                            date_stamp = datetime_stamp,
+                            acct_code = acct_code,
+                            acct_title = acct_title,
+                            reference_no=reference_no,
+                            sl_code=sl_code,
+                            sl_name=sl_name,
+                            sl_type=sl_type,
+                            remarks=remarks,
+                            total_amount = total_amount,
+                        )
+
+                        save_online_payment.save()
+                except Exception as e:
+                    print('error',e)
+                    traceback.print_exc()
+
+            if Other:
+                try:
+                    print('Other',Other)
+                    raw = Other.get('OtherPaymentList',[])
+                    other_payments = [raw] if isinstance(raw, dict) else raw
+                    print('other_payments',other_payments)
+                    for payment in other_payments:
+
+                        particular = payment.get('particular', None)
+                        sl_type = payment.get('sl_type', '')
+                        sl_name = payment.get('sl_name', '')
+                        sl_code = payment.get('sl_code', '')
+                        remarks = payment.get('remarks', '')
+                        total_amount = payment.get('total_amount', 0)
+
+                        OtherAmount += float(total_amount) 
+                        save_other_payment = POSSalesTransOtherPayment (
+                            sales_trans_id = int(float(doc_no)),
+                            ul_code = machineInfo.ul_code,
+                            site_code = int(machineInfo.site_no),
+                            terminal_no = TerminalNo,
+                            cashier_id = cashier_id,
+                            particular=particular,
+                            date_stamp = datetime_stamp,
+                            sl_code=sl_code,
+                            sl_name=sl_name,
+                            sl_type=sl_type,
+                            remarks=remarks,
+                            total_amount = total_amount,
+                        )
+
+                        save_other_payment.save()
+                except Exception as e:
+                    print('error',e)
+                    traceback.print_exc()
+
             if table_no =='':
                 table_no = 0
         
             
             if QueNo == '':
                 QueNo = 0
-            current_datetime = timezone.now()
-            datetime_stamp = current_datetime.strftime('%Y-%m-%d %H:%M:%S')
             
             
-            serial_number = get_serial_number()
-            machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number.strip()).first()
-            companyCode = getCompanyData()
             waiterName=''
-    
-
-
             if data_from_modal.get('Customer') != '':
                 if data_from_modal.get('customerType').upper() == "WALK-IN":
                     try:
@@ -4095,13 +4250,6 @@ def save_multiple_payment(request):
                         vat_amt =(totalItem / (0.12 + 1 ) * 0.12) * (SVatSales -SCAmmountCovered) / SVatSales
                         Vatable_Amount = SVatSales - SCAmmountCovered
 
-                        print('NetSale',NetSale)
-                        print('vat_exempt',vat_exempt)
-                        print('disc_amt',disc_amt)
-                        print('net_total',net_total)
-                        print('vat_amt',vat_amt)
-                        print('Vatable_Amount',Vatable_Amount)
-
                     elif DiscountType =='ITEM':
                         for dis in DiscountData:
 
@@ -4172,7 +4320,7 @@ def save_multiple_payment(request):
                 # total_disc_amt = total_disc_amt + float(disc_amt)
                 # total_desc_rate= total_desc_rate + desc_rate
                 # total_vat_amt = total_vat_amt + vat_amt
-                print('tmp_cart_item_discount',tmp_cart_item_discount)
+
                 if DiscountType == 'SC':
                     total_vat_exempt = vat_exempt + total_vat_exempt
                     total_disc_amt = float(disc_amt) +float(total_disc_amt)
@@ -4375,6 +4523,9 @@ def save_multiple_payment(request):
             total_disc_amt = float(total_disc_amt)
             total_desc_rate = float(total_desc_rate)
             total_vat_exempt = float(total_vat_exempt)
+            if bankID == "":
+                bankID = 0
+
             SaveToPOSSalesInvoiceList = PosSalesInvoiceList (
                     company_code = f"{companyCode.autonum:0>4}",
                     ul_code = machineInfo.ul_code,
@@ -4404,7 +4555,11 @@ def save_multiple_payment(request):
                     total_cash =  "{:.3}".format(float(CashAmount)),
                     total_eps =  "{:.3}".format(float(DebitCardAmount)),
                     total_credit_card = "{:.3f}".format(float(CreditCardAmount)),
+                    other_payment = "{:.3f}".format(float(OtherAmount)),
+                    online_payment="{:.3f}".format(float(OnlineAmount)),
+                    gift_check = "{:.3f}".format(float(GiftCheckAmount)),
                     total_qty = totalQty,
+                    other_income = 0,
                     discount = float(str(total_disc_amt).replace(',', '')),
                     vat = float(str(total_vat_amt).replace(',', '')),
                     vat_exempted = float(str(vat_exempted).replace(',', '')),
@@ -4561,7 +4716,7 @@ def save_multiple_payment(request):
             
      
             # transaction.commit()
-            PDFReceipt(doc_no,'POS-SI',cus_Data)
+            PDFReceipt(request,doc_no,'POS-SI',cus_Data)
             # transaction.commit()
             return Response({'data':data}, status=200)
         except Exception as e:
@@ -4577,6 +4732,7 @@ def save_multiple_payment(request):
 ##************ CHARGE ----DINE IN---- SAVE TO TBL_POS_SALES_INVOICE_LIST AND LISTING**********************
 @api_view(['POST'])
 @transaction.atomic
+@permission_classes([IsAuthenticated])
 def save_charge_payment(request):
     if request.method == 'POST':
         try:
@@ -4667,7 +4823,8 @@ def save_charge_payment(request):
             datetime_stamp = current_datetime.strftime('%Y-%m-%d %H:%M:%S')
             
             
-            serial_number = get_serial_number()
+            serial_number = getattr(request, "SERIALNO", None)
+            # serial_number = get_serial_number()
             machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number.strip()).first()
             companyCode = getCompanyData()
             waiterName=''
@@ -4906,7 +5063,7 @@ def save_charge_payment(request):
                 # total_disc_amt = total_disc_amt + float(disc_amt)
                 # total_desc_rate= total_desc_rate + desc_rate
                 # total_vat_amt = total_vat_amt + vat_amt
-                print('tmp_cart_item_discount',tmp_cart_item_discount)
+
                 if DiscountType == 'SC':
                     total_vat_exempt = vat_exempt + total_vat_exempt
                     total_disc_amt = float(disc_amt) +float(total_disc_amt)
@@ -5292,7 +5449,7 @@ def save_charge_payment(request):
                 'QueNo':QueNo
                 }
 
-            PDFChargeReceipt(doc_no,'POS-CI',cus_Data)
+            PDFChargeReceipt(request,doc_no,'POS-CI',cus_Data)
      
 
             # transaction.commit()
@@ -5308,6 +5465,1910 @@ def save_charge_payment(request):
         return JsonResponse({'error': 'Invalid Request Method'}, status=500)
      
 
+##************ GIFT CHECK PAYMENT ONLY----DINE IN---- SAVE TO TBL_POS_SALES_INVOICE_LIST AND LISTING**********************
+@api_view(['POST'])
+@transaction.atomic
+@permission_classes([IsAuthenticated])
+def save_gift_check_payment(request):
+    if request.method == 'POST':
+        # pdb.set_trace()
+        try:
+            received_data = json.loads(request.body)
+            try:
+                cart_items = received_data.get('data', [])
+                data_from_modal = received_data.get('CustomerPaymentData')
+                table_no = received_data.get('TableNo')
+                cashier_id = received_data.get('CashierID')
+                TerminalNo = received_data.get('TerminalNo')
+                AmountDue = received_data.get('AmountDue')
+                CashierName =  received_data.get('CashierName')
+                OrderType =  received_data.get('OrderType')
+                Discounted_by= received_data.get('Discounted_by')
+                DiscountDataList = received_data.get('DiscountDataList')
+                DiscountType = received_data.get('DiscountType')
+                DiscountData= received_data.get('DiscountData')
+                QueNo= received_data.get('QueNo')
+                GiftCheck = received_data.get('GiftCheck')
+                doctype = received_data.get('doctype')
+                doc_no = get_sales_transaction_id(TerminalNo,doctype)
+
+                print('GiftCheck',GiftCheck)
+            except Exception as e:
+                print('Error',e)
+            # CreditCardPaymentListData = CreditCard.get("CreditCardPaymentList")
+            # pdb.set_trace()
+            Guest_Count = 0
+            total_gift_check = 0
+            isIncome  = False
+            total_excess = 0
+            if QueNo == '':
+                QueNo=0
+            if table_no =='':
+                table_no = 0
+            try:
+                current_datetime = timezone.now()
+                datetime_stamp = current_datetime.strftime('%Y-%m-%d %H:%M:%S')
+                serial_number = getattr(request, "SERIALNO", None)
+                machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number.strip()).first()
+                companyCode = getCompanyData()
+            except Exception as e:
+                print('error',e)
+
+            waiterName=''
+
+
+            try:
+                GiftCheck_payments = GiftCheck['GiftCheckPaymentList']
+                for payment in GiftCheck_payments:
+
+                    gift_check_no = payment['gift_check_no']
+                    gift_check_count = payment['gift_check_count']
+                    amount_due = payment['amount']
+                    isIncome = payment['isIncome']
+                    if gift_check_no == '':
+                        gift_check_no = 0
+                    if gift_check_count == '':
+                        gift_check_count = 0
+
+                    total_gift_check += amount_due 
+                    save_gift_check = POSSalesTransGiftCheck (
+                        sales_trans_id = int(float(doc_no)),
+                        ul_code = machineInfo.ul_code,
+                        site_code = int(machineInfo.site_no),
+                        terminal_no = TerminalNo,
+                        cashier_id = cashier_id,
+                        doc_type = 'SI',
+                        datetime_stamp = datetime_stamp,
+                        gift_check_no = gift_check_no,
+                        gift_check_count = gift_check_count,
+                        amount = amount_due,
+                    )
+
+                    save_gift_check.save()
+            except Exception as e:
+                print('error',e)
+                traceback.print_exc()
+
+            if table_no =='':
+                table_no = 0
+        
+
+            if data_from_modal.get('Customer') != '':
+                if data_from_modal.get('customerType').upper() == "WALK-IN":
+                    try:
+                        Payor = PosPayor.objects.get(payor_name=data_from_modal.get('Customer'))
+                        customer_code = Payor.id_code
+                        CustomerName = Payor.payor_name
+                        CusTIN =Payor.tin
+                        CusAddress =Payor.address
+                        CusBusiness = Payor.business_style
+                        cust_type = "P"
+                    except PosPayor.DoesNotExist:
+                        customer_code = "8888"
+                        CustomerName = "Walk-IN"
+                        cust_type = ""
+                        CusTIN = ""
+                        CusAddress = ""
+                        CusBusiness = ""
+                else:
+                    try:
+                        customer = Customer.objects.get(trade_name=data_from_modal.get('Customer'))
+                        customer_code = customer.id_code
+                        CustomerName = customer.trade_name
+                        cust_type = "C"
+                        CusAddress = customer.st_address
+                    except Customer.DoesNotExist:
+                        customer_code = "8888"
+                        CustomerName = "Walk-IN"
+                        cust_type = ""
+                        CusTIN =customer.tax_id_no
+                        CusAddress =customer.st_address
+                        CusBusiness = customer.business_style
+                        
+            else:
+                customer_code= "8888"
+                CustomerName = "Walk-IN"
+                cust_type = ""
+                CusTIN =""
+                CusAddress =""
+                CusBusiness =""
+            so_no = ''
+            so_doc_no = ''
+            disc_amt = 0
+            desc_rate= 0
+            vat_amt = 0
+            vat_exempt = 0
+            net_total = 0
+            total_disc_amt = 0 ###for sales invoice list
+            total_desc_rate= 0 ###for sales invoice list
+            total_vat_amt = 0 ###for sales invoice list
+            total_vat_exempt = 0 ###for sales invoice list
+            total_net_total = 0 ###for sales invoice list
+            total_sub_total = 0 ###for sales invoice list
+            vatable = ''
+            totalQty = 0
+            desc_rate = 0
+            unit_cost = 0
+            Vatable_Amount = 0
+            countxx = 0
+
+                
+            tmp_cart_item_discount = cart_items
+            for items in cart_items:
+                productInfo = Product.objects.filter(bar_code=items['barcode']).first()
+                
+
+                if productInfo is not None:
+                    quantity = float(items['quantity'])
+                    price = float(items['price'])
+                    item_disc = float(items['item_disc'])
+                    total_sub_total = total_sub_total + (quantity * price)
+                    
+                    if DiscountType == 'SC':
+                        SCAmmountCovered = float(DiscountData.get('SAmountCovered').replace(',',''))
+                        SLess20SCDiscount = float(DiscountData.get('SLess20SCDiscount').replace(',',''))
+                        SLessVat12 =  float(DiscountData.get('SLessVat12').replace(',',''))
+                        SNetOfVat =  float(DiscountData.get('SNetOfVat').replace(',',''))
+                        SVatSales =  float(DiscountData.get('SVatSales').replace(',',''))
+                        vatable = 'Es'
+                        desc_rate = 20
+                        totalItem = quantity * price
+                            
+                        NetSale =  totalItem / (0.12 + 1 )
+                        vat_exempt =  (totalItem / (0.12 + 1 ) * 0.12) * (SCAmmountCovered / SVatSales)
+                        disc_amt  = (totalItem / (0.12 + 1 ) * 0.2) * (SCAmmountCovered / SVatSales)
+                        net_total = (totalItem) - (disc_amt + vat_exempt)
+                        vat_amt =(totalItem / (0.12 + 1 ) * 0.12) * (SVatSales -SCAmmountCovered) / SVatSales
+                        Vatable_Amount = SVatSales - SCAmmountCovered
+
+                    elif DiscountType =='ITEM':
+                        for dis in DiscountData:
+
+                            lineNO = 0
+                            if dis.get('line_no') is None:
+                                lineNO = dis.get('LineNo', 0)  # Use 'lineno' with a default value of 0 if 'line_no' is None
+                            else:
+                                lineNO = dis['line_no']
+
+                            if dis['Barcode'] == items['barcode'] and lineNO == items['line_no']:
+                                
+                                for x in tmp_cart_item_discount:
+                                    if x['barcode'] == items['barcode'] and x['line_no'] == items['line_no']:
+                                        tmp_cart_item_discount.remove(x)
+                                vatable = 'V'
+                                desc_rate = float(dis['D1'])
+                                totalItem = quantity * price
+                                item_disc = float(dis['D1'])
+                                NetSale =  float(dis['DiscountedPrice'])
+                                vat_exempt =  0
+                                disc_amt  = float(dis['ByAmount'])
+                                net_total = (totalItem - disc_amt)
+                                vat_amt = ((totalItem - disc_amt) / 1.12) * 0.12
+                                unit_cost = (totalItem) 
+                                Vatable_Amount = (totalItem + Vatable_Amount) - disc_amt
+                    elif DiscountType =='TRANSACTION':
+                        for dis in DiscountData:
+                            lineNO = 0
+                            if dis.get('line_no') is None:
+                                lineNO = dis.get('lineno', 0)  # Use 'lineno' with a default value of 0 if 'line_no' is None
+                            else:
+                                lineNO = dis['line_no']
+
+                            if dis['barcode'] == items['barcode'] and lineNO == items['line_no']:
+                                desc_rate = float(dis['desc_rate'])
+                                vatable = 'V'
+                                totalItem = quantity * price
+                                item_disc = float(dis['desc_rate'])
+                                vat_exempt =  0
+                                disc_amt  = float(dis['Discount'])
+                                net_total = (totalItem - disc_amt)
+                                vat_amt = ((totalItem - disc_amt) / 1.12) * 0.12
+                                unit_cost = (totalItem) 
+                                Vatable_Amount = (totalItem + Vatable_Amount) - disc_amt
+
+                    else:
+                        if productInfo.tax_code == 'VAT':
+                            vatable = 'V'
+                            totalItem = quantity * price
+                            desc_rate = item_disc / (totalItem) * 100
+                            vat_amt = ((totalItem - item_disc) / 1.12) * 0.12
+                            disc_amt = item_disc
+                            net_total = (totalItem - item_disc)
+                            Vatable_Amount = (totalItem + Vatable_Amount)
+                            unit_cost = totalItem
+                        else:
+                            vatable = 'N'
+                            vat_amt = 0
+                            disc_amt = item_disc
+                            net_total = (quantity * price) - disc_amt
+                else:
+                    # Handle case where productInfo is None (no product found for the barcode)
+                    pass  # You might want to log this or handle it according to your logic
+                    
+
+                if DiscountType == 'SC':
+                    total_vat_exempt = vat_exempt + total_vat_exempt
+                    total_disc_amt = float(disc_amt) +float(total_disc_amt)
+                    total_desc_rate= desc_rate 
+                    total_vat_amt = vat_amt + total_vat_amt
+                else:
+                    total_net_total = total_net_total + net_total
+                    total_vat_exempt = vat_exempt + total_vat_exempt
+                    total_disc_amt = float(disc_amt) + float(total_disc_amt)
+                    total_desc_rate= desc_rate 
+                    total_vat_amt = vat_amt + total_vat_amt
+                
+                # pdb.set_trace()
+                totalQty = totalQty + float(items['quantity'])
+                if so_no == '':
+                    so_no = items['sales_trans_id']
+                else:
+                    if so_no == items['sales_trans_id']:
+                        so_no = so_no
+                    else:
+                        so_no = so_no + ', ' + items['sales_trans_id']
+
+                so_doc_no = so_no
+                SaveToPOSSalesInvoiceListing = PosSalesInvoiceListing(
+                    company_code = f"{companyCode.autonum:0>4}",
+                    ul_code = machineInfo.ul_code,
+                    terminal_no = TerminalNo,
+                    site_code = int(machineInfo.site_no),
+                    cashier_id = cashier_id,
+                    doc_date = datetime_stamp,
+                    doc_no = doc_no,
+                    doc_type = 'POS-SI',
+                    line_number = items['line_no'],
+                    bar_code =items['barcode'],
+                    alternate_code = 0,
+                    item_code = items['barcode'],
+                    rec_qty = items['quantity'],
+                    rec_uom = productInfo.uom,
+                    description = items['description'],
+                    unit_price = items['price'],
+                    sub_total = float(items['quantity']) * float(items['price']),
+                    pc_price =  items['price'],
+                    qtyperuom = 1,
+                    disc_amt = f"{disc_amt:.3f}",
+                    desc_rate =f"{desc_rate:.3f}",
+                    vat_amt =  f"{vat_amt:.3f}",
+                    vat_exempt = f"{vat_exempt:.3f}",
+                    net_total =  f"{net_total:.3f}",
+                    isvoid = 'NO',
+                    unit_cost = unit_cost,
+                    vatable = vatable,
+                    status = 'A',
+                    so_no =items['sales_trans_id'],
+                    so_doc_no =items['sales_trans_id'],
+                    sn_bc = '',
+                    discounted_by = Discounted_by,
+                    
+                )
+                SaveToPOSSalesInvoiceListing.save()
+
+            if DiscountType == 'ITEM' or DiscountType == 'TRANSACTION':
+                for items in tmp_cart_item_discount:
+                    productInfo = Product.objects.filter(bar_code=items['barcode']).first()
+                    if productInfo is not None:
+                        quantity = float(items['quantity'])
+                        price = float(items['price'])
+                        item_disc = float(items['item_disc'])
+                        total_sub_total = total_sub_total + (quantity * price)
+                        if productInfo.tax_code == 'VAT':
+                               
+                                vatable = 'V'
+                                totalItem = quantity * price
+                                desc_rate = item_disc / (totalItem) * 100
+                                vat_amt = ((totalItem - item_disc) / 1.12) * 0.12
+                                disc_amt = item_disc
+                                net_total = (totalItem - item_disc)
+                                Vatable_Amount = (totalItem + Vatable_Amount)
+                                unit_cost = totalItem
+                        else:
+                                vatable = 'N'
+                                vat_amt = 0
+                                disc_amt = item_disc
+                                net_total = (quantity * price) - disc_amt
+                    else:
+                        # Handle case where productInfo is None (no product found for the barcode)
+                        pass  # You might want to log this or handle it according to your logic
+                        
+
+                    total_net_total = total_net_total + net_total
+                    total_vat_exempt = vat_exempt + total_vat_exempt
+                    total_disc_amt = float(disc_amt) + float(total_disc_amt)
+                    total_desc_rate= desc_rate 
+                    total_vat_amt = vat_amt + total_vat_amt
+                    
+                    # pdb.set_trace()
+                    totalQty = totalQty + float(items['quantity'])
+                    if so_no == '':
+                        so_no = items['sales_trans_id']
+                    else:
+                        if so_no == items['sales_trans_id']:
+                            so_no = so_no
+                        else:
+                            so_no = so_no + ', ' + items['sales_trans_id']
+
+                    so_doc_no = so_no
+                    SaveToPOSSalesInvoiceListing = PosSalesInvoiceListing(
+                        company_code = f"{companyCode.autonum:0>4}",
+                        ul_code = machineInfo.ul_code,
+                        terminal_no = TerminalNo,
+                        site_code = int(machineInfo.site_no),
+                        cashier_id = cashier_id,
+                        doc_date = datetime_stamp,
+                        doc_no = doc_no,
+                        doc_type = 'POS-SI',
+                        line_number = items['line_no'],
+                        bar_code =items['barcode'],
+                        alternate_code = 0,
+                        item_code = items['barcode'],
+                        rec_qty = items['quantity'],
+                        rec_uom = productInfo.uom,
+                        description = items['description'],
+                        unit_price = items['price'],
+                        sub_total = float(items['quantity']) * float(items['price']),
+                        pc_price =  items['price'],
+                        qtyperuom = 1,
+                        disc_amt = f"{disc_amt:.3f}",
+                        desc_rate =f"{desc_rate:.3f}",
+                        vat_amt =  f"{vat_amt:.3f}",
+                        vat_exempt = f"{vat_exempt:.3f}",
+                        net_total =  f"{net_total:.3f}",
+                        isvoid = 'NO',
+                        unit_cost = unit_cost,
+                        vatable = vatable,
+                        status = 'A',
+                        so_no =items['sales_trans_id'],
+                        so_doc_no =items['sales_trans_id'],
+                        sn_bc = '',
+                        discounted_by = Discounted_by,
+                        
+                    )
+                    SaveToPOSSalesInvoiceListing.save()
+
+
+            Vatable_Amount = float(Vatable_Amount) - float(total_vat_amt)
+            net_vat = 0
+            net_discount = 0
+            vat_exempted = 0
+            #### Take note of computation of net_vat and net_discount
+            # pdb.set_trace()
+            if DiscountType == 'SC':
+                total_disc_amt = DiscountData['SLess20SCDiscount']
+                net_vat = DiscountData['SDiscountedPrice']
+                net_discount = DiscountData['SDiscountedPrice']
+                vat_exempted = DiscountData['SLessVat12']
+                count = len(DiscountDataList)
+                SCAmmountCovered =  float(str(DiscountData['SAmountCovered']).replace(',','')) * int(count)
+                for item in DiscountDataList:
+                    saveSeniorData  = PosSalesTransSeniorCitizenDiscount(
+                            sales_trans_id=int(float(doc_no)),
+                            terminal_no=TerminalNo,
+                            cashier_id=cashier_id,
+                            document_type=doctype,
+                            details_id=0,
+                            id_no=item['SID'],
+                            senior_member_name=item['SName'],
+                            id=0,
+                            tin_no=item['STIN'],
+                            so_no=so_no,
+                            amount_covered=SCAmmountCovered
+                        )
+                    saveSeniorData.save()
+                
+            elif DiscountType == 'ITEM':
+                net_vat = total_sub_total - (total_disc_amt + total_vat_amt + total_vat_exempt)
+                net_discount = total_sub_total - (total_disc_amt + total_vat_exempt)
+
+            elif DiscountType == 'TRANSACTION':
+                DiscountType='TRSD'
+                net_vat = total_sub_total - (total_disc_amt + total_vat_amt + total_vat_exempt)
+                net_discount = total_sub_total - (total_disc_amt + total_vat_exempt)
+            elif DiscountType == 'TRADE':
+                DiscountType='TRD'
+                net_vat = total_sub_total - (total_disc_amt + total_vat_amt + total_vat_exempt)
+                net_discount = total_sub_total - (total_disc_amt + total_vat_exempt)
+            else:   
+                net_vat = total_sub_total - (total_disc_amt + total_vat_amt + total_vat_exempt)
+                net_discount = total_sub_total - (total_disc_amt + total_vat_exempt)
+                
+                
+            
+            AmountDue_without_comma = AmountDue.replace(',', '')
+            # Convert the modified string to a float
+            AmountDue_float = float(AmountDue_without_comma)
+            
+            AmountDue_float = float(AmountDue_float)       
+            AmountDue_formatted = f"{AmountDue_float:.3f}"
+            print('isIncome',isIncome)
+            if isIncome == True:
+                total_excess = float(total_gift_check) - AmountDue_float
+            print('total_excess',total_excess)
+            try:
+                total_disc_amt = float(str(total_disc_amt).replace(',', ''))
+                total_desc_rate = float(str(total_desc_rate).replace(',', ''))
+                total_vat_exempt = float(str(total_vat_exempt).replace(',', ''))
+                SaveToPOSSalesInvoiceList = PosSalesInvoiceList (
+                        company_code = f"{companyCode.autonum:0>4}",
+                        ul_code = machineInfo.ul_code,
+                        site_code = int(machineInfo.site_no),
+                        trans_type = 'Cash Sales',
+                        discount_type = DiscountType,
+                        doc_no = doc_no,
+                        doc_type = 'POS-SI',
+                        terminal_no = TerminalNo,
+                        cashier_id = cashier_id,
+                        so_no =items['sales_trans_id'],
+                        so_doc_no =items['sales_trans_id'],
+                        doc_date = datetime_stamp,
+                        customer_code = customer_code,
+                        customer_name = CustomerName,
+                        customer_address = CusAddress,
+                        business_unit = CusBusiness,
+                        customer_type = cust_type,
+                        salesman_id = '0',
+                        salesman = '',
+                        pricing = '',
+                        terms = 0,
+                        remarks = '',
+                        ServiceCharge_TotalAmount = 0 ,
+                        other_income = total_excess,
+                        gift_check =  AmountDue_formatted,
+                        total_qty = totalQty,
+                        discount = float(str(total_disc_amt).replace(',', '')),
+                        vat = float(str(total_vat_amt).replace(',', '')),
+                        vat_exempted = float(str(vat_exempted).replace(',', '')),
+                        net_vat = float(str(net_vat).replace(',', '')),
+                        net_discount = float(str(net_discount).replace(',', '')),
+                        sub_total = float(str(total_sub_total).replace(',', '')),
+                        lvl1_disc = '0',
+                        lvl2_disc = '0',
+                        lvl3_disc = '0',
+                        lvl4_disc = '0',
+                        lvl5_disc = '0',
+                        HMO = '',
+                        PHIC = '',
+                        status = 'S',
+                        prepared_id = cashier_id,
+                        prepared_by = CashierName,
+                        )
+                
+                SaveToPOSSalesInvoiceList.save()
+            except Exception as e:
+                print('error',e)
+
+            if OrderType == 'DINE IN':
+                GetWaiterID = PosSalesOrder.objects.filter(
+                        table_no=table_no,
+                        paid='N',
+                        terminal_no=machineInfo.terminal_no,
+                        site_code=int(machineInfo.site_no)
+                    ).first()
+                if GetWaiterID:
+                    waiterID = GetWaiterID.waiter_id
+                    
+                    # Fetch waiter details if waiterID is available
+                    waiter_details = PosWaiterList.objects.filter(waiter_id=waiterID).first()
+                    
+                    if waiter_details:
+                        waiterName = waiter_details.waiter_name
+                        # Perform further operations with waiterName or other attributes
+                    else:
+                        # Handle the case where waiter details are not found
+                        waiterName = None  # or any default value or error handling
+                else:
+                    # Handle the case where GetWaiterID is None (no matching record found)
+                    waiterID = None  # or any default value or error handling
+                    waiterName = None  # or any default value or error handling
+
+
+                sales_orders_data = PosSalesOrder.objects.filter(
+                    table_no=table_no,
+                    paid='N',
+                    active='Y',
+                    terminal_no=int(float(machineInfo.terminal_no)),
+                    site_code=int(machineInfo.site_no)
+                ).first()
+
+                if sales_orders_data:
+                    Guest_Count=sales_orders_data.guest_count
+                    QueNo = sales_orders_data.q_no
+                    table_no = sales_orders_data.table_no
+            
+                sales_orders_to_update = PosSalesOrder.objects.filter(
+                    table_no=table_no,
+                    paid='N',
+                    active='Y',
+                    terminal_no=int(float(machineInfo.terminal_no)),
+                    site_code=int(machineInfo.site_no)
+                )
+
+                # Check if there are any matching objects
+                if sales_orders_to_update.exists():
+                    # Update all matching objects to set 'paid' to 'Y'
+                    sales_orders_to_update.update(paid='Y')
+                    
+                    pass
+            else:
+                sales_orders_data = PosSalesOrder.objects.filter(
+                    q_no=QueNo,
+                    paid='N',
+                    active='Y',
+                     terminal_no=int(float(machineInfo.terminal_no)),
+                    site_code=int(machineInfo.site_no)
+                ).first()
+
+                if sales_orders_data:
+                    Guest_Count=sales_orders_data.guest_count
+                    QueNo = sales_orders_data.q_no
+                    table_no = sales_orders_data.table_no
+
+                sales_orders_to_update = PosSalesOrder.objects.filter(
+                    q_no=QueNo,
+                    paid='N',
+                    active='Y',
+                     terminal_no=int(float(machineInfo.terminal_no)),
+                    site_code=int(machineInfo.site_no)
+                )
+
+                # Check if there are any matching objects
+                if sales_orders_to_update.exists():
+                    # Update all matching objects to set 'paid' to 'Y'
+                    sales_orders_to_update.update(paid='Y')
+                    
+                    pass
+
+            UpdateINVRef = InvRefNo.objects.filter(description=doctype,terminalno=TerminalNo).first()
+            UpdateINVRef.next_no = doc_no
+            UpdateINVRef.save()
+    
+
+            data = []
+            data = {
+                'CustomerCompanyName':companyCode.company_name,
+                'CustomerCompanyAddress':companyCode.company_address,
+                'CustomerTIN':companyCode.company_TIN,
+                'CustomerZipCode':companyCode.company_zipcode,
+                'MachineNo':machineInfo.Machine_no,
+                'SerialNO':machineInfo.Serial_no,
+                'CustomerPTU':machineInfo.PTU_no,
+                'DateIssue':machineInfo.date_issue,
+                'DateValid':machineInfo.date_valid,
+                'TelNo':'TEL NOS:785-462',
+                'OR':doc_no,
+                'VAT': '{:,.2f}'.format(total_vat_amt),
+                'VATable': '{:,.2f}'.format(Vatable_Amount),
+                'Discount': '{:,.2f}'.format(total_disc_amt),
+                'Discount_Rate': '{:,.2f}'.format(total_desc_rate),
+                'VatExempt': '{:,.2f}'.format(total_vat_exempt),
+                'NonVat':'0.00',
+                'VatZeroRated':'0.00',
+                'ServiceCharge': '0.00',
+                'customer_code' : customer_code,
+                'CustomerName' :CustomerName,
+                'CusTIN' :CusTIN,
+                'CusAddress' :CusAddress,
+                'CusBusiness' : CusBusiness,
+                'cust_type' : cust_type,
+                'TerminalNo':TerminalNo,
+                'WaiterName':waiterName,
+                'GiftCheck':GiftCheck,
+                'SeniorDiscountDataList':DiscountDataList,
+            } 
+            cus_Data = {
+                'CustomerName' :CustomerName,
+                'CusTIN' :CusTIN,
+                'CusAddress' :CusAddress,
+                'CusBusiness' : CusBusiness,
+                'TableNo':table_no,
+                'Guest_Count':Guest_Count,
+                'QueNo':QueNo
+                }
+            # transaction.commit()
+            PDFReceipt(request,doc_no,'POS-SI',cus_Data)
+            return Response({'data':data}, status=200)
+        except Exception as e:
+                # If any error occurs during the save operations, rollback the transaction
+            transaction.rollback()
+            traceback.print_exc()    
+                # Optionally, log the error or handle it in some way
+            return Response({"message": "An error occurred while saving the sales order"}, status=500)
+    else:
+        return Response({"message": "An error occurred while saving the sales order"}, status=500)
+
+
+
+##************ ONLINE PAYMENT ONLY----DINE IN---- SAVE TO TBL_POS_SALES_INVOICE_LIST AND LISTING**********************
+@api_view(['POST'])
+@transaction.atomic
+@permission_classes([IsAuthenticated])
+def save_online_payment(request):
+    if request.method == 'POST':
+        # pdb.set_trace()
+        try:
+            received_data = json.loads(request.body)
+            try:
+                cart_items = received_data.get('data', [])
+                data_from_modal = received_data.get('CustomerPaymentData')
+                table_no = received_data.get('TableNo')
+                cashier_id = received_data.get('CashierID')
+                TerminalNo = received_data.get('TerminalNo')
+                AmountDue = received_data.get('AmountDue')
+                CashierName =  received_data.get('CashierName')
+                OrderType =  received_data.get('OrderType')
+                Discounted_by= received_data.get('Discounted_by')
+                DiscountDataList = received_data.get('DiscountDataList')
+                DiscountType = received_data.get('DiscountType')
+                DiscountData= received_data.get('DiscountData')
+                QueNo= received_data.get('QueNo')
+                Online = received_data.get('Online')
+                doctype = received_data.get('doctype')
+                doc_no = get_sales_transaction_id(TerminalNo,doctype)
+
+                print('Online',Online)
+            except Exception as e:
+                print('Error',e)
+            # CreditCardPaymentListData = CreditCard.get("CreditCardPaymentList")
+            # pdb.set_trace()
+            Guest_Count = 0
+            total_online = 0
+
+            if QueNo == '':
+                QueNo=0
+            if table_no =='':
+                table_no = 0
+            try:
+                
+                current_datetime = timezone.now()
+                datetime_stamp = current_datetime.strftime('%Y-%m-%d %H:%M:%S')
+                serial_number = getattr(request, "SERIALNO", None)
+                machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number.strip()).first()
+                companyCode = getCompanyData()
+            except Exception as e:
+                print('error',e)
+
+            waiterName=''
+
+
+            try:
+                raw = Online.get('OnlinekPaymentList',[])
+                online_payments = [raw] if isinstance(raw, dict) else raw
+                print('online_payments',online_payments)
+                for payment in online_payments:
+
+                    date_credited = payment.get('date_credited', None)
+                    acct_title = payment.get('acct_title', '')
+                    acct_code = payment.get('acct_code', 0)
+                    reference_no = payment.get('reference_no', '')
+                    sl_type = payment.get('sl_type', '')
+                    sl_name = payment.get('sl_name', '')
+                    sl_code = payment.get('sl_code', '')
+                    remarks = payment.get('remarks', '')
+                    total_amount = payment.get('total_amount', 0)
+
+                    total_online += float(total_amount) 
+                    save_online_payment = POSSalesTransOnlinePayment (
+                        sales_trans_id = int(float(doc_no)),
+                        ul_code = machineInfo.ul_code,
+                        site_code = int(machineInfo.site_no),
+                        terminal_no = TerminalNo,
+                        cashier_id = cashier_id,
+                        date_credited=date_credited,
+                        date_stamp = datetime_stamp,
+                        acct_code = acct_code,
+                        acct_title = acct_title,
+                        reference_no=reference_no,
+                        sl_code=sl_code,
+                        sl_name=sl_name,
+                        sl_type=sl_type,
+                        remarks=remarks,
+                        total_amount = total_amount,
+                    )
+
+                    save_online_payment.save()
+            except Exception as e:
+                print('error',e)
+                traceback.print_exc()
+
+            if table_no =='':
+                table_no = 0
+        
+
+            if data_from_modal.get('Customer') != '':
+                if data_from_modal.get('customerType').upper() == "WALK-IN":
+                    try:
+                        Payor = PosPayor.objects.get(payor_name=data_from_modal.get('Customer'))
+                        customer_code = Payor.id_code
+                        CustomerName = Payor.payor_name
+                        CusTIN =Payor.tin
+                        CusAddress =Payor.address
+                        CusBusiness = Payor.business_style
+                        cust_type = "P"
+                    except PosPayor.DoesNotExist:
+                        customer_code = "8888"
+                        CustomerName = "Walk-IN"
+                        cust_type = ""
+                        CusTIN = ""
+                        CusAddress = ""
+                        CusBusiness = ""
+                else:
+                    try:
+                        customer = Customer.objects.get(trade_name=data_from_modal.get('Customer'))
+                        customer_code = customer.id_code
+                        CustomerName = customer.trade_name
+                        cust_type = "C"
+                        CusAddress = customer.st_address
+                    except Customer.DoesNotExist:
+                        customer_code = "8888"
+                        CustomerName = "Walk-IN"
+                        cust_type = ""
+                        CusTIN =customer.tax_id_no
+                        CusAddress =customer.st_address
+                        CusBusiness = customer.business_style
+                        
+            else:
+                customer_code= "8888"
+                CustomerName = "Walk-IN"
+                cust_type = ""
+                CusTIN =""
+                CusAddress =""
+                CusBusiness =""
+            so_no = ''
+            so_doc_no = ''
+            disc_amt = 0
+            desc_rate= 0
+            vat_amt = 0
+            vat_exempt = 0
+            net_total = 0
+            total_disc_amt = 0 ###for sales invoice list
+            total_desc_rate= 0 ###for sales invoice list
+            total_vat_amt = 0 ###for sales invoice list
+            total_vat_exempt = 0 ###for sales invoice list
+            total_net_total = 0 ###for sales invoice list
+            total_sub_total = 0 ###for sales invoice list
+            vatable = ''
+            totalQty = 0
+            desc_rate = 0
+            unit_cost = 0
+            Vatable_Amount = 0
+            countxx = 0
+
+                
+            tmp_cart_item_discount = cart_items
+            for items in cart_items:
+                productInfo = Product.objects.filter(bar_code=items['barcode']).first()
+                
+
+                if productInfo is not None:
+                    quantity = float(items['quantity'])
+                    price = float(items['price'])
+                    item_disc = float(items['item_disc'])
+                    total_sub_total = total_sub_total + (quantity * price)
+                    
+                    if DiscountType == 'SC':
+                        SCAmmountCovered = float(DiscountData.get('SAmountCovered').replace(',',''))
+                        SLess20SCDiscount = float(DiscountData.get('SLess20SCDiscount').replace(',',''))
+                        SLessVat12 =  float(DiscountData.get('SLessVat12').replace(',',''))
+                        SNetOfVat =  float(DiscountData.get('SNetOfVat').replace(',',''))
+                        SVatSales =  float(DiscountData.get('SVatSales').replace(',',''))
+                        vatable = 'Es'
+                        desc_rate = 20
+                        totalItem = quantity * price
+                            
+                        NetSale =  totalItem / (0.12 + 1 )
+                        vat_exempt =  (totalItem / (0.12 + 1 ) * 0.12) * (SCAmmountCovered / SVatSales)
+                        disc_amt  = (totalItem / (0.12 + 1 ) * 0.2) * (SCAmmountCovered / SVatSales)
+                        net_total = (totalItem) - (disc_amt + vat_exempt)
+                        vat_amt =(totalItem / (0.12 + 1 ) * 0.12) * (SVatSales -SCAmmountCovered) / SVatSales
+                        Vatable_Amount = SVatSales - SCAmmountCovered
+
+                    elif DiscountType =='ITEM':
+                        for dis in DiscountData:
+
+                            lineNO = 0
+                            if dis.get('line_no') is None:
+                                lineNO = dis.get('LineNo', 0)  # Use 'lineno' with a default value of 0 if 'line_no' is None
+                            else:
+                                lineNO = dis['line_no']
+
+                            if dis['Barcode'] == items['barcode'] and lineNO == items['line_no']:
+                                
+                                for x in tmp_cart_item_discount:
+                                    if x['barcode'] == items['barcode'] and x['line_no'] == items['line_no']:
+                                        tmp_cart_item_discount.remove(x)
+                                vatable = 'V'
+                                desc_rate = float(dis['D1'])
+                                totalItem = quantity * price
+                                item_disc = float(dis['D1'])
+                                NetSale =  float(dis['DiscountedPrice'])
+                                vat_exempt =  0
+                                disc_amt  = float(dis['ByAmount'])
+                                net_total = (totalItem - disc_amt)
+                                vat_amt = ((totalItem - disc_amt) / 1.12) * 0.12
+                                unit_cost = (totalItem) 
+                                Vatable_Amount = (totalItem + Vatable_Amount) - disc_amt
+                    elif DiscountType =='TRANSACTION':
+                        for dis in DiscountData:
+                            lineNO = 0
+                            if dis.get('line_no') is None:
+                                lineNO = dis.get('lineno', 0)  # Use 'lineno' with a default value of 0 if 'line_no' is None
+                            else:
+                                lineNO = dis['line_no']
+
+                            if dis['barcode'] == items['barcode'] and lineNO == items['line_no']:
+                                desc_rate = float(dis['desc_rate'])
+                                vatable = 'V'
+                                totalItem = quantity * price
+                                item_disc = float(dis['desc_rate'])
+                                vat_exempt =  0
+                                disc_amt  = float(dis['Discount'])
+                                net_total = (totalItem - disc_amt)
+                                vat_amt = ((totalItem - disc_amt) / 1.12) * 0.12
+                                unit_cost = (totalItem) 
+                                Vatable_Amount = (totalItem + Vatable_Amount) - disc_amt
+
+                    else:
+                        if productInfo.tax_code == 'VAT':
+                            vatable = 'V'
+                            totalItem = quantity * price
+                            desc_rate = item_disc / (totalItem) * 100
+                            vat_amt = ((totalItem - item_disc) / 1.12) * 0.12
+                            disc_amt = item_disc
+                            net_total = (totalItem - item_disc)
+                            Vatable_Amount = (totalItem + Vatable_Amount)
+                            unit_cost = totalItem
+                        else:
+                            vatable = 'N'
+                            vat_amt = 0
+                            disc_amt = item_disc
+                            net_total = (quantity * price) - disc_amt
+                else:
+                    # Handle case where productInfo is None (no product found for the barcode)
+                    pass  # You might want to log this or handle it according to your logic
+                    
+
+                if DiscountType == 'SC':
+                    total_vat_exempt = vat_exempt + total_vat_exempt
+                    total_disc_amt = float(disc_amt) +float(total_disc_amt)
+                    total_desc_rate= desc_rate 
+                    total_vat_amt = vat_amt + total_vat_amt
+                else:
+                    total_net_total = total_net_total + net_total
+                    total_vat_exempt = vat_exempt + total_vat_exempt
+                    total_disc_amt = float(disc_amt) + float(total_disc_amt)
+                    total_desc_rate= desc_rate 
+                    total_vat_amt = vat_amt + total_vat_amt
+                
+                # pdb.set_trace()
+                totalQty = totalQty + float(items['quantity'])
+                if so_no == '':
+                    so_no = items['sales_trans_id']
+                else:
+                    if so_no == items['sales_trans_id']:
+                        so_no = so_no
+                    else:
+                        so_no = so_no + ', ' + items['sales_trans_id']
+
+                so_doc_no = so_no
+                SaveToPOSSalesInvoiceListing = PosSalesInvoiceListing(
+                    company_code = f"{companyCode.autonum:0>4}",
+                    ul_code = machineInfo.ul_code,
+                    terminal_no = TerminalNo,
+                    site_code = int(machineInfo.site_no),
+                    cashier_id = cashier_id,
+                    doc_date = datetime_stamp,
+                    doc_no = doc_no,
+                    doc_type = 'POS-SI',
+                    line_number = items['line_no'],
+                    bar_code =items['barcode'],
+                    alternate_code = 0,
+                    item_code = items['barcode'],
+                    rec_qty = items['quantity'],
+                    rec_uom = productInfo.uom,
+                    description = items['description'],
+                    unit_price = items['price'],
+                    sub_total = float(items['quantity']) * float(items['price']),
+                    pc_price =  items['price'],
+                    qtyperuom = 1,
+                    disc_amt = f"{disc_amt:.3f}",
+                    desc_rate =f"{desc_rate:.3f}",
+                    vat_amt =  f"{vat_amt:.3f}",
+                    vat_exempt = f"{vat_exempt:.3f}",
+                    net_total =  f"{net_total:.3f}",
+                    isvoid = 'NO',
+                    unit_cost = unit_cost,
+                    vatable = vatable,
+                    status = 'A',
+                    so_no =items['sales_trans_id'],
+                    so_doc_no =items['sales_trans_id'],
+                    sn_bc = '',
+                    discounted_by = Discounted_by,
+                    
+                )
+                SaveToPOSSalesInvoiceListing.save()
+
+            if DiscountType == 'ITEM' or DiscountType == 'TRANSACTION':
+                for items in tmp_cart_item_discount:
+                    productInfo = Product.objects.filter(bar_code=items['barcode']).first()
+                    if productInfo is not None:
+                        quantity = float(items['quantity'])
+                        price = float(items['price'])
+                        item_disc = float(items['item_disc'])
+                        total_sub_total = total_sub_total + (quantity * price)
+                        if productInfo.tax_code == 'VAT':
+                               
+                                vatable = 'V'
+                                totalItem = quantity * price
+                                desc_rate = item_disc / (totalItem) * 100
+                                vat_amt = ((totalItem - item_disc) / 1.12) * 0.12
+                                disc_amt = item_disc
+                                net_total = (totalItem - item_disc)
+                                Vatable_Amount = (totalItem + Vatable_Amount)
+                                unit_cost = totalItem
+                        else:
+                                vatable = 'N'
+                                vat_amt = 0
+                                disc_amt = item_disc
+                                net_total = (quantity * price) - disc_amt
+                    else:
+                        # Handle case where productInfo is None (no product found for the barcode)
+                        pass  # You might want to log this or handle it according to your logic
+                        
+
+                    total_net_total = total_net_total + net_total
+                    total_vat_exempt = vat_exempt + total_vat_exempt
+                    total_disc_amt = float(disc_amt) + float(total_disc_amt)
+                    total_desc_rate= desc_rate 
+                    total_vat_amt = vat_amt + total_vat_amt
+                    
+                    # pdb.set_trace()
+                    totalQty = totalQty + float(items['quantity'])
+                    if so_no == '':
+                        so_no = items['sales_trans_id']
+                    else:
+                        if so_no == items['sales_trans_id']:
+                            so_no = so_no
+                        else:
+                            so_no = so_no + ', ' + items['sales_trans_id']
+
+                    so_doc_no = so_no
+                    SaveToPOSSalesInvoiceListing = PosSalesInvoiceListing(
+                        company_code = f"{companyCode.autonum:0>4}",
+                        ul_code = machineInfo.ul_code,
+                        terminal_no = TerminalNo,
+                        site_code = int(machineInfo.site_no),
+                        cashier_id = cashier_id,
+                        doc_date = datetime_stamp,
+                        doc_no = doc_no,
+                        doc_type = 'POS-SI',
+                        line_number = items['line_no'],
+                        bar_code =items['barcode'],
+                        alternate_code = 0,
+                        item_code = items['barcode'],
+                        rec_qty = items['quantity'],
+                        rec_uom = productInfo.uom,
+                        description = items['description'],
+                        unit_price = items['price'],
+                        sub_total = float(items['quantity']) * float(items['price']),
+                        pc_price =  items['price'],
+                        qtyperuom = 1,
+                        disc_amt = f"{disc_amt:.3f}",
+                        desc_rate =f"{desc_rate:.3f}",
+                        vat_amt =  f"{vat_amt:.3f}",
+                        vat_exempt = f"{vat_exempt:.3f}",
+                        net_total =  f"{net_total:.3f}",
+                        isvoid = 'NO',
+                        unit_cost = unit_cost,
+                        vatable = vatable,
+                        status = 'A',
+                        so_no =items['sales_trans_id'],
+                        so_doc_no =items['sales_trans_id'],
+                        sn_bc = '',
+                        discounted_by = Discounted_by,
+                        
+                    )
+                    SaveToPOSSalesInvoiceListing.save()
+
+
+            Vatable_Amount = float(Vatable_Amount) - float(total_vat_amt)
+            net_vat = 0
+            net_discount = 0
+            vat_exempted = 0
+            #### Take note of computation of net_vat and net_discount
+            # pdb.set_trace()
+            if DiscountType == 'SC':
+                total_disc_amt = DiscountData['SLess20SCDiscount']
+                net_vat = DiscountData['SDiscountedPrice']
+                net_discount = DiscountData['SDiscountedPrice']
+                vat_exempted = DiscountData['SLessVat12']
+                count = len(DiscountDataList)
+                SCAmmountCovered =  float(str(DiscountData['SAmountCovered']).replace(',','')) * int(count)
+                for item in DiscountDataList:
+                    saveSeniorData  = PosSalesTransSeniorCitizenDiscount(
+                            sales_trans_id=int(float(doc_no)),
+                            terminal_no=TerminalNo,
+                            cashier_id=cashier_id,
+                            document_type=doctype,
+                            details_id=0,
+                            id_no=item['SID'],
+                            senior_member_name=item['SName'],
+                            id=0,
+                            tin_no=item['STIN'],
+                            so_no=so_no,
+                            amount_covered=SCAmmountCovered
+                        )
+                    saveSeniorData.save()
+                
+            elif DiscountType == 'ITEM':
+                net_vat = total_sub_total - (total_disc_amt + total_vat_amt + total_vat_exempt)
+                net_discount = total_sub_total - (total_disc_amt + total_vat_exempt)
+
+            elif DiscountType == 'TRANSACTION':
+                DiscountType='TRSD'
+                net_vat = total_sub_total - (total_disc_amt + total_vat_amt + total_vat_exempt)
+                net_discount = total_sub_total - (total_disc_amt + total_vat_exempt)
+            elif DiscountType == 'TRADE':
+                DiscountType='TRD'
+                net_vat = total_sub_total - (total_disc_amt + total_vat_amt + total_vat_exempt)
+                net_discount = total_sub_total - (total_disc_amt + total_vat_exempt)
+            else:   
+                net_vat = total_sub_total - (total_disc_amt + total_vat_amt + total_vat_exempt)
+                net_discount = total_sub_total - (total_disc_amt + total_vat_exempt)
+                
+                
+            
+            AmountDue_without_comma = AmountDue.replace(',', '')
+            # Convert the modified string to a float
+            AmountDue_float = float(AmountDue_without_comma)
+            
+            AmountDue_float = float(AmountDue_float)       
+            AmountDue_formatted = f"{AmountDue_float:.3f}"
+            try:
+                total_disc_amt = float(str(total_disc_amt).replace(',', ''))
+                total_desc_rate = float(str(total_desc_rate).replace(',', ''))
+                total_vat_exempt = float(str(total_vat_exempt).replace(',', ''))
+                SaveToPOSSalesInvoiceList = PosSalesInvoiceList (
+                        company_code = f"{companyCode.autonum:0>4}",
+                        ul_code = machineInfo.ul_code,
+                        site_code = int(machineInfo.site_no),
+                        trans_type = 'Cash Sales',
+                        discount_type = DiscountType,
+                        doc_no = doc_no,
+                        doc_type = 'POS-SI',
+                        terminal_no = TerminalNo,
+                        cashier_id = cashier_id,
+                        so_no =items['sales_trans_id'],
+                        so_doc_no =items['sales_trans_id'],
+                        doc_date = datetime_stamp,
+                        customer_code = customer_code,
+                        customer_name = CustomerName,
+                        customer_address = CusAddress,
+                        business_unit = CusBusiness,
+                        customer_type = cust_type,
+                        salesman_id = '0',
+                        salesman = '',
+                        pricing = '',
+                        terms = 0,
+                        remarks = '',
+                        ServiceCharge_TotalAmount = 0 ,
+                        online_payment=total_online,
+                        total_qty = totalQty,
+                        discount = float(str(total_disc_amt).replace(',', '')),
+                        vat = float(str(total_vat_amt).replace(',', '')),
+                        vat_exempted = float(str(vat_exempted).replace(',', '')),
+                        net_vat = float(str(net_vat).replace(',', '')),
+                        net_discount = float(str(net_discount).replace(',', '')),
+                        sub_total = float(str(total_sub_total).replace(',', '')),
+                        lvl1_disc = '0',
+                        lvl2_disc = '0',
+                        lvl3_disc = '0',
+                        lvl4_disc = '0',
+                        lvl5_disc = '0',
+                        HMO = '',
+                        PHIC = '',
+                        status = 'S',
+                        prepared_id = cashier_id,
+                        prepared_by = CashierName,
+                        )
+                
+                SaveToPOSSalesInvoiceList.save()
+            except Exception as e:
+                print('error',e)
+
+            if OrderType == 'DINE IN':
+                GetWaiterID = PosSalesOrder.objects.filter(
+                        table_no=table_no,
+                        paid='N',
+                        terminal_no=machineInfo.terminal_no,
+                        site_code=int(machineInfo.site_no)
+                    ).first()
+                if GetWaiterID:
+                    waiterID = GetWaiterID.waiter_id
+                    
+                    # Fetch waiter details if waiterID is available
+                    waiter_details = PosWaiterList.objects.filter(waiter_id=waiterID).first()
+                    
+                    if waiter_details:
+                        waiterName = waiter_details.waiter_name
+                        # Perform further operations with waiterName or other attributes
+                    else:
+                        # Handle the case where waiter details are not found
+                        waiterName = None  # or any default value or error handling
+                else:
+                    # Handle the case where GetWaiterID is None (no matching record found)
+                    waiterID = None  # or any default value or error handling
+                    waiterName = None  # or any default value or error handling
+
+
+                sales_orders_data = PosSalesOrder.objects.filter(
+                    table_no=table_no,
+                    paid='N',
+                    active='Y',
+                    terminal_no=int(float(machineInfo.terminal_no)),
+                    site_code=int(machineInfo.site_no)
+                ).first()
+
+                if sales_orders_data:
+                    Guest_Count=sales_orders_data.guest_count
+                    QueNo = sales_orders_data.q_no
+                    table_no = sales_orders_data.table_no
+            
+                sales_orders_to_update = PosSalesOrder.objects.filter(
+                    table_no=table_no,
+                    paid='N',
+                    active='Y',
+                    terminal_no=int(float(machineInfo.terminal_no)),
+                    site_code=int(machineInfo.site_no)
+                )
+
+                # Check if there are any matching objects
+                if sales_orders_to_update.exists():
+                    # Update all matching objects to set 'paid' to 'Y'
+                    sales_orders_to_update.update(paid='Y')
+                    
+                    pass
+            else:
+                sales_orders_data = PosSalesOrder.objects.filter(
+                    q_no=QueNo,
+                    paid='N',
+                    active='Y',
+                     terminal_no=int(float(machineInfo.terminal_no)),
+                    site_code=int(machineInfo.site_no)
+                ).first()
+
+                if sales_orders_data:
+                    Guest_Count=sales_orders_data.guest_count
+                    QueNo = sales_orders_data.q_no
+                    table_no = sales_orders_data.table_no
+
+                sales_orders_to_update = PosSalesOrder.objects.filter(
+                    q_no=QueNo,
+                    paid='N',
+                    active='Y',
+                     terminal_no=int(float(machineInfo.terminal_no)),
+                    site_code=int(machineInfo.site_no)
+                )
+
+                # Check if there are any matching objects
+                if sales_orders_to_update.exists():
+                    # Update all matching objects to set 'paid' to 'Y'
+                    sales_orders_to_update.update(paid='Y')
+                    
+                    pass
+
+            UpdateINVRef = InvRefNo.objects.filter(description=doctype,terminalno=TerminalNo).first()
+            UpdateINVRef.next_no = doc_no
+            UpdateINVRef.save()
+    
+
+            data = []
+            data = {
+                'CustomerCompanyName':companyCode.company_name,
+                'CustomerCompanyAddress':companyCode.company_address,
+                'CustomerTIN':companyCode.company_TIN,
+                'CustomerZipCode':companyCode.company_zipcode,
+                'MachineNo':machineInfo.Machine_no,
+                'SerialNO':machineInfo.Serial_no,
+                'CustomerPTU':machineInfo.PTU_no,
+                'DateIssue':machineInfo.date_issue,
+                'DateValid':machineInfo.date_valid,
+                'TelNo':'TEL NOS:785-462',
+                'OR':doc_no,
+                'VAT': '{:,.2f}'.format(total_vat_amt),
+                'VATable': '{:,.2f}'.format(Vatable_Amount),
+                'Discount': '{:,.2f}'.format(total_disc_amt),
+                'Discount_Rate': '{:,.2f}'.format(total_desc_rate),
+                'VatExempt': '{:,.2f}'.format(total_vat_exempt),
+                'NonVat':'0.00',
+                'VatZeroRated':'0.00',
+                'ServiceCharge': '0.00',
+                'customer_code' : customer_code,
+                'CustomerName' :CustomerName,
+                'CusTIN' :CusTIN,
+                'CusAddress' :CusAddress,
+                'CusBusiness' : CusBusiness,
+                'cust_type' : cust_type,
+                'TerminalNo':TerminalNo,
+                'WaiterName':waiterName,
+                'Online':Online,
+                'SeniorDiscountDataList':DiscountDataList,
+            } 
+            cus_Data = {
+                'CustomerName' :CustomerName,
+                'CusTIN' :CusTIN,
+                'CusAddress' :CusAddress,
+                'CusBusiness' : CusBusiness,
+                'TableNo':table_no,
+                'Guest_Count':Guest_Count,
+                'QueNo':QueNo
+                }
+            # transaction.commit()
+            PDFReceipt(request,doc_no,'POS-SI',cus_Data)
+            return Response({'data':data}, status=200)
+        except Exception as e:
+                # If any error occurs during the save operations, rollback the transaction
+            transaction.rollback()
+            traceback.print_exc()    
+                # Optionally, log the error or handle it in some way
+            return Response({"message": "An error occurred while saving the sales order"}, status=500)
+    else:
+        return Response({"message": "An error occurred while saving the sales order"}, status=500)
+
+
+
+##************ OTHER PAYMENT ONLY----DINE IN---- SAVE TO TBL_POS_SALES_INVOICE_LIST AND LISTING**********************
+@api_view(['POST'])
+@transaction.atomic
+@permission_classes([IsAuthenticated])
+def save_other_payment(request):
+    if request.method == 'POST':
+        # pdb.set_trace()
+        try:
+            received_data = json.loads(request.body)
+            try:
+                cart_items = received_data.get('data', [])
+                data_from_modal = received_data.get('CustomerPaymentData')
+                table_no = received_data.get('TableNo')
+                cashier_id = received_data.get('CashierID')
+                TerminalNo = received_data.get('TerminalNo')
+                AmountDue = received_data.get('AmountDue')
+                CashierName =  received_data.get('CashierName')
+                OrderType =  received_data.get('OrderType')
+                Discounted_by= received_data.get('Discounted_by')
+                DiscountDataList = received_data.get('DiscountDataList')
+                DiscountType = received_data.get('DiscountType')
+                DiscountData= received_data.get('DiscountData')
+                QueNo= received_data.get('QueNo')
+                Other = received_data.get('Other')
+                doctype = received_data.get('doctype')
+                doc_no = get_sales_transaction_id(TerminalNo,doctype)
+
+                print('Other',Other)
+            except Exception as e:
+                print('Error',e)
+            # CreditCardPaymentListData = CreditCard.get("CreditCardPaymentList")
+            # pdb.set_trace()
+            Guest_Count = 0
+            total_other = 0
+
+            if QueNo == '':
+                QueNo=0
+            if table_no =='':
+                table_no = 0
+            try:
+                current_datetime = timezone.now()
+                datetime_stamp = current_datetime.strftime('%Y-%m-%d %H:%M:%S')
+                serial_number = getattr(request, "SERIALNO", None)
+                machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number.strip()).first()
+                companyCode = getCompanyData()
+            except Exception as e:
+                print('error',e)
+
+            waiterName=''
+
+
+            try:
+                raw = Other.get('OtherPaymentList',[])
+                other_payments = [raw] if isinstance(raw, dict) else raw
+                print('online_payments',other_payments)
+                for payment in other_payments:
+
+                    particular = payment.get('particular', None)
+                    sl_type = payment.get('sl_type', '')
+                    sl_name = payment.get('sl_name', '')
+                    sl_code = payment.get('sl_code', '')
+                    remarks = payment.get('remarks', '')
+                    total_amount = payment.get('total_amount', 0)
+
+                    total_other += float(total_amount) 
+                    save_other_payment = POSSalesTransOtherPayment (
+                        sales_trans_id = int(float(doc_no)),
+                        ul_code = machineInfo.ul_code,
+                        site_code = int(machineInfo.site_no),
+                        terminal_no = TerminalNo,
+                        cashier_id = cashier_id,
+                        particular=particular,
+                        date_stamp = datetime_stamp,
+                        sl_code=sl_code,
+                        sl_name=sl_name,
+                        sl_type=sl_type,
+                        remarks=remarks,
+                        total_amount = total_amount,
+                    )
+
+                    save_other_payment.save()
+            except Exception as e:
+                print('error',e)
+                traceback.print_exc()
+
+            if table_no =='':
+                table_no = 0
+        
+
+            if data_from_modal.get('Customer') != '':
+                if data_from_modal.get('customerType').upper() == "WALK-IN":
+                    try:
+                        Payor = PosPayor.objects.get(payor_name=data_from_modal.get('Customer'))
+                        customer_code = Payor.id_code
+                        CustomerName = Payor.payor_name
+                        CusTIN =Payor.tin
+                        CusAddress =Payor.address
+                        CusBusiness = Payor.business_style
+                        cust_type = "P"
+                    except PosPayor.DoesNotExist:
+                        customer_code = "8888"
+                        CustomerName = "Walk-IN"
+                        cust_type = ""
+                        CusTIN = ""
+                        CusAddress = ""
+                        CusBusiness = ""
+                else:
+                    try:
+                        customer = Customer.objects.get(trade_name=data_from_modal.get('Customer'))
+                        customer_code = customer.id_code
+                        CustomerName = customer.trade_name
+                        cust_type = "C"
+                        CusAddress = customer.st_address
+                    except Customer.DoesNotExist:
+                        customer_code = "8888"
+                        CustomerName = "Walk-IN"
+                        cust_type = ""
+                        CusTIN =customer.tax_id_no
+                        CusAddress =customer.st_address
+                        CusBusiness = customer.business_style
+                        
+            else:
+                customer_code= "8888"
+                CustomerName = "Walk-IN"
+                cust_type = ""
+                CusTIN =""
+                CusAddress =""
+                CusBusiness =""
+            so_no = ''
+            so_doc_no = ''
+            disc_amt = 0
+            desc_rate= 0
+            vat_amt = 0
+            vat_exempt = 0
+            net_total = 0
+            total_disc_amt = 0 ###for sales invoice list
+            total_desc_rate= 0 ###for sales invoice list
+            total_vat_amt = 0 ###for sales invoice list
+            total_vat_exempt = 0 ###for sales invoice list
+            total_net_total = 0 ###for sales invoice list
+            total_sub_total = 0 ###for sales invoice list
+            vatable = ''
+            totalQty = 0
+            desc_rate = 0
+            unit_cost = 0
+            Vatable_Amount = 0
+            countxx = 0
+
+                
+            tmp_cart_item_discount = cart_items
+            for items in cart_items:
+                productInfo = Product.objects.filter(bar_code=items['barcode']).first()
+                
+
+                if productInfo is not None:
+                    quantity = float(items['quantity'])
+                    price = float(items['price'])
+                    item_disc = float(items['item_disc'])
+                    total_sub_total = total_sub_total + (quantity * price)
+                    
+                    if DiscountType == 'SC':
+                        SCAmmountCovered = float(DiscountData.get('SAmountCovered').replace(',',''))
+                        SLess20SCDiscount = float(DiscountData.get('SLess20SCDiscount').replace(',',''))
+                        SLessVat12 =  float(DiscountData.get('SLessVat12').replace(',',''))
+                        SNetOfVat =  float(DiscountData.get('SNetOfVat').replace(',',''))
+                        SVatSales =  float(DiscountData.get('SVatSales').replace(',',''))
+                        vatable = 'Es'
+                        desc_rate = 20
+                        totalItem = quantity * price
+                            
+                        NetSale =  totalItem / (0.12 + 1 )
+                        vat_exempt =  (totalItem / (0.12 + 1 ) * 0.12) * (SCAmmountCovered / SVatSales)
+                        disc_amt  = (totalItem / (0.12 + 1 ) * 0.2) * (SCAmmountCovered / SVatSales)
+                        net_total = (totalItem) - (disc_amt + vat_exempt)
+                        vat_amt =(totalItem / (0.12 + 1 ) * 0.12) * (SVatSales -SCAmmountCovered) / SVatSales
+                        Vatable_Amount = SVatSales - SCAmmountCovered
+
+                    elif DiscountType =='ITEM':
+                        for dis in DiscountData:
+
+                            lineNO = 0
+                            if dis.get('line_no') is None:
+                                lineNO = dis.get('LineNo', 0)  # Use 'lineno' with a default value of 0 if 'line_no' is None
+                            else:
+                                lineNO = dis['line_no']
+
+                            if dis['Barcode'] == items['barcode'] and lineNO == items['line_no']:
+                                
+                                for x in tmp_cart_item_discount:
+                                    if x['barcode'] == items['barcode'] and x['line_no'] == items['line_no']:
+                                        tmp_cart_item_discount.remove(x)
+                                vatable = 'V'
+                                desc_rate = float(dis['D1'])
+                                totalItem = quantity * price
+                                item_disc = float(dis['D1'])
+                                NetSale =  float(dis['DiscountedPrice'])
+                                vat_exempt =  0
+                                disc_amt  = float(dis['ByAmount'])
+                                net_total = (totalItem - disc_amt)
+                                vat_amt = ((totalItem - disc_amt) / 1.12) * 0.12
+                                unit_cost = (totalItem) 
+                                Vatable_Amount = (totalItem + Vatable_Amount) - disc_amt
+                    elif DiscountType =='TRANSACTION':
+                        for dis in DiscountData:
+                            lineNO = 0
+                            if dis.get('line_no') is None:
+                                lineNO = dis.get('lineno', 0)  # Use 'lineno' with a default value of 0 if 'line_no' is None
+                            else:
+                                lineNO = dis['line_no']
+
+                            if dis['barcode'] == items['barcode'] and lineNO == items['line_no']:
+                                desc_rate = float(dis['desc_rate'])
+                                vatable = 'V'
+                                totalItem = quantity * price
+                                item_disc = float(dis['desc_rate'])
+                                vat_exempt =  0
+                                disc_amt  = float(dis['Discount'])
+                                net_total = (totalItem - disc_amt)
+                                vat_amt = ((totalItem - disc_amt) / 1.12) * 0.12
+                                unit_cost = (totalItem) 
+                                Vatable_Amount = (totalItem + Vatable_Amount) - disc_amt
+
+                    else:
+                        if productInfo.tax_code == 'VAT':
+                            vatable = 'V'
+                            totalItem = quantity * price
+                            desc_rate = item_disc / (totalItem) * 100
+                            vat_amt = ((totalItem - item_disc) / 1.12) * 0.12
+                            disc_amt = item_disc
+                            net_total = (totalItem - item_disc)
+                            Vatable_Amount = (totalItem + Vatable_Amount)
+                            unit_cost = totalItem
+                        else:
+                            vatable = 'N'
+                            vat_amt = 0
+                            disc_amt = item_disc
+                            net_total = (quantity * price) - disc_amt
+                else:
+                    # Handle case where productInfo is None (no product found for the barcode)
+                    pass  # You might want to log this or handle it according to your logic
+                    
+
+                if DiscountType == 'SC':
+                    total_vat_exempt = vat_exempt + total_vat_exempt
+                    total_disc_amt = float(disc_amt) +float(total_disc_amt)
+                    total_desc_rate= desc_rate 
+                    total_vat_amt = vat_amt + total_vat_amt
+                else:
+                    total_net_total = total_net_total + net_total
+                    total_vat_exempt = vat_exempt + total_vat_exempt
+                    total_disc_amt = float(disc_amt) + float(total_disc_amt)
+                    total_desc_rate= desc_rate 
+                    total_vat_amt = vat_amt + total_vat_amt
+                
+                # pdb.set_trace()
+                totalQty = totalQty + float(items['quantity'])
+                if so_no == '':
+                    so_no = items['sales_trans_id']
+                else:
+                    if so_no == items['sales_trans_id']:
+                        so_no = so_no
+                    else:
+                        so_no = so_no + ', ' + items['sales_trans_id']
+
+                so_doc_no = so_no
+                SaveToPOSSalesInvoiceListing = PosSalesInvoiceListing(
+                    company_code = f"{companyCode.autonum:0>4}",
+                    ul_code = machineInfo.ul_code,
+                    terminal_no = TerminalNo,
+                    site_code = int(machineInfo.site_no),
+                    cashier_id = cashier_id,
+                    doc_date = datetime_stamp,
+                    doc_no = doc_no,
+                    doc_type = 'POS-SI',
+                    line_number = items['line_no'],
+                    bar_code =items['barcode'],
+                    alternate_code = 0,
+                    item_code = items['barcode'],
+                    rec_qty = items['quantity'],
+                    rec_uom = productInfo.uom,
+                    description = items['description'],
+                    unit_price = items['price'],
+                    sub_total = float(items['quantity']) * float(items['price']),
+                    pc_price =  items['price'],
+                    qtyperuom = 1,
+                    disc_amt = f"{disc_amt:.3f}",
+                    desc_rate =f"{desc_rate:.3f}",
+                    vat_amt =  f"{vat_amt:.3f}",
+                    vat_exempt = f"{vat_exempt:.3f}",
+                    net_total =  f"{net_total:.3f}",
+                    isvoid = 'NO',
+                    unit_cost = unit_cost,
+                    vatable = vatable,
+                    status = 'A',
+                    so_no =items['sales_trans_id'],
+                    so_doc_no =items['sales_trans_id'],
+                    sn_bc = '',
+                    discounted_by = Discounted_by,
+                    
+                )
+                SaveToPOSSalesInvoiceListing.save()
+
+            if DiscountType == 'ITEM' or DiscountType == 'TRANSACTION':
+                for items in tmp_cart_item_discount:
+                    productInfo = Product.objects.filter(bar_code=items['barcode']).first()
+                    if productInfo is not None:
+                        quantity = float(items['quantity'])
+                        price = float(items['price'])
+                        item_disc = float(items['item_disc'])
+                        total_sub_total = total_sub_total + (quantity * price)
+                        if productInfo.tax_code == 'VAT':
+                               
+                                vatable = 'V'
+                                totalItem = quantity * price
+                                desc_rate = item_disc / (totalItem) * 100
+                                vat_amt = ((totalItem - item_disc) / 1.12) * 0.12
+                                disc_amt = item_disc
+                                net_total = (totalItem - item_disc)
+                                Vatable_Amount = (totalItem + Vatable_Amount)
+                                unit_cost = totalItem
+                        else:
+                                vatable = 'N'
+                                vat_amt = 0
+                                disc_amt = item_disc
+                                net_total = (quantity * price) - disc_amt
+                    else:
+                        # Handle case where productInfo is None (no product found for the barcode)
+                        pass  # You might want to log this or handle it according to your logic
+                        
+
+                    total_net_total = total_net_total + net_total
+                    total_vat_exempt = vat_exempt + total_vat_exempt
+                    total_disc_amt = float(disc_amt) + float(total_disc_amt)
+                    total_desc_rate= desc_rate 
+                    total_vat_amt = vat_amt + total_vat_amt
+                    
+                    # pdb.set_trace()
+                    totalQty = totalQty + float(items['quantity'])
+                    if so_no == '':
+                        so_no = items['sales_trans_id']
+                    else:
+                        if so_no == items['sales_trans_id']:
+                            so_no = so_no
+                        else:
+                            so_no = so_no + ', ' + items['sales_trans_id']
+
+                    so_doc_no = so_no
+                    SaveToPOSSalesInvoiceListing = PosSalesInvoiceListing(
+                        company_code = f"{companyCode.autonum:0>4}",
+                        ul_code = machineInfo.ul_code,
+                        terminal_no = TerminalNo,
+                        site_code = int(machineInfo.site_no),
+                        cashier_id = cashier_id,
+                        doc_date = datetime_stamp,
+                        doc_no = doc_no,
+                        doc_type = 'POS-SI',
+                        line_number = items['line_no'],
+                        bar_code =items['barcode'],
+                        alternate_code = 0,
+                        item_code = items['barcode'],
+                        rec_qty = items['quantity'],
+                        rec_uom = productInfo.uom,
+                        description = items['description'],
+                        unit_price = items['price'],
+                        sub_total = float(items['quantity']) * float(items['price']),
+                        pc_price =  items['price'],
+                        qtyperuom = 1,
+                        disc_amt = f"{disc_amt:.3f}",
+                        desc_rate =f"{desc_rate:.3f}",
+                        vat_amt =  f"{vat_amt:.3f}",
+                        vat_exempt = f"{vat_exempt:.3f}",
+                        net_total =  f"{net_total:.3f}",
+                        isvoid = 'NO',
+                        unit_cost = unit_cost,
+                        vatable = vatable,
+                        status = 'A',
+                        so_no =items['sales_trans_id'],
+                        so_doc_no =items['sales_trans_id'],
+                        sn_bc = '',
+                        discounted_by = Discounted_by,
+                        
+                    )
+                    SaveToPOSSalesInvoiceListing.save()
+
+
+            Vatable_Amount = float(Vatable_Amount) - float(total_vat_amt)
+            net_vat = 0
+            net_discount = 0
+            vat_exempted = 0
+            #### Take note of computation of net_vat and net_discount
+            # pdb.set_trace()
+            if DiscountType == 'SC':
+                total_disc_amt = DiscountData['SLess20SCDiscount']
+                net_vat = DiscountData['SDiscountedPrice']
+                net_discount = DiscountData['SDiscountedPrice']
+                vat_exempted = DiscountData['SLessVat12']
+                count = len(DiscountDataList)
+                SCAmmountCovered =  float(str(DiscountData['SAmountCovered']).replace(',','')) * int(count)
+                for item in DiscountDataList:
+                    saveSeniorData  = PosSalesTransSeniorCitizenDiscount(
+                            sales_trans_id=int(float(doc_no)),
+                            terminal_no=TerminalNo,
+                            cashier_id=cashier_id,
+                            document_type=doctype,
+                            details_id=0,
+                            id_no=item['SID'],
+                            senior_member_name=item['SName'],
+                            id=0,
+                            tin_no=item['STIN'],
+                            so_no=so_no,
+                            amount_covered=SCAmmountCovered
+                        )
+                    saveSeniorData.save()
+                
+            elif DiscountType == 'ITEM':
+                net_vat = total_sub_total - (total_disc_amt + total_vat_amt + total_vat_exempt)
+                net_discount = total_sub_total - (total_disc_amt + total_vat_exempt)
+
+            elif DiscountType == 'TRANSACTION':
+                DiscountType='TRSD'
+                net_vat = total_sub_total - (total_disc_amt + total_vat_amt + total_vat_exempt)
+                net_discount = total_sub_total - (total_disc_amt + total_vat_exempt)
+            elif DiscountType == 'TRADE':
+                DiscountType='TRD'
+                net_vat = total_sub_total - (total_disc_amt + total_vat_amt + total_vat_exempt)
+                net_discount = total_sub_total - (total_disc_amt + total_vat_exempt)
+            else:   
+                net_vat = total_sub_total - (total_disc_amt + total_vat_amt + total_vat_exempt)
+                net_discount = total_sub_total - (total_disc_amt + total_vat_exempt)
+                
+                
+            AmountDue_without_comma = AmountDue.replace(',', '')
+            # Convert the modified string to a float
+            AmountDue_float = float(AmountDue_without_comma)
+            
+            AmountDue_float = float(AmountDue_float)       
+            AmountDue_formatted = f"{AmountDue_float:.3f}"
+            print(1)
+            try:
+                total_disc_amt = float(str(total_disc_amt).replace(',', ''))
+                total_desc_rate = float(str(total_desc_rate).replace(',', ''))
+                total_vat_exempt = float(str(total_vat_exempt).replace(',', ''))
+                SaveToPOSSalesInvoiceList = PosSalesInvoiceList (
+                        company_code = f"{companyCode.autonum:0>4}",
+                        ul_code = machineInfo.ul_code,
+                        site_code = int(machineInfo.site_no),
+                        trans_type = 'Cash Sales',
+                        discount_type = DiscountType,
+                        doc_no = doc_no,
+                        doc_type = 'POS-SI',
+                        terminal_no = TerminalNo,
+                        cashier_id = cashier_id,
+                        so_no =items['sales_trans_id'],
+                        so_doc_no =items['sales_trans_id'],
+                        doc_date = datetime_stamp,
+                        customer_code = customer_code,
+                        customer_name = CustomerName,
+                        customer_address = CusAddress,
+                        business_unit = CusBusiness,
+                        customer_type = cust_type,
+                        salesman_id = '0',
+                        salesman = '',
+                        pricing = '',
+                        terms = 0,
+                        remarks = '',
+                        ServiceCharge_TotalAmount = 0 ,
+                        other_payment=total_other,
+                        total_qty = totalQty,
+                        discount = float(str(total_disc_amt).replace(',', '')),
+                        vat = float(str(total_vat_amt).replace(',', '')),
+                        vat_exempted = float(str(vat_exempted).replace(',', '')),
+                        net_vat = float(str(net_vat).replace(',', '')),
+                        net_discount = float(str(net_discount).replace(',', '')),
+                        sub_total = float(str(total_sub_total).replace(',', '')),
+                        lvl1_disc = '0',
+                        lvl2_disc = '0',
+                        lvl3_disc = '0',
+                        lvl4_disc = '0',
+                        lvl5_disc = '0',
+                        HMO = '',
+                        PHIC = '',
+                        status = 'S',
+                        prepared_id = cashier_id,
+                        prepared_by = CashierName,
+                        )
+                
+                SaveToPOSSalesInvoiceList.save()
+            except Exception as e:
+                print('error',e)
+            print(2)
+            if OrderType == 'DINE IN':
+                GetWaiterID = PosSalesOrder.objects.filter(
+                        table_no=table_no,
+                        paid='N',
+                        terminal_no=machineInfo.terminal_no,
+                        site_code=int(machineInfo.site_no)
+                    ).first()
+                if GetWaiterID:
+                    waiterID = GetWaiterID.waiter_id
+                    
+                    # Fetch waiter details if waiterID is available
+                    waiter_details = PosWaiterList.objects.filter(waiter_id=waiterID).first()
+                    
+                    if waiter_details:
+                        waiterName = waiter_details.waiter_name
+                        # Perform further operations with waiterName or other attributes
+                    else:
+                        # Handle the case where waiter details are not found
+                        waiterName = None  # or any default value or error handling
+                else:
+                    # Handle the case where GetWaiterID is None (no matching record found)
+                    waiterID = None  # or any default value or error handling
+                    waiterName = None  # or any default value or error handling
+
+
+                sales_orders_data = PosSalesOrder.objects.filter(
+                    table_no=table_no,
+                    paid='N',
+                    active='Y',
+                    terminal_no=int(float(machineInfo.terminal_no)),
+                    site_code=int(machineInfo.site_no)
+                ).first()
+                print(3)
+                if sales_orders_data:
+                    Guest_Count=sales_orders_data.guest_count
+                    QueNo = sales_orders_data.q_no
+                    table_no = sales_orders_data.table_no
+            
+                sales_orders_to_update = PosSalesOrder.objects.filter(
+                    table_no=table_no,
+                    paid='N',
+                    active='Y',
+                    terminal_no=int(float(machineInfo.terminal_no)),
+                    site_code=int(machineInfo.site_no)
+                )
+
+                # Check if there are any matching objects
+                if sales_orders_to_update.exists():
+                    # Update all matching objects to set 'paid' to 'Y'
+                    sales_orders_to_update.update(paid='Y')
+                    
+                    pass
+            else:
+                sales_orders_data = PosSalesOrder.objects.filter(
+                    q_no=QueNo,
+                    paid='N',
+                    active='Y',
+                     terminal_no=int(float(machineInfo.terminal_no)),
+                    site_code=int(machineInfo.site_no)
+                ).first()
+
+                if sales_orders_data:
+                    Guest_Count=sales_orders_data.guest_count
+                    QueNo = sales_orders_data.q_no
+                    table_no = sales_orders_data.table_no
+
+                sales_orders_to_update = PosSalesOrder.objects.filter(
+                    q_no=QueNo,
+                    paid='N',
+                    active='Y',
+                     terminal_no=int(float(machineInfo.terminal_no)),
+                    site_code=int(machineInfo.site_no)
+                )
+
+                # Check if there are any matching objects
+                if sales_orders_to_update.exists():
+                    # Update all matching objects to set 'paid' to 'Y'
+                    sales_orders_to_update.update(paid='Y')
+                    
+                    pass
+            print(4)
+            UpdateINVRef = InvRefNo.objects.filter(description=doctype,terminalno=TerminalNo).first()
+            UpdateINVRef.next_no = doc_no
+            UpdateINVRef.save()
+    
+
+            data = []
+            data = {
+                'CustomerCompanyName':companyCode.company_name,
+                'CustomerCompanyAddress':companyCode.company_address,
+                'CustomerTIN':companyCode.company_TIN,
+                'CustomerZipCode':companyCode.company_zipcode,
+                'MachineNo':machineInfo.Machine_no,
+                'SerialNO':machineInfo.Serial_no,
+                'CustomerPTU':machineInfo.PTU_no,
+                'DateIssue':machineInfo.date_issue,
+                'DateValid':machineInfo.date_valid,
+                'TelNo':'TEL NOS:785-462',
+                'OR':doc_no,
+                'VAT': '{:,.2f}'.format(total_vat_amt),
+                'VATable': '{:,.2f}'.format(Vatable_Amount),
+                'Discount': '{:,.2f}'.format(total_disc_amt),
+                'Discount_Rate': '{:,.2f}'.format(total_desc_rate),
+                'VatExempt': '{:,.2f}'.format(total_vat_exempt),
+                'NonVat':'0.00',
+                'VatZeroRated':'0.00',
+                'ServiceCharge': '0.00',
+                'customer_code' : customer_code,
+                'CustomerName' :CustomerName,
+                'CusTIN' :CusTIN,
+                'CusAddress' :CusAddress,
+                'CusBusiness' : CusBusiness,
+                'cust_type' : cust_type,
+                'TerminalNo':TerminalNo,
+                'WaiterName':waiterName,
+                'Other':Other,
+                'SeniorDiscountDataList':DiscountDataList,
+            } 
+            cus_Data = {
+                'CustomerName' :CustomerName,
+                'CusTIN' :CusTIN,
+                'CusAddress' :CusAddress,
+                'CusBusiness' : CusBusiness,
+                'TableNo':table_no,
+                'Guest_Count':Guest_Count,
+                'QueNo':QueNo
+                }
+            # transaction.commit()
+            PDFReceipt(request,doc_no,'POS-SI',cus_Data)
+            return Response({'data':data}, status=200)
+        except Exception as e:
+                # If any error occurs during the save operations, rollback the transaction
+            transaction.rollback()
+            traceback.print_exc()    
+                # Optionally, log the error or handle it in some way
+            return Response({"message": "An error occurred while saving the sales order"}, status=500)
+    else:
+        return Response({"message": "An error occurred while saving the sales order"}, status=500)
+
+
+
 
 
 
@@ -5317,6 +7378,7 @@ def save_charge_payment(request):
 ###*************** SAVE AFTER CASH COUNT END SHIFT-----*******************
 @api_view(['GET','POST'])
 @transaction.atomic
+@permission_classes([IsAuthenticated])
 def cash_breakdown(request):
     if request.method == 'GET':
         cash_breakdown = PosCashBreakdown.objects.filter(login_record='1')
@@ -5356,7 +7418,7 @@ def cash_breakdown(request):
                     if int(quantity) > 0:
                         trans_id = 0
                         value = conversion_rates[denomination]
-                        print((float(value) * int(quantity)))
+                        
                         try:
                             last_record = PosCashBreakdown.objects.latest('trans_id')
                             trans_id = last_record.trans_id + 1
@@ -5378,7 +7440,8 @@ def cash_breakdown(request):
                 pullout_by = ''
                 pullout_name = ''
                 verify_by = ''
-                serial_number = get_serial_number()
+                serial_number = getattr(request, "SERIALNO", None)
+            # serial_number = get_serial_number()
                 machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number.strip()).first()
                 date_stamp = GetPHilippineDateTime()
                 try:
@@ -5394,7 +7457,7 @@ def cash_breakdown(request):
                 for denomination, quantity in dinomination.items():
                     if int(quantity) > 0:
                         value = conversion_rates[denomination]
-                        print((float(value) * int(quantity)))
+                        
                         details_id = 0
                         try:
                             last_record = PosCashPulloutDetails.objects.latest('details_id')
@@ -5422,6 +7485,8 @@ def cash_breakdown(request):
                 save_cash_pullout.save()
 
                     # transaction.commit()
+
+            PDFCashBreakDown(request,TransID)
             return JsonResponse({'message':"This endpoint is for POST requests only."},status=200)      
         except Exception as e:
             print(e)
@@ -5433,6 +7498,7 @@ def cash_breakdown(request):
         
 
 @api_view(['GET','POST'])
+@permission_classes([IsAuthenticated])
 def get_sales_list_of_transaction(request):
     if request.method =='GET':
         try:
@@ -5441,9 +7507,6 @@ def get_sales_list_of_transaction(request):
             DateTo = request.GET.get('DateTo')
             DocType = request.GET.get('DocType')
             DocNo = request.GET.get('DocNo')
-            print(DateFrom)
-            print(DateTo)
-
             sales_list=[]
             if DateFrom and DateTo:
                 DateFrom1 = datetime.strptime(DateFrom, '%Y-%m-%d')  # Example start date
@@ -5458,7 +7521,6 @@ def get_sales_list_of_transaction(request):
                     sales_list = PosSalesInvoiceList.objects.filter(doc_date__range=(DateFrom1,DateTo_datetime),doc_type =DocType)
 
                 serialize = PosSalesInvoiceListSerializer(sales_list,many=True)
-                print('List',serialize.data)
                 return Response(serialize.data)
         except Exception as e:
             print(e)
@@ -5479,7 +7541,7 @@ def get_sales_list_of_transaction(request):
                 site_code =  data.get('site_code')
                 doc_type =  data.get('doc_type')
 
-                print(doc_no)
+                
 
                 sales_list = PosSalesInvoiceList.objects.filter(
                     doc_no=doc_no,
@@ -5498,4 +7560,171 @@ def get_sales_list_of_transaction(request):
         except Exception as e:
             print(e)
             traceback.print_exc()
-   
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def validate_gift_check(request):
+    try:
+        gift_check_no = request.GET.get("gift_check_no")  # or POST if needed
+
+        if not gift_check_no:
+            return JsonResponse({"success": False, "message": "Gift Check number is required"}, status=400)
+
+        # 1️⃣ Check if already used
+        if POSSalesTransGiftCheck.objects.filter(gift_check_no=gift_check_no).exists():
+            return JsonResponse({
+                "success": False,
+                "message": "Gift Check already used!"
+            }, status=400)
+
+        # 2️⃣ Check if exists in series
+        gift_check = POSGiftCheckSeries.objects.filter(
+            series_from__lte=gift_check_no,
+            series_to__gte=gift_check_no
+        ).first()
+
+        if not gift_check:
+            return JsonResponse({
+                "success": False,
+                "message": "Gift Check is not on the list!"
+            }, status=400)
+
+        now = timezone.now().date()
+        validity_date_from = dt.datetime.strptime(gift_check.validity_date_from, "%Y-%m-%d").date()
+        validity_date_to = dt.datetime.strptime(gift_check.validity_date_to, "%Y-%m-%d").date()
+
+        # 3️⃣ Check validity dates
+        if now < validity_date_from:
+            return JsonResponse({
+                "success": False,
+                "message": f"Gift Check validity starts on {gift_check.validity_date_from.strftime('%B %d, %Y')}!"
+            }, status=400)
+
+        if now > validity_date_to:
+            return JsonResponse({
+                "success": False,
+                "message": "Gift Check has expired!"
+            }, status=400)
+
+        # ✅ Valid
+        return JsonResponse({
+            "success": True,
+            "message": "Gift Check is valid",
+            "amount": float(gift_check.amount)
+        })
+    except Exception as e:
+        print('error',e)
+        traceback.print_exc()
+        return JsonResponse({
+                "success": False,
+                "message": "Request failed"
+            }, status=501)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_denomination(request):
+    try:
+        deno = POSGiftCheckDenomination.objects.all()
+        serialize = POSGiftCheckDenominationSerializer(deno,many=True)
+        return Response(serialize.data)
+    except Exception as e:
+        print('error',e)
+        traceback.print_exc()
+        return JsonResponse({
+                "success": False,
+                "message": "Request failed"
+            }, status=501)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_acct_title(request):
+    try:
+        _list = AcctSubsidiary.objects.all().order_by('subsidiary_acct_title')
+        serialize = AcctSubsidiaryTitleSerializer(_list,many=True)
+        return Response(serialize.data)
+
+    except Exception as e:
+        print('error',e)
+        traceback.print_exc()
+
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def getSLname(request):
+
+        try:
+            SLType = request.GET.get('sl_type')
+            sl_name =  request.GET.get('sl_name')
+            print('xxxx',SLType)
+            # SLType = data.get('st_type', '')
+            if SLType == 'S':
+                output =  MainRefSlSupplier.objects.annotate(concat_address=Concat(Cast(models.F('address'), CharField()), Value(', '),
+                                                                                    Cast(models.F('city_municipality'), CharField()), Value(', '),
+                                                                                    Cast(models.F('province'), CharField()), Value(', '),
+                                                                                    Cast(models.F('zip_code'), CharField()))
+                                                        ).filter( active='Y'
+                                                        ).values('concat_address',name=models.F('trade_name'),idcode=models.F('id_code')).order_by('trade_name')
+                return Response(output)
+            elif SLType == 'C':
+                    try:
+                        print(11)
+                        output =  MainRefCustomer.objects.annotate(concat_address=Concat(Cast(models.F('st_address'), CharField()), Value(', '),
+                                                                                        Cast(models.F('city_address'), CharField()), Value(''))
+                                                        ).filter(active='Y'
+                                                        ).values('concat_address',name=models.F('trade_name'),idcode=models.F('id_code')).order_by('trade_name')
+                        print('output',output)
+                        return Response(output)
+                    except Exception as e:
+                        print('error',e) 
+                    
+            elif SLType == 'E':
+                    output =  Employee.objects.annotate(name=Concat(Cast(models.F('last_name'), CharField()),Value(', '),
+                                                                                Cast(models.F('first_name'), CharField()),Value(' '),
+                                                                                Cast(models.F('middle_name'), CharField())),
+                                                                    concat_address=Concat(Cast(models.F('address'), CharField()), Value(', '),
+                                                                                    Cast(models.F('city_municipality'), CharField()), Value(', '),
+                                                                                    Cast(models.F('province'), CharField()), Value(', '),
+                                                                                    Cast(models.F('zip_code'), CharField()))
+                                                    ).filter(active_status='Y'
+                                                    ).values('concat_address','name',idcode=models.F('id_code')).order_by('name')
+                    return Response(output)
+                                       
+            elif SLType == 'P':
+                    output =  MainRefSlSupplier.objects.annotate(concat_address=Concat(Cast(models.F('address'), CharField()), Value(', '),
+                                                                                    Cast(models.F('city_municipality'), CharField()), Value(', '),
+                                                                                    Cast(models.F('province'), CharField()), Value(', '),
+                                                                                    Cast(models.F('country'), CharField()), Value(', '),
+                                                                                    Cast(models.F('zip_code'), CharField()))
+                                                        ).filter(active_status='Y').values('concat_address',name=models.F('trade_name'),idcode=models.F('id_code')).order_by('trade_name')
+                    return Response(output)                   
+            elif SLType == 'O':
+                    output =  OtherAccount.objects.filter(active='Y',acct_title__icontains= sl_name
+                                                    ).values(concat_address=Value(''),name=models.F('sl_name'),idcode=models.F('id_code')).order_by('sl_name')
+                    return Response(output)
+                
+        except Exception as e:
+            print(f"Error: {e}")
+            traceback.print_exc()
+            return Response({'error': str(e)}, status=500)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_other_payment_setup(request):
+    try:
+        _list = PosOtherPmtSetup.objects.all().order_by('pmt_desc')
+        serialize = PosOtherPmtSetupPaymentSerializer(_list,many=True)
+        return Response(serialize.data)
+
+    except Exception as e:
+        print('error',e)
+        traceback.print_exc()
+
+
+
+
+

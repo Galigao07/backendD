@@ -7,14 +7,8 @@ import pdb
 from django.conf import settings
 from django.http import FileResponse, JsonResponse
 from rest_framework.response import Response
-from backend.models import (Product,PosRestTable,PosSalesOrder,PosSalesTransDetails,InvRefNo,POS_Terminal,PosSalesTrans,PosSalesInvoiceList,PosSalesInvoiceListing,
-                            CompanySetup,Customer,PosWaiterList,PosPayor,User,Employee,LeadSetup,PosClientSetup,PosCashiersLogin,PosCashBreakdown,PosVideo,
-                            POSProductPrinter,ProductCategorySetup,POSGiftCheckDenomination,POSGiftCheckSeries,POSSalesTransGiftCheck)
-from backend.serializers import (ProductSerializer,ProductCategorySerializer,PosSalesOrderSerializer,PosSalesTransDetailsSerializer,PosSalesTransSerializer,
-                                 PosSalesInvoiceListing,PosSalesInvoiceList,CustomerSerializer,PosWaiterListSerializer,PosPayorSerializer,PosSalesInvoiceListSerializer,
-                                 UserSerializer,EmployeeSetupSerializer,PosRestTableSerializer,POS_TerminalSerializer,LeadSetupSerializer,PosClientSetupSerializer,
-                                 PosCashiersLoginpSerializer,PosCashBreakdownSerializer,PosVideoSerializer,Product2Serializer,POSProductPrinterSerializer,
-                                 ProductCategorySetupSerializer,POSGiftCheckDenominationSerializer,POSGiftCheckSeriesSerializer,POSSalesTransGiftCheckSerializer)
+from backend.models import *
+from backend.serializers import *
 from rest_framework.decorators import api_view
 from rest_framework.views import APIView
 from django.db.models import Min,Max
@@ -30,10 +24,16 @@ from rest_framework.permissions import IsAuthenticated
 from backend.globalFunction import GetPHilippineDate,GetPHilippineDateTime
 from django.db.models import Sum
 import traceback
-import win32print
 import subprocess
 import re
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated,AllowAny
+from rest_framework import status
+from django.core.exceptions import ValidationError
+
+
 @api_view(['GET'])
+@permission_classes([IsAuthenticated])
 def get_employee_list(request):
     if request.method == 'GET':
         name = request.GET.get('employee')
@@ -43,18 +43,15 @@ def get_employee_list(request):
         return JsonResponse({'EmployeeList': EmployeeList}, status=200)
     
 @api_view(['GET','POST'])
+@permission_classes([IsAuthenticated])
 def get_product_profile(request):
     if request.method == 'GET':
         try:
-            # recieve_data = json.loads(request.body)
-            # print('recieve_data',recieve_data)
-            # pdb.set_trace()
-            serial_number = get_serial_number()
-            machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number.strip()).first()
             description = request.GET.get('Search')
             if description== None:
                 product_list = Product.objects.all()
                 serialize = Product2Serializer(product_list,many=True)
+                print(serialize.data)
                 return Response(serialize.data)
             else:
                 product_list = Product.objects.filter(long_desc__icontains=description)
@@ -85,6 +82,7 @@ def get_product_profile(request):
 
 ####* **************************** USER *******************************
 @api_view(['POST'])
+@permission_classes([IsAuthenticated])
 def add_user(request):
     if request.method == 'POST':
         try:
@@ -114,6 +112,7 @@ def add_user(request):
     return JsonResponse({'error': 'Invalid request method'}, status=400)
 
 @api_view(['GET'])
+@permission_classes([IsAuthenticated])
 def view_user(request):
     if request.method == 'GET':
         try:
@@ -126,6 +125,7 @@ def view_user(request):
         
     
 @api_view(['POST'])
+@permission_classes([IsAuthenticated])
 def update_user(request):
     if request.method == 'POST':
         received_data = request.data
@@ -165,6 +165,7 @@ def update_user(request):
 
 
 @api_view(['DELETE'])  
+@permission_classes([IsAuthenticated])
 def delete_user(request):
     if request.method == 'DELETE':
         received_data = json.loads(request.body.decode('utf-8'))  # Decode and load JSON data
@@ -195,6 +196,7 @@ def delete_user(request):
 
 ####* **************************** WAITER *******************************
 @api_view(['GET'])
+@permission_classes([IsAuthenticated])
 def view_waiter(request):
     if request.method == 'GET':
         data = PosWaiterList.objects.all().order_by('-autonum')
@@ -203,6 +205,7 @@ def view_waiter(request):
 
 
 @api_view(['POST'])
+@permission_classes([IsAuthenticated])
 def add_waiter(request):
     if request.method == 'POST':
         try:
@@ -233,6 +236,7 @@ def add_waiter(request):
     return JsonResponse({'error': 'Invalid request method'}, status=400)
 
 @api_view(['POST'])
+@permission_classes([IsAuthenticated])
 def update_waiter(request):
     if request.method == 'POST':
         received_data = request.data
@@ -263,6 +267,7 @@ def update_waiter(request):
 
 
 @api_view(['DELETE'])  
+@permission_classes([IsAuthenticated])
 def delete_waiter(request):
     if request.method == 'DELETE':
         received_data = json.loads(request.body.decode('utf-8'))  # Decode and load JSON data
@@ -291,6 +296,7 @@ def delete_waiter(request):
 ####* **************************** TABLE NO *******************************
 
 @api_view(['GET'])
+@permission_classes([IsAuthenticated])
 def view_table(request):
     if request.method == 'GET':
         data = PosRestTable.objects.all().order_by('-details_id')
@@ -298,6 +304,7 @@ def view_table(request):
         return JsonResponse({'userList': userList}, status=200)
 
 @api_view(['POST'])
+@permission_classes([IsAuthenticated])
 def add_table(request):
     if request.method == 'POST':
         try:
@@ -324,6 +331,7 @@ def add_table(request):
 
 
 @api_view(['POST'])
+@permission_classes([IsAuthenticated])
 def update_table(request):
     if request.method == 'POST':
        
@@ -362,6 +370,7 @@ def update_table(request):
 
 
 @api_view(['DELETE'])  
+@permission_classes([IsAuthenticated])
 def delete_table(request):
     if request.method == 'DELETE':
         received_data = json.loads(request.body.decode('utf-8'))  # Decode and load JSON data
@@ -389,140 +398,164 @@ def delete_table(request):
     return JsonResponse({'error': 'Invalid request method'}, status=400)
 
 
-####* **************************** VIDEO *******************************
-# @api_view(['GET','POST'])
-# def UploadVideo(request):
-#     if request.method == 'POST':
-#         video_file = request.FILES.get('video')
-#         if video_file:
-#             # Save the file to the media directory
-#             filename = video_file.name
-#             filepath = os.path.join(settings.MEDIA_ROOT, filename)
-#             with open(filepath, 'wb') as destination:
-#                 # Read the entire file content at once
-#                 file_content = video_file.read()
-#                 # Write the file content to the destination
-#                 destination.write(file_content)
-            
-#             # Return a response indicating success
-#             video_url = os.path.join(settings.MEDIA_URL, filename)
-#             return Response({'message': 'Video uploaded successfully', 'url': video_url}, status=200)
-#         else:
-#             return Response({'error': 'No video file provided'}, status=400)
-    
-#     elif request.method == 'GET':
-
-#         media_dir = os.path.join(settings.BASE_DIR, 'media')
-
-#         # Check if the videos directory exists
-#         if os.path.isdir(media_dir):
-#             # List all files in the videos directory
-#             video_files = [f for f in os.listdir(media_dir) if os.path.isfile(os.path.join(media_dir, f))]
-
-#             # Sort files by modification time (latest first)
-#             video_files.sort(key=lambda x: os.path.getmtime(os.path.join(media_dir, x)), reverse=True)
-
-#             # Get the path to the latest video file
-#             if video_files:
-#                 latest_video_file = os.path.join(media_dir, video_files[0])
-#                 with open(latest_video_file, 'rb') as file:
-#                     file_content = file.read()
-
-#                     # Encode the file content to Base64
-#                     base64_content = base64.b64encode(file_content).decode()
-#                     # print(base64_content)
-#                     # Construct the data URL
-#                     # data_url = 'data:base64,{base64_content}'
-
-#                     data_url = f'data:video/mp4;base64,{base64_content}'
-      
-#                 return JsonResponse({'data':data_url})
-#                 # Serve the latest video file
-#             else:
-#                 return Response({'error': 'No videos found in the media directory'}, status=404)
-#         else:
-#             return Response({'error': 'Media directory not found'}, status=404)
-
-
-
 @api_view(['GET', 'POST'])
+@permission_classes([AllowAny])
 def UploadVideo(request):
     if request.method == 'POST':
         try:
             video_file = request.FILES.get('video')
-            if video_file:
-                # pdb.set_trace()
-                # Get the desktop path
-                username = os.getlogin()
-                desktop_path = os.path.join('C:/Users', username, 'Desktop')
-                serial_number = get_serial_number()
-                machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number.strip()).first()
-                # Save the file to the desktop
-                filename = video_file.name
-                filepath = os.path.join(desktop_path, filename)
-                SaveVideo = PosVideo(
-                    filepath = desktop_path,
-                    filename = filename,
-                    serial_no = machineInfo.Serial_no,
-                )
-                SaveVideo.save()
-
-                with open(filepath, 'wb') as destination:
-                    # Write the file content to the destination
-                    for chunk in video_file.chunks():
-                        destination.write(chunk)
-
-                # Return a response indicating success
-                video_url = filepath
-                return Response({'message': 'Video uploaded successfully', 'url': video_url}, status=200)
-            else:
+            if not video_file:
                 return Response({'error': 'No video file provided'}, status=400)
+
+            # Get serial number and machine info
+            serial_number = getattr(request, "SERIALNO", None) or request.POST.get('serialNo')
+            machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number).first()
+            if not machineInfo:
+                return Response({'error': 'Machine not found'}, status=404)
+
+            # Save file in MEDIA_ROOT
+            filename = video_file.name
+            save_path = os.path.join(settings.MEDIA_ROOT, filename)
+            os.makedirs(settings.MEDIA_ROOT, exist_ok=True)
+
+            with open(save_path, 'wb') as destination:
+                for chunk in video_file.chunks():
+                    destination.write(chunk)
+
+            # Save DB record
+            SaveVideo = PosVideo(
+                filepath=save_path,
+                filename=filename,
+                serial_no=machineInfo.Serial_no
+            )
+            SaveVideo.save()
+
+            # Return absolute URL
+            video_url = request.build_absolute_uri(settings.MEDIA_URL + filename)
+
+            print('Video uploaded to:', video_url)
+            return Response({'message': 'Video uploaded successfully', 'url': video_url}, status=200)
+
         except Exception as e:
             print(e)
             traceback.print_exc()
+            return Response({'error': str(e)}, status=500)
+
     elif request.method == 'GET':
         try:
-            # desktop_path = os.path.join('C:/Users', os.getlogin(), 'Desktop')
-            serial_number = get_serial_number()  # Ensure this function is implemented correctly
+            serial_number = getattr(request, "SERIALNO", None) or request.GET.get('serialNo')
             machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number.strip()).first()
-            
-            if machineInfo:
-                path = PosVideo.objects.filter(serial_no=machineInfo.Serial_no).first()
-                
-                if path and path.filepath:
-                    # pdb.set_trace()
-                    desktop_path = path.filepath
-                    desktop_path = os.path.normpath(desktop_path)
-                    filename = path.filename  # Assuming filename is a field in PosVideo model
-                    
-                    if os.path.isdir(desktop_path):
-                        # List all files on the desktop
-                        video_files = [f for f in os.listdir(desktop_path) if os.path.isfile(os.path.join(desktop_path, f))]
-                        
-                        # Filter video files by filename (if specified)
-                        if filename:
-                            video_files = [f for f in video_files if f.lower() == filename.lower()]
-                        
-                        # Sort files by modification time (latest first)
-                        video_files.sort(key=lambda x: os.path.getmtime(os.path.join(desktop_path, x)), reverse=True)
-                        
-                        # Get the path to the latest video file on the desktop
-                        if video_files:
-                            latest_video_file = os.path.join(desktop_path, video_files[0])
-                            
-                            with open(latest_video_file, 'rb') as file:
-                                file_content = file.read()
-                                
-                                # Encode the file content to Base64
-                                base64_content = base64.b64encode(file_content).decode()
-                                
-                                # Construct the data URL
-                                data_url = f'data:video/mp4;base64,{base64_content}'
-                                
-                                return JsonResponse({'data': data_url})
+            if not machineInfo:
+                return JsonResponse({'error': 'Machine not found'}, status=404)
+
+            video_record = PosVideo.objects.filter(serial_no=machineInfo.Serial_no).order_by('-autonum').first()
+            if not video_record or not video_record.filename:
+                return JsonResponse({'error': 'No videos found'}, status=404)
+          
+            video_url = request.build_absolute_uri(settings.MEDIA_URL + video_record.filename)
+            if video_url.startswith('http://'):
+                video_url = video_url.replace('http://', 'https://', 1)
+            print('Latest video URL:', video_url)
+            return JsonResponse({'data': video_url})
+
         except Exception as e:
             print(e)
             traceback.print_exc()
+            return JsonResponse({'error': str(e)}, status=500)
+
+# @api_view(['GET', 'POST'])
+# @permission_classes([AllowAny])
+# def UploadVideo(request):
+#     if request.method == 'POST':
+#         try:
+#             video_file = request.FILES.get('video')
+#             if video_file:
+#                 # pdb.set_trace()
+#                 # Get the desktop path
+#                 username = os.getlogin()
+#                 desktop_path = os.path.join('C:/Users', username, 'Desktop')
+#                 serial_number = getattr(request, "SERIALNO", None)
+#                 machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number.strip()).first()
+#                 # Save the file to the desktop
+#                 filename = video_file.name
+#                 filepath = os.path.join(desktop_path, filename)
+#                 SaveVideo = PosVideo(
+#                     filepath = desktop_path,
+#                     filename = filename,
+#                     serial_no = machineInfo.Serial_no,
+#                 )
+#                 SaveVideo.save()
+
+#                 with open(filepath, 'wb') as destination:
+#                     # Write the file content to the destination
+#                     for chunk in video_file.chunks():
+#                         destination.write(chunk)
+
+#                 # Return a response indicating success
+#                 video_url = filepath
+#                 return Response({'message': 'Video uploaded successfully', 'url': video_url}, status=200)
+#             else:
+#                 return Response({'error': 'No video file provided'}, status=400)
+#         except Exception as e:
+#             print(e)
+#             traceback.print_exc()
+#     elif request.method == 'GET':
+#         try:
+#             # desktop_path = os.path.join('C:/Users', os.getlogin(), 'Desktop')
+#             print('getvideo')
+#             serial_number = getattr(request, "SERIALNO", None)
+#             if serial_number is None:
+#                 serial_number = request.GET.get('serialNo')  # <-- get from query string
+#             machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number.strip()).first()
+#             print(serial_number)
+#             if machineInfo:
+#                 print(1)
+#                 path = PosVideo.objects.filter(serial_no=machineInfo.Serial_no).first()
+#                 try:
+#                     if path and path.filepath:
+#                         # pdb.set_trace()
+#                         desktop_path = path.filepath
+#                         desktop_path = os.path.normpath(desktop_path)
+#                         filename = path.filename  # Assuming filename is a field in PosVideo model
+#                         print(2)
+#                         print('directory',desktop_path)
+#                         try:
+#                             if os.path.isdir(desktop_path):
+                                
+#                                 # List all files on the desktop
+#                                 video_files = [f for f in os.listdir(desktop_path) if os.path.isfile(os.path.join(desktop_path, f))]
+                                
+#                                 # Filter video files by filename (if specified)
+#                                 if filename:
+#                                     video_files = [f for f in video_files if f.lower() == filename.lower()]
+                                
+#                                 # Sort files by modification time (latest first)
+#                                 video_files.sort(key=lambda x: os.path.getmtime(os.path.join(desktop_path, x)), reverse=True)
+#                                 print(3)
+#                                 # Get the path to the latest video file on the desktop
+#                                 if video_files:
+#                                     latest_video_file = os.path.join(desktop_path, video_files[0])
+                                    
+#                                     with open(latest_video_file, 'rb') as file:
+#                                         file_content = file.read()
+                                        
+#                                         # Encode the file content to Base64
+#                                         base64_content = base64.b64encode(file_content).decode()
+                                        
+#                                         # Construct the data URL
+#                                         data_url = f'data:video/mp4;base64,{base64_content}'
+#                                         print('data_url',data_url)
+                                        
+#                                         return JsonResponse({'data': data_url})
+#                         except Exception as e:
+#                             print(e)
+#                             traceback.print_exc()
+#                 except Exception as e:
+#                     print(e)
+#                     traceback.print_exc()
+#         except Exception as e:
+#             print(e)
+#             traceback.print_exc()
 
 ####* **************************** Terminal Setup *******************************
 @api_view(['GET','POST'])       
@@ -1099,7 +1132,7 @@ def generate_data_xread(request):
     if request.method =='GET':
         DateFrom = request.query_params.get("DateFrom")
         DateTo = request.query_params.get("DateTo")
-        serial_number = get_serial_number()
+        serial_number = getattr(request, "SERIALNO", None)
         machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number).first()
         
         sales_invoices_listing = PosSalesInvoiceListing.objects.filter(
@@ -1283,19 +1316,55 @@ def Gift_Check_series(request):
             traceback.print_exc()
     elif request.method == 'POST':
         try:
-            data_receiver = json.loads(request.body)
+            # data_receiver = json.loads(request.body)
+            data_receive = request.data.get('data','')
 
-            data_receive = data_receiver.get('data')
-            print(data_receive)
+            # data_receive = data_receiver.get('data')
             trans_no = data_receive.get('trans_no')
             SeriesFrom = data_receive.get('series_from')
             SeriesTo = data_receive.get('series_to')
             DateFrom = data_receive.get('validity_date_from')
             DateTo = data_receive.get('validity_date_to')
             Amount = data_receive.get('amount')
-            serial_number = get_serial_number()
+            serial_number = getattr(request, "SERIALNO", None)
             machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number).first()
             check_data = POSGiftCheckSeries.objects.filter(trans_no=trans_no).first()
+
+            errors = {}
+
+            # 1️⃣ Convert series to integers
+            try:
+                series_from_int = int(SeriesFrom)
+                series_to_int = int(SeriesTo)
+                if series_from_int > series_to_int:
+                    errors['series'] = "Series From cannot be greater than Series To."
+
+                   
+            except ValueError:
+                errors['series'] = "Series From and Series To must be valid integers."
+
+            # 2️⃣ Convert dates
+            try:
+                date_from_obj = DateFrom if isinstance(DateFrom, datetime) else datetime.strptime(DateFrom, "%Y-%m-%d")
+                date_to_obj = DateTo if isinstance(DateTo, datetime) else datetime.strptime(DateTo, "%Y-%m-%d")
+                if date_from_obj > date_to_obj:
+                    errors['dates'] = "Validity start date cannot be after end date."
+            except Exception:
+                errors['dates'] = "Validity dates must be valid date strings (YYYY-MM-DD)."
+
+            # 3️⃣ Check for overlapping series (no PK check)
+            overlapping = POSGiftCheckSeries.objects.filter(
+                Q(series_from__lte=series_to_int, series_to__gte=series_from_int) &
+                Q(validity_date_from__lte=date_to_obj, validity_date_to__gte=date_from_obj)
+            )
+
+            if overlapping.exists():
+                errors['series'] = "Series numbers overlap with existing GiftCheck entries."
+
+            # 4️⃣ Raise error if any validation fails
+            if errors:
+                return Response({"success": False, "errors": errors}, status=status.HTTP_400_BAD_REQUEST)
+
 
             if check_data:
                 check_data.site_code = machineInfo.site_no
@@ -1323,12 +1392,18 @@ def Gift_Check_series(request):
             return Response('Success')
 
         except Exception as e:
-            print(e)
+            print('errors',e)
             traceback.print_exc()
+            return Response(
+                {"success": False, "message": str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+        
+            
     elif request.method == 'DELETE':
         try:
-            data_receiver = json.loads(request.body)
-            trans_no = data_receiver.get('trans_no')
+            # data_receiver = json.loads(request.body)
+            trans_no = request.GET.get('trans_no')
             print(trans_no)
             POSGiftCheckSeries.objects.filter(trans_no=trans_no).delete()
             return Response('Success')
@@ -1383,8 +1458,9 @@ def Gift_Check_Denomination(request):
             traceback.print_exc()
     elif request.method == 'DELETE':
         try:
-            data_receiver = json.loads(request.body)
-            code = data_receiver.get('code')
+            print(request.GET)
+            code = request.GET.get('code','0')
+            print('code',code)
             POSGiftCheckDenomination.objects.filter(code=code).delete()
             return Response('Success')
 

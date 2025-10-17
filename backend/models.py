@@ -1,6 +1,61 @@
 from django.db import models
 from rest_framework import serializers
 
+# accounts/models.py
+from django.contrib.auth.models import AbstractBaseUser, BaseUserManager
+from django.db import models
+
+class CustomUserManager(BaseUserManager):
+    def create_user(self, user_name, password=None, **extra_fields):
+        if not user_name:
+            raise ValueError("The Username must be set")
+        user = self.model(user_name=user_name, **extra_fields)
+        user.set_password(password)  # hashes the password
+        user.save(using=self._db)
+        return user
+
+    def create_superuser(self, user_name, password=None, **extra_fields):
+        extra_fields.setdefault('is_staff', True)
+        extra_fields.setdefault('is_superuser', True)
+        if not password:
+            raise ValueError("Superusers must have a password.")
+        return self.create_user(user_name, password, **extra_fields)
+
+class User(AbstractBaseUser):
+    autonum = models.AutoField(primary_key=True)
+    id_code = models.PositiveSmallIntegerField(default=0)
+    fullname = models.CharField(max_length=40, default=' ')
+    department = models.CharField(max_length=30, default=' ')
+    user_name = models.CharField(max_length=30, unique=True)
+    password = models.CharField(max_length=128)  # Django password hash length
+    user_rank = models.CharField(max_length=15, default=' ')
+    sys_type = models.CharField(max_length=5, default='')
+    mod_access = models.CharField(max_length=2000, default=' ')
+    acct_title = models.TextField(blank=True, null=True)
+    active = models.CharField(max_length=5,default='Y')
+    emp_id = models.IntegerField(default=0)
+    
+    is_staff = models.BooleanField(default=False)  # Required for admin
+    is_active = models.BooleanField(default=True)  # Required for auth
+    last_login = models.DateTimeField(blank=True, null=True)
+   
+    @property
+    def id(self):
+        return self.autonum
+    # Disable Django permissions/groups
+    groups = None
+    user_permissions = None
+    USERNAME_FIELD = 'user_name'
+    REQUIRED_FIELDS = ['fullname', 'department']
+    objects = CustomUserManager()
+    class Meta:
+        db_table = 'tbl_user'
+        ordering = ['fullname']
+        managed = False
+
+    def __str__(self):
+        return self.user_name
+
 
 class CompanySetup(models.Model):
     autonum = models.BigAutoField(primary_key=True)
@@ -224,6 +279,7 @@ class CompanySetup(models.Model):
     # RRprintAPV = models.CharField(max_length=1, default='N')
 
     class Meta:
+        managed = False
         db_table = 'tbl_company_setup'
 
 class PosSetup(models.Model):
@@ -238,6 +294,7 @@ class PosSetup(models.Model):
     subsidiary_account = models.CharField(max_length=100, default=' ')
 
     class Meta:
+        managed = False
         db_table = 'tbl_pos_setup'
 
 class ProductCategorySales(models.Model):
@@ -271,6 +328,7 @@ class ProductCategorySales(models.Model):
     return_acct_title5 = models.CharField(max_length=150, default='')
 
     class Meta:
+        managed = False
         db_table = 'tbl_product_category_sales'
 
 class ProductSiteSetup(models.Model):
@@ -289,6 +347,7 @@ class ProductSiteSetup(models.Model):
     active = models.CharField(max_length=1, default='Y')
 
     class Meta:
+        managed = False
         db_table = 'tbl_product_site_setup'
 
 class PosMultiplePriceTypeSiteSetup(models.Model):
@@ -299,6 +358,7 @@ class PosMultiplePriceTypeSiteSetup(models.Model):
     pricetype_name = models.CharField(max_length=100, default=' ')
 
     class Meta:
+        managed = False
         db_table = 'tbl_pos_multiple_pricetype_site_setup'
 
 class PosPriceTypeSiteSetup(models.Model):
@@ -309,6 +369,7 @@ class PosPriceTypeSiteSetup(models.Model):
     default_pricetype_name = models.CharField(max_length=100, default='')
 
     class Meta:
+        managed = False
         db_table = 'tbl_pos_pricetype_site_setup'
        
 class PosSalesTransSeniorCitizenDiscount(models.Model):
@@ -326,6 +387,7 @@ class PosSalesTransSeniorCitizenDiscount(models.Model):
     amount_covered = models.DecimalField(max_digits=15, decimal_places=3, default=0.000)
 
     class Meta:
+        managed = False
         db_table = 'tbl_pos_sales_trans_senior_citizen_discount'
 
 class ProductCategorySetup(models.Model):
@@ -342,6 +404,7 @@ class ProductCategorySetup(models.Model):
 
     class Meta:
         db_table = 'tbl_product_category_setup'
+        managed = False
 
 class PosExtended(models.Model):
     autonum = models.AutoField(primary_key=True)
@@ -359,6 +422,7 @@ class PosExtended(models.Model):
 
     class Meta:
         db_table = 'tbl_pos_extended'
+        managed = False
 
 class PosClientSetup(models.Model):
     autonum = models.AutoField(primary_key=True)
@@ -376,6 +440,7 @@ class PosClientSetup(models.Model):
 
     class Meta:
         db_table = 'tbl_pos_client_setup'
+        managed = False
 
 class LeadSetup(models.Model):
     autonum = models.AutoField(primary_key=True)
@@ -391,6 +456,7 @@ class LeadSetup(models.Model):
 
     class Meta:
         db_table = 'tbl_lead_setup'
+        managed = False
 
 class Employee(models.Model):
     autonum = models.AutoField(primary_key=True)
@@ -436,6 +502,7 @@ class Employee(models.Model):
 
     class Meta:
         db_table = 'tbl_employee'
+        managed = False
 
 
 class RCCDetails(models.Model):
@@ -454,6 +521,7 @@ class RCCDetails(models.Model):
 
     class Meta:
         db_table = 'tbl_rcc_details'
+        managed = False
 
 
 class CCCDetails(models.Model):
@@ -467,6 +535,7 @@ class CCCDetails(models.Model):
 
     class Meta:
         db_table = 'tbl_ccc_details'
+        managed = False
 
 
 class PosPayor(models.Model):
@@ -481,6 +550,7 @@ class PosPayor(models.Model):
 
     class Meta:
         db_table = 'tbl_pos_payor'
+        managed = False
 
 class BankCompany(models.Model):
     autonum = models.AutoField(primary_key=True)
@@ -490,6 +560,7 @@ class BankCompany(models.Model):
 
     class Meta:
         db_table = 'tbl_bank_company'
+        managed = False
 
 
 class BankCard(models.Model):
@@ -500,6 +571,7 @@ class BankCard(models.Model):
 
     class Meta:
         db_table = 'tbl_bank_card'
+        managed = False
 
 class TSetup(models.Model):
     autonum = models.AutoField(primary_key=True)
@@ -519,6 +591,7 @@ class TSetup(models.Model):
 
     class Meta:
         db_table = 'tbl_setup'
+        managed = False
 
 class OtherAccount(models.Model):
     autonum = models.AutoField(primary_key=True)
@@ -540,6 +613,7 @@ class OtherAccount(models.Model):
 
     class Meta:
         db_table = 'tbl_other_acct'
+        managed = False
 
 class PosCashBreakdown(models.Model):
     login_record = models.IntegerField(default=0)
@@ -580,6 +654,7 @@ class SalesTransCreditCard(models.Model):
 
     class Meta:
         db_table = 'tbl_pos_sales_trans_creditcard'
+        managed = False
 
 
 class SalesTransEPS(models.Model):
@@ -660,8 +735,8 @@ class Customer(models.Model):
     group_name = models.CharField(max_length=150, default=' ')
     area_id = models.IntegerField(default=0)
     area_name = models.CharField(max_length=150, default=' ')
-    sub_area_id = models.IntegerField(default=0)
-    sub_area_name = models.CharField(max_length=150, default='')
+    # sub_area_id = models.IntegerField(default=0)
+    # sub_area_name = models.CharField(max_length=150, default='')
     office_name = models.CharField(max_length=150, default=' ')
     agent_id = models.IntegerField(default=0)
     agent_name = models.CharField(max_length=150, default=' ')
@@ -681,6 +756,7 @@ class Customer(models.Model):
     # sl_sub_category_description = models.CharField(max_length=50, default='')
     class Meta:
         db_table = 'tbl_customer'
+        managed = False
 
 class PosWaiterList(models.Model):
     autonum = models.AutoField(primary_key=True)
@@ -689,9 +765,10 @@ class PosWaiterList(models.Model):
 
     class Meta:
         db_table = 'tbl_pos_waiterlist'
+        managed = False
 
 class MainRefSlSupplier(models.Model):
-    id = models.AutoField(primary_key=True)
+    autonum = models.AutoField(primary_key=True)
     id_code = models.PositiveIntegerField(default=0)
     trade_name = models.CharField(max_length=150, default='')
     supplier_class = models.CharField(max_length=15, default=' ')
@@ -701,25 +778,26 @@ class MainRefSlSupplier(models.Model):
     business_phone_no = models.CharField(max_length=15, default=' ')
     mobile_no = models.CharField(max_length=15, default=' ')
     fax_no = models.CharField(max_length=15, default=' ')
-    address = models.CharField(max_length=150, default=' ')
-    city_municipality = models.CharField(max_length=150, default=' ')
-    province = models.CharField(max_length=150, default=' ')
-    zip_code = models.PositiveIntegerField(default=0)
-    trade = models.CharField(max_length=1, default='')
-    vat_registration_type = models.CharField(max_length=1, default='')
-    tax_id_no = models.CharField(max_length=25, default=' ')
-    active_status = models.CharField(max_length=1, default='Y')
-    group_id = models.PositiveIntegerField(default=0)
-    group_name = models.CharField(max_length=150, default=' ')
-    remarks = models.CharField(max_length=100, default=' ')
-    supplier_image = models.BinaryField(null=True, blank=True)
-    date_entered = models.DateField(default='1960-01-01')
-    ul_code = models.PositiveIntegerField(default=0)
-    sl_sub_category_id = models.PositiveIntegerField(default=0)
-    sl_sub_category_description = models.CharField(max_length=50, default='')
+    st_address = models.CharField(max_length=150, default=' ')
+    city_address = models.CharField(max_length=150, default=' ')
+    # province = models.CharField(max_length=150, default=' ')
+    # zip_code = models.PositiveIntegerField(default=0)
+    # trade = models.CharField(max_length=1, default='')
+    # vat_registration_type = models.CharField(max_length=1, default='')
+    # tax_id_no = models.CharField(max_length=25, default=' ')
+    active = models.CharField(max_length=1, default='Y')
+    # group_id = models.PositiveIntegerField(default=0)
+    # group_name = models.CharField(max_length=150, default=' ')
+    # remarks = models.CharField(max_length=100, default=' ')
+    # supplier_image = models.BinaryField(null=True, blank=True)
+    # date_entered = models.DateField(default='1960-01-01')
+    # ul_code = models.PositiveIntegerField(default=0)
+    # sl_sub_category_id = models.PositiveIntegerField(default=0)
+    # sl_sub_category_description = models.CharField(max_length=50, default='')
 
     class Meta:
-        db_table = 'tbl_main_ref_sl_supplier'
+        db_table = 'tbl_supplier'
+        managed = False
 
 class MainRefCustomer(models.Model):
     id = models.AutoField(primary_key=True)
@@ -732,32 +810,33 @@ class MainRefCustomer(models.Model):
     business_phone_no = models.CharField(max_length=15, default=' ')
     mobile_no = models.CharField(max_length=15, default=' ')
     fax_no = models.CharField(max_length=15, default=' ')
-    address = models.CharField(max_length=150, default=' ')
-    city_municipality = models.CharField(max_length=150, default=' ')
-    province = models.CharField(max_length=150, default=' ')
-    zip_code = models.IntegerField(default=0)
-    vat_registration_type = models.CharField(max_length=1, default='')
-    tax_id_no = models.CharField(max_length=25, default=' ')
-    active_status = models.CharField(max_length=1, default='Y')
-    group_id = models.IntegerField(default=0)
-    group_name = models.CharField(max_length=150, default=' ')
-    area_id = models.IntegerField(default=0)
-    area_name = models.CharField(max_length=150, default=' ')
-    agent_id = models.IntegerField(default=0)
-    agent_name = models.CharField(max_length=150, default=' ')
-    collector_id = models.IntegerField(default=0)
-    collector_name = models.CharField(max_length=150, default=' ')
-    kob_id = models.IntegerField(default=0)
-    kob_name = models.CharField(max_length=150, default=' ')
-    remarks = models.CharField(max_length=100, default=' ')
-    customer_image = models.BinaryField(null=True)
-    date_entered = models.DateField(default='1900-01-01')
-    ul_code = models.IntegerField(default=0)
-    sl_sub_category_id = models.IntegerField(default=0)
-    sl_sub_category_description = models.CharField(max_length=50, default='')
+    st_address = models.CharField(max_length=150, default=' ')
+    city_address = models.CharField(max_length=150, default=' ')
+    # province = models.CharField(max_length=150, default=' ')
+    # zip_code = models.IntegerField(default=0)
+    # vat_registration_type = models.CharField(max_length=1, default='')
+    # tax_id_no = models.CharField(max_length=25, default=' ')
+    active = models.CharField(max_length=1, default='Y')
+    # group_id = models.IntegerField(default=0)
+    # group_name = models.CharField(max_length=150, default=' ')
+    # area_id = models.IntegerField(default=0)
+    # area_name = models.CharField(max_length=150, default=' ')
+    # agent_id = models.IntegerField(default=0)
+    # agent_name = models.CharField(max_length=150, default=' ')
+    # collector_id = models.IntegerField(default=0)
+    # collector_name = models.CharField(max_length=150, default=' ')
+    # kob_id = models.IntegerField(default=0)
+    # kob_name = models.CharField(max_length=150, default=' ')
+    # remarks = models.CharField(max_length=100, default=' ')
+    # customer_image = models.BinaryField(null=True)
+    # date_entered = models.DateField(default='1900-01-01')
+    # ul_code = models.IntegerField(default=0)
+    # sl_sub_category_id = models.IntegerField(default=0)
+    # sl_sub_category_description = models.CharField(max_length=50, default='')
 
     class Meta:
-        db_table = 'tbl_main_ref_sl_customer'
+        db_table = 'tbl_customer'
+        managed = False
 
 class SeniorCitizenDiscount(models.Model):
     autonum = models.BigAutoField(primary_key=True)
@@ -790,7 +869,7 @@ class Product(models.Model):
     item_type = models.CharField(max_length=20, default='')
     category_id = models.IntegerField(default=0)
     category = models.CharField(max_length=150, default=' ')
-    principal_id = models.IntegerField(default=0)
+    principal_id = models.DecimalField(max_digits=21, decimal_places=9, default=0.000000000)
     principal = models.CharField(max_length=100, default=' ')
     brand = models.CharField(max_length=50, default=' ')
     model = models.CharField(max_length=50, default=' ')
@@ -842,6 +921,7 @@ class Product(models.Model):
 
     class Meta:
         db_table = 'tbl_product'
+        managed = False
 
 
 class PosRestTable(models.Model):
@@ -854,6 +934,7 @@ class PosRestTable(models.Model):
 
     class Meta:
         db_table = 'tbl_pos_rest_table'
+        managed = False
         
 class PosSalesOrder(models.Model):
     autonum = models.AutoField(primary_key=True)
@@ -877,29 +958,30 @@ class PosSalesOrder(models.Model):
     active = models.CharField(max_length=2, null=True, default=None)
 
     class Meta:
+        managed = False
         # Define primary key constraints
         db_table = 'tbl_pos_sales_order'
         unique_together = (('autonum', 'SO_no', 'document_no'),)
     
         
-class User(models.Model):
-    autonum = models.AutoField(primary_key=True)
-    id_code = models.PositiveSmallIntegerField(default=0)
-    fullname = models.CharField(max_length=40, default=' ')
-    department = models.CharField(max_length=30, default=' ')
-    user_name = models.CharField(max_length=30, default=' ')
-    password = models.CharField(max_length=100, default=' ')
-    user_rank = models.CharField(max_length=15, default=' ')
-    sys_type = models.CharField(max_length=5, default='')
-    mod_access = models.CharField(max_length=2000, default=' ')
-    acct_title = models.TextField()
-    active = models.CharField(max_length=1, default='Y')
-    emp_id = models.IntegerField(default=0)
+# class User(models.Model):
+#     autonum = models.AutoField(primary_key=True)
+#     id_code = models.PositiveSmallIntegerField(default=0)
+#     fullname = models.CharField(max_length=40, default=' ')
+#     department = models.CharField(max_length=30, default=' ')
+#     user_name = models.CharField(max_length=30, default=' ')
+#     password = models.CharField(max_length=100, default=' ')
+#     user_rank = models.CharField(max_length=15, default=' ')
+#     sys_type = models.CharField(max_length=5, default='')
+#     mod_access = models.CharField(max_length=2000, default=' ')
+#     acct_title = models.TextField()
+#     active = models.CharField(max_length=1, default='Y')
+#     emp_id = models.IntegerField(default=0)
 
-    class Meta:
-        db_table = 'tbl_user'  # Define the database table name
-        ordering = ['fullname']  # Define the default ordering of results
-        unique_together = [['user_name', 'department']]  # Define unique constraints
+#     class Meta:
+#         db_table = 'tbl_user'  # Define the database table name
+#         ordering = ['fullname']  # Define the default ordering of results
+#         unique_together = [['user_name', 'department']]  # Define unique constraints
 
 
 
@@ -917,6 +999,7 @@ class POS_Terminal(models.Model):
     ul_code = models.IntegerField(default=0)
     class Meta:
         db_table = 'tbl_pos_terminal'
+        managed = False
 
 
 class PosSalesTransDetails(models.Model):
@@ -963,6 +1046,7 @@ class InvRefNo(models.Model):
 
     class Meta:
         db_table = 'tbl_inv_ref_no' 
+        managed = False
 
 
 
@@ -1043,6 +1127,7 @@ class PosSalesInvoiceListing(models.Model):
 
     class Meta:
         db_table = 'tbl_pos_sales_invoice_listing'
+        managed = False
 
 
 class PosSalesInvoiceList(models.Model):
@@ -1114,6 +1199,7 @@ class PosSalesInvoiceList(models.Model):
 
     class Meta:
         db_table = 'tbl_pos_sales_invoice_list'
+        managed = False
 
 
 
@@ -1137,6 +1223,7 @@ class AcctSubsidiary(models.Model):
 
     class Meta:
         db_table = 'tbl_acct_subsidiary'
+        managed = False
 
 
 
@@ -1152,6 +1239,7 @@ class AcctList(models.Model):
 
     class Meta:
         db_table = 'tbl_acct_list'
+        managed = False
 
 
 class POSSettings(models.Model):
@@ -1244,6 +1332,7 @@ class POSSettings(models.Model):
 
     class Meta:
         db_table = 'tbl_pos_settings'
+        managed = False
 
 
 class SLCategory(models.Model):
@@ -1291,6 +1380,7 @@ class PosSuspendList(models.Model):
 
     class Meta:
         db_table = 'tbl_pos_suspend_list'
+        managed = False
 
 class PosSuspendListing(models.Model):
     autonum = models.BigAutoField(primary_key=True)
@@ -1306,6 +1396,7 @@ class PosSuspendListing(models.Model):
 
     class Meta:
         db_table = 'tbl_pos_suspend_listing'
+        managed = False
 
 
 class PosCashPullout(models.Model):
@@ -1403,6 +1494,7 @@ class POSSalesTransGiftCheck(models.Model):
 
     class Meta:
         db_table = 'tbl_pos_sales_trans_gift_check'
+        managed = False
 
 
 class POSSalesTransOnlinePayment(models.Model):
@@ -1425,6 +1517,7 @@ class POSSalesTransOnlinePayment(models.Model):
 
     class Meta:
         db_table = 'tbl_pos_sales_trans_online_payment'
+        managed = False
 
 class POSSalesTransOtherPayment(models.Model):
     autonum = models.BigAutoField(primary_key=True)
@@ -1439,9 +1532,11 @@ class POSSalesTransOtherPayment(models.Model):
     sl_name = models.CharField(max_length=225, default='')
     sl_type = models.CharField(max_length=2, default='')
     total_amount = models.DecimalField(max_digits=9, decimal_places=3, default=0.000)
+    remarks = models.CharField(max_length=225, default='')
 
     class Meta:
         db_table = 'tbl_pos_sales_trans_other_payment'
+        managed = False
 
 class POSGiftCheckDenomination(models.Model):
     autonum = models.BigAutoField(primary_key=True)
@@ -1450,6 +1545,7 @@ class POSGiftCheckDenomination(models.Model):
 
     class Meta:
         db_table = 'tbl_pos_gift_check_denomination'
+        managed = False
 
 class POSGiftCheckSeries(models.Model):
     autonum = models.BigAutoField(primary_key=True)
@@ -1465,5 +1561,18 @@ class POSGiftCheckSeries(models.Model):
 
     class Meta:
         db_table = 'tbl_pos_gift_check_series'
+        managed = False
 
+class PosOtherPmtSetup(models.Model):
+    autonum = models.BigAutoField(primary_key=True)
+    pmt_code = models.PositiveIntegerField(default=0)
+    pmt_desc = models.CharField(max_length=150, default=' ')
+    acct_code = models.DecimalField(max_digits=15, decimal_places=3, default=0.000)
+    acct_title = models.CharField(max_length=150, default=' ')
+    pmt_type = models.CharField(max_length=2, null=True, default=None)
+    remarks = models.CharField(max_length=1, default='N')
+
+    class Meta:
+        db_table = 'tbl_pos_other_pmt_setup'
+        managed = False
 

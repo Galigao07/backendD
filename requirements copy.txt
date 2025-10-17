@@ -1,0 +1,60 @@
+# Core Django
+Django==3.2.25
+
+# Channels for Django 3.x
+channels==3.0.5
+channels_redis==3.4.0
+
+# ASGI server
+daphne==3.0.2
+
+# Django utilities
+django-extensions==3.2.3
+django-cors-headers==3.13.0
+django-user-agents==0.4.0
+
+# REST Framework
+djangorestframework==3.14.0
+djangorestframework-simplejwt==5.3.1
+
+# Database
+# mysqlclient==2.2.7
+
+# Async support
+asgiref==3.8.1
+Twisted==22.10.0            # downgraded from 25.5.0 for Python 3.8 compatibility
+autobahn== 23.1.2          # compatible with Python 3.8
+txaio==23.1.1              # compatible with Python 3.8
+Automat==22.10.0            # compatible with Python 3.8
+cryptography==40.0.2        # latest version compatible with Python 3.8
+cffi==1.17.1
+greenlet==3.1.1
+gevent==24.2.1
+
+# Utilities
+pytz==2023.3
+python-dateutil==2.8.2
+requests==2.31.0
+six==1.16.0
+attrs==23.1.0
+charset-normalizer==3.1.0
+idna==3.4
+urllib3==2.0.4
+certifi==2023.7.22
+packaging==23.1
+pyjwt==2.9.0
+pyOpenSSL==23.2.0
+redis==5.0.0
+
+# Optional Windows-only packages
+# pywin32==311
+# pywinauto==0.6.9
+
+# Dev / Jupyter
+ipython==8.12.3
+ipykernel==6.28.0
+jupyter_client==8.3.0
+jupyter_core==5.3.0
+matplotlib-inline==0.1.6
+stack-data==0.6.2
+debugpy==1.8.17
