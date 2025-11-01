@@ -36,26 +36,37 @@ urlpatterns = [
 
     
     path('product/', get_product_data, name='get_product_data'),
+    path('product-per-price-type/', get_product_per_price_name, name='get_product_per_price_name'),
+    path('price-type-list/', get_price_type_list, name='get_price_type_list'),
     path('product/category/', get_productCategory_data, name='get_productCategory_data'),
     path('product-category/', product_list_by_category, name='product_list_by_category'),
     path('table/count/', table_list_view, name='table_list_view'),
     path('csrf-token/', get_csrf_token, name='get_csrf_token'),
     path('add-sales-order/',save_sales_order,name='save_sales_order'),
     path('sales-order-list/',get_sales_order_list,name = 'get_sales_order_list'),
+    path('print-bill/',PrintBill,name = 'PrintBill'),
     path('sales-order-listing/', get_sales_order_listing, name='get_sales_order_listing'),
     path('sales-order-list-cancelled/',get_sales_order_list_cancelled,name = 'get_sales_order_list_cancelled'),
     path('sales-order-listing-cancelled/', get_sales_order_listing_cancelled, name='get_sales_order_listing_cancelled'),
+    path('update-item-discount/', update_item_discount, name='update_item_discount'),
+    path('tmp-sc-discount/', tmp_sc_discount, name='tmp_sc_discount'),
+
+    
 
     path('order/view/', get_add_order_view, name='get_add_order_view'),
     path('save-cash-payment/', save_cash_payment, name='save_cash_payment'),
     path('customer-list/', get_customer_list, name='get_customer_list'),
     path('waiter-list/', get_waiter_list, name='get_waiter_list'),
     path('cancel-sales-order/', cancel_sales_order, name='cancel_sales_order'),
-    path('uncancel-sales-order/',    uncancelled_sales_order, name='uncancelled_sales_order'),
+    path('uncancel-sales-order/', uncancelled_sales_order, name='uncancelled_sales_order'),
+    path('void-so-listing/', void_so_listing, name='void_so_listing'),
+    path('void-so/',    void_so, name='void_so'),
+
+
 
     path('save-sales-order-payment/', save_sales_order_payment, name='save_sales_order_payment'),
     path('reprint-transaction/', get_reprint_transaction, name='get_reprint_transaction'),
-    path('reprint-transacion-receipt/', get_reprint_transaction_for_receipt, name='get_reprint_transaction_for_receipt'),
+
     path('company-details/', get_company_details, name='get_company_details'),
     path('que-list/', queing_list_view, name='queing_list_view'),
     path('extended-data/', pos_extended, name='pos_extended'),
@@ -83,6 +94,8 @@ urlpatterns = [
     path('cash-count-pdf/', download_pdf_cash_count, name='download_pdf'),
     path('sales-order-pdf/', download_sales_order_pdf, name='download_sales_order_pdf'),
     path('charge-receipt-pdf/', download_charge_receipt_pdf, name='download_charge_receipt_pdf'),
+    path('reprint-transacion-receipt/', get_reprint_transaction_for_receipt, name='get_reprint_transaction_for_receipt'),
+    path('reprint-receipt-pdf/', download_Reprint_pdf, name='download_Reprint_pdf'),
     path('check-que-no/', Check_Que_No, name='Check_Que_No'),
     path('validate-gift-check/', validate_gift_check, name='validate_gift_check'),
     path('dinomination/', get_denomination, name='get_denomination'),

@@ -36,8 +36,11 @@ from django.core.exceptions import ValidationError
 @permission_classes([IsAuthenticated])
 def get_employee_list(request):
     if request.method == 'GET':
-        name = request.GET.get('employee')
-        data = Employee.objects.filter(Q(last_name__icontains=name) | Q(first_name__icontains=name),active='Y').order_by('-autonum')
+        name = request.GET.get('employee','')
+        if name == '':
+            data = Employee.objects.filter(active='Y').order_by('-autonum')
+        else:
+            data = Employee.objects.filter(Q(last_name__icontains=name) | Q(first_name__icontains=name),active='Y').order_by('-autonum')
         
         EmployeeList = EmployeeSetupSerializer(data, many=True).data
         return JsonResponse({'EmployeeList': EmployeeList}, status=200)
@@ -51,7 +54,7 @@ def get_product_profile(request):
             if description== None:
                 product_list = Product.objects.all()
                 serialize = Product2Serializer(product_list,many=True)
-                print(serialize.data)
+
                 return Response(serialize.data)
             else:
                 product_list = Product.objects.filter(long_desc__icontains=description)
@@ -94,7 +97,7 @@ def add_user(request):
             password = received_data.get('password')
             rank = received_data.get('rank')
             hashed_password = make_password(password)
-            print(full_name,username,password,rank,received_data)
+
 
             if full_name and username and hashed_password and rank:
                 if User.objects.filter(user_name=username).exists():
@@ -177,7 +180,7 @@ def delete_user(request):
             username = user_data.get('username')
             password = user_data.get('password')
             rank = user_data.get('rank')
-            print(id_code,full_name,username,rank)
+
 
             if user_data:
                 try:
@@ -217,7 +220,6 @@ def add_waiter(request):
             existing_waiter = PosWaiterList.objects.filter(waiter_id=waiter_id).first()
             
             if existing_waiter:
-                print('Waiter ID already exists:', existing_waiter.waiter_id)
                 return JsonResponse({'message': 'Duplication is Not Allowed'}, status=500)
 
             else:
@@ -433,7 +435,7 @@ def UploadVideo(request):
             # Return absolute URL
             video_url = request.build_absolute_uri(settings.MEDIA_URL + filename)
 
-            print('Video uploaded to:', video_url)
+
             return Response({'message': 'Video uploaded successfully', 'url': video_url}, status=200)
 
         except Exception as e:
@@ -455,7 +457,6 @@ def UploadVideo(request):
             video_url = request.build_absolute_uri(settings.MEDIA_URL + video_record.filename)
             if video_url.startswith('http://'):
                 video_url = video_url.replace('http://', 'https://', 1)
-            print('Latest video URL:', video_url)
             return JsonResponse({'data': video_url})
 
         except Exception as e:
@@ -569,7 +570,6 @@ def terminal_setup(request):
     elif request.method == 'POST':
     
         received_data = json.loads(request.body)
-        print('received_data',received_data)
         autonum = received_data.get('autonum')
         ulcode = received_data.get('ulcode')
         terminalno = received_data.get('terminalno')
@@ -627,10 +627,10 @@ def lead_setup(request):
         return JsonResponse({'data': serializer}, status=200)
     
     elif request.method == 'POST':
-        print('sfsdfsdf')
+
         try:
             received_data = json.loads(request.body)
-            print('received_data',received_data)
+
             autonum = received_data.get('autonum')
             company_code = received_data.get('companycode')
             company_name = received_data.get('companyname')
@@ -687,9 +687,9 @@ def Client_setup(request):
         return JsonResponse({'data': serializer}, status=200)
     
     elif request.method == 'POST':
-        print('sfsdfsdf')
+
         received_data = json.loads(request.body)
-        print('received_data',received_data)
+
 
         autonum = received_data.get('autonum')
         company_code = received_data.get('companycode')
@@ -782,22 +782,19 @@ def CustomerDetails(request):
                     fax_no = data['Fax'],
                     st_address = data['Address'],
                     city_address = data['City'],
-                    # address = data['Address'],
-                    # city_municipality = data['City'],
-                    province = data['Province'],
                     zip_code = data['ZipCode'],
                     vat = data['Vat'],
-                                    # vat_registration_type = data['Vat'],
                     tax_id_no = data['Tax'],
                     group_name = data['Group'],
                     area_name = data['Area'],
                     agent_name = data['Agent'],
                     collector_name = data['Collector'],
                     kob_name = data['KOB'],
-                    # sl_sub_category_description = data['sl'],
                     remarks = data['Remarks'],
-                    customer_image = image,
                 )
+                if base64_image:
+                    SaveCustomer.customer_image = image
+
                 SaveCustomer.save()
                 return Response({'mesage':'Customer Successfully Added'})
             except Exception as e:
@@ -847,7 +844,7 @@ def CustomerSearchResults(request):
             trade_name = request.GET.get('trade_name', '')        
             latest_customers = Customer.objects.filter(trade_name__icontains=trade_name)
             serializer = CustomerSerializer(latest_customers, many=True)  # Use many=True for multiple instances
-            print(serializer.data)
+
             return JsonResponse({'customersSearch': serializer.data})
         elif request.method =='DELETE':
             id_code = request.GET.get('id_code', '')   
@@ -855,96 +852,92 @@ def CustomerSearchResults(request):
             return Response({'message': 'Location Successfully Deleted'})
 ####* **************************** Supplier Details *******************************
         
+
 class SupplierDetails(APIView):
-    def get(self,request,args,*kwargs):    
-        return Response('OK')
-    # def get(self, request, args, *kw):
-    #     trade_name = request.GET.get('trade_name', '')
-    #     if trade_name == '':
-    #         all_customers = MainRefSlSupplier.objects.all()
-    #         latest_customer = MainRefSlSupplier.objects.order_by('-id_code').first()
-    #         serializer_all_customers = MainRefSLSupplierSerializer(all_customers, many=True)
-    #         serializer_latest_customer = MainRefSLSupplierSerializer(latest_customer)
-    #         response_data = {
-    #             'all_customers': serializer_all_customers.data,
-    #             'latest_customer': serializer_latest_customer.data
-    #         }
-    #         return Response(response_data)
-    #     else:
-    #         customers = MainRefCustomer.objects.filter(trade_name__contains=trade_name).values('id_code', 'trade_name')
-    #         return JsonResponse(list(customers), safe=False)
-    # def post(self,request, args, *kw):
-    #     data = self.request.data
-        
-    #     base64_image = data.get('supplier_image')
-    #     if base64_image:
-    #         image = base64.b64decode(base64_image.split(',')[1])
+    permission_classes = [IsAuthenticated]
+    def get(self, request):
+        trade_name = request.GET.get('trade_name', '')
+        if trade_name == '':
+            all_customers = Supplier.objects.all()
+            latest_customer = Supplier.objects.order_by('-id_code').first()
+            serializer_all_customers = SupplierSerializer(all_customers, many=True)
+            serializer_latest_customer = SupplierSerializer(latest_customer)
+            response_data = {
+                'all_customers': serializer_all_customers.data,
+                'latest_customer': serializer_latest_customer.data
+            }
+            return Response(response_data)
+        else:
+            customers = MainRefCustomer.objects.filter(trade_name__contains=trade_name).values('id_code', 'trade_name')
+            return JsonResponse(list(customers), safe=False)
+    def post(self,request):
+        data = request.data
+        base64_image = data.get('supplier_image')
+        if base64_image:
+            image = base64.b64decode(base64_image.split(',')[1])
           
-    #     SaveCustomer = MainRefSlSupplier(
-    #         id_code = data['ID_Code'],
-    #         trade_name = data['Tradename'],
-    #         last_name = data['Lname'],
-    #         first_name = data['Fname'],
-    #         middle_name = data['MI'],
-    #         business_phone_no = data['Phone'],
-    #         mobile_no = data['Mobile'],
-    #         fax_no = data['Fax'],
-    #         address = data['Address'],
-    #         city_municipality = data['City'],
-    #         province = data['Province'],
-    #         zip_code = data['ZipCode'],
-    #         vat_registration_type = data['Vat'],
-    #         tax_id_no = data['Tax'],
-    #         group_name = data['Group'],
-    #         # area_name = data['Area'],
-    #         # agent_name = data['Agent'],
-    #         # collector_name = data['Collector'],
-    #         # kob_name = data['KOB'],
-    #         sl_sub_category_description = data['sl'],
-    #         remarks = data['Remarks'],
-    #         supplier_image = image,
-    #     )
-    #     SaveCustomer.save()
-    #     return Response({'mesage':'Customer Successfully Added'})
+        SaveCustomer = Supplier(
+            id_code = data['ID_Code'],
+            trade_name = data['Tradename'],
+            last_name = data['Lname'],
+            first_name = data['Fname'],
+            middle_name = data['MI'],
+            business_phone_no = data['Phone'],
+            mobile_no = data['Mobile'],
+            fax_no = data['Fax'],
+            st_address = data['Address'],
+            city_address = data['City'],
+            zip_code = data['ZipCode'],
+            tax_id_no = data['Tax'],
+            group_name = data['Group'],
+            remarks = data['Remarks'],
+            
+        )
+        if base64_image:
+            SaveCustomer.supplier_image = image
+        SaveCustomer.save()
+        return Response({'mesage':'Customer Successfully Added'})
     
-    # def put(self, request, args, *kwargs):
-    #     data = request.data
-    #     try:
-    #         cutomerDetails = MainRefSlSupplier.objects.get(id_code=data['ID_Code'])
-    #         cutomerDetails.id_code = data.get('ID_Code', cutomerDetails.id_code)
-    #         cutomerDetails.trade_name = data.get('Tradename', cutomerDetails.trade_name)
-    #         cutomerDetails.last_name = data.get('Lname', cutomerDetails.last_name)
-    #         cutomerDetails.first_name = data.get('Fname', cutomerDetails.first_name)
-    #         cutomerDetails.middle_name = data.get('MI', cutomerDetails.middle_name)
-    #         cutomerDetails.business_phone_no = data.get('Phone', cutomerDetails.business_phone_no)
-    #         cutomerDetails.mobile_no = data.get('Mobile', cutomerDetails.mobile_no)
-    #         cutomerDetails.fax_no = data.get('Fax', cutomerDetails.fax_no)
-    #         cutomerDetails.address = data.get('Address', cutomerDetails.address)
-    #         cutomerDetails.city_municipality = data.get('City', cutomerDetails.city_municipality)
-    #         cutomerDetails.province = data.get('Province', cutomerDetails.province)
-    #         cutomerDetails.zip_code = data.get('ZipCode', cutomerDetails.zip_code)
-    #         cutomerDetails.vat_registration_type = data.get('Vat', cutomerDetails.vat_registration_type)
-    #         cutomerDetails.tax_id_no = data.get('Tax', cutomerDetails.tax_id_no)
-    #         cutomerDetails.active_status = data.get('Status', cutomerDetails.active_status)
-    #         cutomerDetails.group_name = data.get('Group', cutomerDetails.group_name)
-    #         # cutomerDetails.area_name = data.get('Area', cutomerDetails.area_name)
-    #         # cutomerDetails.agent_name = data.get('Agent', cutomerDetails.agent_name)
-    #         # cutomerDetails.collector_name = data.get('Collector', cutomerDetails.collector_name)
-    #         # cutomerDetails.kob_name = data.get('KOB', cutomerDetails.kob_name)
-    #         cutomerDetails.sl_sub_category_description = data.get('sl', cutomerDetails.sl_sub_category_description)
-    #         cutomerDetails.remarks = data.get('Remarks', cutomerDetails.remarks)
-    #         base64_image = data.get('image')
+    def put(self, request, args, *kwargs):
+        data = request.data
+        try:
+            cutomerDetails = Supplier.objects.get(id_code=data['ID_Code'])
+            cutomerDetails.id_code = data.get('ID_Code', cutomerDetails.id_code)
+            cutomerDetails.trade_name = data.get('Tradename', cutomerDetails.trade_name)
+            cutomerDetails.last_name = data.get('Lname', cutomerDetails.last_name)
+            cutomerDetails.first_name = data.get('Fname', cutomerDetails.first_name)
+            cutomerDetails.middle_name = data.get('MI', cutomerDetails.middle_name)
+            cutomerDetails.business_phone_no = data.get('Phone', cutomerDetails.business_phone_no)
+            cutomerDetails.mobile_no = data.get('Mobile', cutomerDetails.mobile_no)
+            cutomerDetails.fax_no = data.get('Fax', cutomerDetails.fax_no)
+            cutomerDetails.st_address = data.get('Address', cutomerDetails.st_address)
+            cutomerDetails.zip_code = data.get('ZipCode', cutomerDetails.zip_code)
+            cutomerDetails.tax_id_no = data.get('Tax', cutomerDetails.tax_id_no)
+            cutomerDetails.active = data.get('Status', cutomerDetails.active)
+            cutomerDetails.group_name = data.get('Group', cutomerDetails.group_name)
+            cutomerDetails.remarks = data.get('Remarks', cutomerDetails.remarks)
+            base64_image = data.get('image')
 
-    #         if base64_image:
-    #             image = base64.b64decode(base64_image.split(',')[1])
-    #             cutomerDetails.supplier_image = image
-    #         cutomerDetails.save()
+            if base64_image:
+                image = base64.b64decode(base64_image.split(',')[1])
+                cutomerDetails.supplier_image = image
+            cutomerDetails.save()
 
-    #         return Response({"message": "UnitLocation updated successfully"}, status=status.HTTP_200_OK)
-    #     except UnitLocation.DoesNotExist:
-    #         return Response({"error": "UnitLocation not found"}, status=status.HTTP_404_NOT_FOUND)
-    #     except Exception as e:
-    #         return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response({"message": "UnitLocation updated successfully"}, status=status.HTTP_200_OK)
+        except UnitLocation.DoesNotExist:
+            return Response({"error": "UnitLocation not found"}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    def delete(self, request):
+        try:
+            id_code = request.GET.get('id_code', '')   
+            Supplier.objects.filter(id_code=id_code).delete()
+            return Response({'message': 'Location Successfully Deleted'})
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
+
+    
 
 
 ####* **************************** Get Cashiers Login For the Day ****************************
@@ -954,11 +947,7 @@ def get_cahiers_login(request):
     if request.method == 'GET':
         DateFrom = request.query_params.get("DateFrom")
         DateTo = request.query_params.get("DateTo")
-        # filterDate = json.loads(request.body)
-        print(DateFrom,DateTo)
-        # pdb.set_trace()
-        # dateFrom = filterDate.GET.get('DateFrom')  # Corrected typo in ".Get"
-        # dateTo = filterDate.GET.get('DateTo') 
+
         current_date_ph = GetPHilippineDate()
         if DateFrom and DateTo:
             data = PosCashiersLogin.objects.filter(date_stamp__range=[DateFrom, DateTo], isshift_end='YES', islogout='YES',isxread='NO')
@@ -968,7 +957,7 @@ def get_cahiers_login(request):
                     reviewed = 'NO'  # Default value
                     login_record = '0'
                     login_record = item.trans_id
-                    # print(item.trans_id)
+
                     cash_breakdown_data = PosCashBreakdown.objects.filter(login_record=item.trans_id)
 
                     if cash_breakdown_data.exists():
@@ -985,7 +974,7 @@ def get_cahiers_login(request):
                             'login_record':login_record
                             }
                     list_data.append(cashiers_data)
-                print(list_data)
+
                 return Response(list_data)
             else: 
                 return JsonResponse({'message':'No Data Found'})
@@ -1020,18 +1009,17 @@ def get_cash_count_cash_breakdown(request):
         # pdb.set_trace()
         login_record = request.query_params.get('login_record')
         # DateFrom = request.query_params.get("DateFrom")
-        print('login_record',login_record)
+
         cashBreakdown = PosCashBreakdown.objects.filter(login_record=login_record)
         serialize = PosCashBreakdownSerializer(cashBreakdown,many=True)
-        print(cashBreakdown)
-        print(serialize.data)
+
         return Response(serialize.data)
     elif request.method == 'POST':
         # pdb.set_trace()
         data_recieve = json.loads(request.body)
         login_record = data_recieve.get('login_record')
         UserID = data_recieve.get('UserID')
-        print('login_record',login_record)
+
 
         data = data_recieve.get('data')
         dinomination = data.get('dinomination')
@@ -1084,11 +1072,7 @@ def get_cahiers_login_for_xread(request):
     if request.method == 'GET':
         DateFrom = request.query_params.get("DateFrom")
         DateTo = request.query_params.get("DateTo")
-        # filterDate = json.loads(request.body)
-        print(DateFrom,DateTo)
-        # pdb.set_trace()
-        # dateFrom = filterDate.GET.get('DateFrom')  # Corrected typo in ".Get"
-        # dateTo = filterDate.GET.get('DateTo') 
+ 
         current_date_ph = GetPHilippineDate()
         if DateFrom and DateTo:
             data = PosCashiersLogin.objects.filter(date_stamp__range=[DateFrom, DateTo], isshift_end='YES',islogout='YES',isxread='NO')
@@ -1214,7 +1198,7 @@ def product_printer_category(request):
             data_receiver = json.loads(request.body)
 
             data_receive = data_receiver.get('data')
-            print(data_receive)
+
             prod_code = data_receive.get('prod_code')
             prod_desc = data_receive.get('prod_desc')
             printer_name = data_receive.get('printer_name')
@@ -1247,7 +1231,7 @@ def product_printer_category(request):
     elif request.method == 'DELETE':
         try:
             prod_code = request.GET.get('prod_code')
-            print(prod_code)
+     
             POSProductPrinter.objects.filter(prod_code=prod_code).delete()
             return Response('Success')
 
@@ -1257,6 +1241,7 @@ def product_printer_category(request):
 
 
 @api_view(['GET'])
+@permission_classes([IsAuthenticated])
 def printer_list(request):
     if request.method == 'GET':
         try:
@@ -1271,12 +1256,10 @@ def printer_list(request):
                             list = {
                                 "printer_name":match.group(1).lstrip()
                             }
-                            print(printername)
                         else:
                             list = {
                                 "printer_name":printername.lstrip()
                             }
-                            print(printername)
                         list_data.append(list)
                         break
             return Response(list_data,status=200)
@@ -1404,7 +1387,6 @@ def Gift_Check_series(request):
         try:
             # data_receiver = json.loads(request.body)
             trans_no = request.GET.get('trans_no')
-            print(trans_no)
             POSGiftCheckSeries.objects.filter(trans_no=trans_no).delete()
             return Response('Success')
 
@@ -1439,7 +1421,7 @@ def Gift_Check_Denomination(request):
   
 
             check_data = POSGiftCheckDenomination.objects.filter(code=code).first()
-            print(check_data)
+
             if check_data:
                 check_data.code = code
                 check_data.denomination_amount = denomination
@@ -1458,9 +1440,9 @@ def Gift_Check_Denomination(request):
             traceback.print_exc()
     elif request.method == 'DELETE':
         try:
-            print(request.GET)
+
             code = request.GET.get('code','0')
-            print('code',code)
+
             POSGiftCheckDenomination.objects.filter(code=code).delete()
             return Response('Success')
 

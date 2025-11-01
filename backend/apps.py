@@ -9,6 +9,7 @@ class BackendConfig(AppConfig):
         self.add_columns_if_not_exist()
         self.add_user_columns_if_not_exist()
         self.create_unmanaged_tables()
+        self.add_tbl_product_site_setup_columns_if_not_exist()
         # import backend.signals
 
     def add_columns_if_not_exist(self):
@@ -88,6 +89,43 @@ class BackendConfig(AppConfig):
                 except Exception as e:
                     print(f"⚠️ Error adding column '{col_name}': {e}")
 
+    def add_tbl_product_site_setup_columns_if_not_exist(self):
+        columns_to_add = [
+                ("sys_type", "VARCHAR(150)", "''"),
+                
+            ]
+
+        with connection.cursor() as cursor:
+                for col_name, col_type, default_value in columns_to_add:
+                    try:
+                        # ✅ MySQL schema-aware column check
+                        cursor.execute(f"""
+                            SELECT column_name
+                            FROM information_schema.columns
+                            WHERE table_schema = DATABASE()
+                            AND table_name = 'tbl_product_site_setup'
+                            AND column_name = '{col_name}';
+                        """)
+                        exists = cursor.fetchone()
+
+                        if not exists:
+                            # ✅ Handle columns with NULL default
+                            if default_value is None:
+                                default_sql = ""
+                            else:
+                                default_sql = f"DEFAULT {default_value}"
+
+                            cursor.execute(f"""
+                                ALTER TABLE tbl_product_site_setup
+                                ADD COLUMN {col_name} {col_type} {default_sql};
+                            """)
+                            print(f"✅ Added column '{col_name}' to tbl_product_site_setup.")
+                        else:
+                            print(f"ℹ️ Column '{col_name}' already exists in tbl_product_site_setup.")
+                    except Exception as e:
+                        print(f"⚠️ Error adding column '{col_name}': {e}")
+
+
     def create_unmanaged_tables(self):
         tables = {
             "tbl_pos_client_setup": """
@@ -119,7 +157,38 @@ class BackendConfig(AppConfig):
                     date_issued VARCHAR(50) DEFAULT '',
                     date_valid VARCHAR(50) DEFAULT ''
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-            """
+            """,    
+              "tmp_tbl_pos_web_sc_discount_list": """
+            CREATE TABLE IF NOT EXISTS tmp_tbl_pos_web_sc_discount_list (
+            id BIGINT(20) NOT NULL AUTO_INCREMENT,
+            terminal_no BIGINT(11) DEFAULT 0,
+            site_no BIGINT(11) DEFAULT 0,
+            so_no BIGINT(11) DEFAULT 0,
+            cashier_id BIGINT(11) DEFAULT 0,
+            SeniorCount BIGINT(11) DEFAULT 0,
+            SGuestCount BIGINT(11) DEFAULT 0,
+            SAmountCovered DOUBLE(9,3) DEFAULT 0.000,
+            SVatSales DOUBLE(9,3) DEFAULT 0.000,
+            SLessVat12 DOUBLE(9,3) DEFAULT 0.000,
+            SNetOfVat DOUBLE(9,3) DEFAULT 0.000,
+            SLess20SCDiscount DOUBLE(9,3) DEFAULT 0.000,
+            SDiscountedPrice DOUBLE(9,3) DEFAULT 0.000,
+            PRIMARY KEY (id)
+            ) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4;
+            """,
+                "tmp_tbl_pos_web_sc_discount_listing": """
+                CREATE TABLE IF NOT EXISTS tmp_tbl_pos_web_sc_discount_listing (
+                id BIGINT(20) NOT NULL AUTO_INCREMENT,
+                terminal_no BIGINT(11) DEFAULT 0,
+                site_no BIGINT(11) DEFAULT 0,
+                cashier_id BIGINT(11) DEFAULT 0,
+                so_no BIGINT(11) DEFAULT 0,
+                SID BIGINT(11) DEFAULT 0,
+                SNAME VARCHAR(225) DEFAULT '',
+                STIN VARCHAR(225) DEFAULT '',
+                PRIMARY KEY (id)
+                ) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4;
+                """
         }
 
         with connection.cursor() as cursor:

@@ -1,0 +1,112 @@
+🧾 start_all.sh
+#!/bin/bash
+# ===============================================
+# AUTO START DJANGO DEV + DAPHNE + REDIS + NGINX
+# Auto-detects virtual environment, runs both HTTP and ASGI
+# ===============================================
+
+set -e
+
+# --- CONFIGURATION ---
+PROJECT_DIR="/mnt/d/LSI Web/POS/backendD"     # Django project path
+DEV_PORT=8000                                  # Django dev server port
+DAPHNE_PORT=8001                            # Daphne ASGI server port
+LOG_FILE="$PROJECT_DIR/django_runserver.log"
+DAPHNE_LOG="$PROJECT_DIR/daphne.log"
+# ----------------------------------------------
+
+#!/bin/bash
+PASSWORD="yourpassword"
+
+echo "🚀 Starting Redis..."
+wsl bash -c "echo $PASSWORD | sudo -S service redis-server start || true"
+
+echo "🌐 Starting NGINX..."
+wsl bash -c "echo $PASSWORD | sudo -S service nginx start || true"
+
+
+
+echo "🔍 Detecting Python virtual environment..."
+cd "$PROJECT_DIR"
+
+# Try to detect venv folder automatically
+if [ -d "venv" ]; then
+    VENV_PATH="venv"
+elif [ -d ".venv" ]; then
+    VENV_PATH=".venv"
+elif [ -d "env" ]; then
+    VENV_PATH="env"
+else
+    FOUND_VENV=$(find "$PROJECT_DIR" -maxdepth 2 -type d -name "venv" -o -name ".venv" -o -name "env" | head -n 1)
+    if [ -n "$FOUND_VENV" ]; then
+        VENV_PATH="$FOUND_VENV"
+    else
+        echo "❌ No virtual environment found! Please create one (python -m venv venv)"
+        exit 1
+    fi
+fi
+
+echo "✅ Virtual environment found at: $VENV_PATH"
+source "$VENV_PATH/bin/activate"
+
+# --- Kill existing processes ---
+for PORT in $DEV_PORT $DAPHNE_PORT; do
+    PID=$(lsof -ti:$PORT)
+    if [ -n "$PID" ]; then
+        echo "⚠️  Stopping existing process on port $PORT (PID: $PID)..."
+        kill -9 $PID || true
+    fi
+done
+
+# --- Start Django dev server ---
+echo "🐍 Starting Django dev server on port $DEV_PORT..."
+nohup python manage.py runserver 0.0.0.0:$DEV_PORT > "$LOG_FILE" 2>&1 &
+
+# --- Start Daphne ASGI server ---
+echo "🌀 Starting Daphne ASGI server on port $DAPHNE_PORT..."
+nohup daphne -b 0.0.0.0 -p $DAPHNE_PORT backendD.asgi:application > "$DAPHNE_LOG" 2>&1 &
+
+# --- Verification ---
+sleep 2
+for PORT in $DEV_PORT $DAPHNE_PORT; do
+    if lsof -i:$PORT >/dev/null; then
+        echo "✅ Service running on port $PORT"
+    else
+        echo "❌ Failed to start service on port $PORT"
+    fi
+done
+
+echo "✅ All services started successfully!"
+echo "-----------------------------------"
+echo "🔹 Django dev server: http://localhost:$DEV_PORT"
+echo "🔹 Daphne ASGI server: http://localhost:$DAPHNE_PORT"
+echo "🔹 Redis: running on port 6379"
+echo "🔹 NGINX: running on port 80"
+echo "-----------------------------------"
+
+⚙️ Steps to Use
+
+Save the file in WSL home:
+
+nano ~/start_all.sh
+
+
+Make it executable:
+
+chmod +x ~/start_all.sh
+
+
+Test manually:
+
+bash ~/start_all.sh
+
+
+Check logs:
+
+tail -f /mnt/d/LSI\ Web/POS/backendD/django_runserver.log
+tail -f /mnt/d/LSI\ Web/POS/backendD/daphne.log
+
+
+For Windows startup, create a Task Scheduler task as before pointing to:
+
+-d Ubuntu -u root bash /home/yourusername/start_all.sh

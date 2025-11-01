@@ -335,7 +335,10 @@ class PosOtherPmtSetupPaymentSerializer(serializers.ModelSerializer):
 
         return acct_sub.sl_type if acct_sub else None
 
-
+class SupplierSerializer(serializers.ModelSerializer):
+    class Meta:
+        model =  Supplier
+        fields = '__all__'
 
 
 

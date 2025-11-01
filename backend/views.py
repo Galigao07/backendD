@@ -325,9 +325,15 @@ def PDFSalesOrderaLL(data,SO,TableNo,QueNo,GuestCount,Customer,order_type,cashie
             quantity = json.dumps(item['quantity'], ensure_ascii=False)
             description = description.replace('"', '')  # Remove double quotes
             total_qty = total_qty + int(item['quantity'])
-            c.setFont("Helvetica", 12)
+            c.setFont("Helvetica", 10)
             c.setFillColor(colors.black)
-            quantity_str = str(quantity).ljust(3)  
+            quantity_str = str(quantity).replace('"', '').strip()
+            quantity_str = float(quantity_str)
+            #check if decimal part > 0
+            if quantity_str % 1 > 0:
+                quantity_str = float(quantity_str)
+            else:
+                quantity_str = int(quantity_str)
             text_to_draw = f"{quantity_str} {description}"
 
             wrapped_description = textwrap.wrap(description, width=25)
@@ -339,6 +345,7 @@ def PDFSalesOrderaLL(data,SO,TableNo,QueNo,GuestCount,Customer,order_type,cashie
 
                 # Draw the rest of the wrapped lines without quantity
             for line in wrapped_description[1:]:
+                quantity_str = str(quantity).ljust(3) 
                 text_to_draw = f"{' ' * len(quantity_str)} {line}"
                 c.drawString(10 * mm, y_position, text_to_draw)
                 y_position -= line_height
@@ -348,11 +355,12 @@ def PDFSalesOrderaLL(data,SO,TableNo,QueNo,GuestCount,Customer,order_type,cashie
         y_position -= line_height
         c.drawString(10 * mm, y_position,'Items:' + str(total_qty))
         y_position -= line_height
+        c.setFont("Helvetica", 8.5)
         c.drawString(10 * mm, y_position,'Cashier:' + Cashier_Name)
         c.drawString(10 * mm, y_position,'' )
 
         # Save the PDF
-        print('already save pdf')
+        print('already save pdf sales order')
         c.save()
         # print_pdf_to_printer(PrinterName,'SalesOrder.pdf')
     except Exception as e:
@@ -580,17 +588,27 @@ def PDFReceipt(request,doc_no,doc_type,cusData):
             is_gift_check_payment = False
             is_online_payment = False
             is_other_payment = False
+            Service_Charge = 0
+            total_sc_discount = 0
+            total_item_discount = 0
+            total_trade_discount = 0
+            total_transaction_discount = 0
+            total_pwd_discount = 0
+            total_athlete_discount = 0
             
 
 
 
             serial_number = getattr(request, "SERIALNO", None)
-            machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number.strip()).first()
+            machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number).first()
+            print('receipt serial',serial_number)
             
 
             # GET DATA IN SALES INVOICE LIST
-            data_list = PosSalesInvoiceList.objects.filter(doc_no=doc_no,doc_type=doc_type).first()
+            data_list = PosSalesInvoiceList.objects.filter(doc_no=doc_no,doc_type=doc_type,terminal_no=machineInfo.terminal_no
+                                                           ,site_code =machineInfo.site_no).first()
             if data_list:
+                Service_Charge = data_list.ServiceCharge_TotalAmount
                 if data_list.discount_type == 'IM':
                     Item_Dicount = True
                 elif data_list.discount_type == 'SC':
@@ -621,18 +639,23 @@ def PDFReceipt(request,doc_no,doc_type,cusData):
                 #     data_tmp.
 
             # GET DATA IN SALES INVOICE LISTING
-            data_listing = PosSalesInvoiceListing.objects.filter(doc_no=doc_no,doc_type=doc_type)
+            data_listing = PosSalesInvoiceListing.objects.filter(doc_no=doc_no,doc_type=doc_type,terminal_no=machineInfo.terminal_no
+                                                           ,site_code =machineInfo.site_no)
             if data_listing:
                 data = PosSalesInvoiceListingSerializer(data_listing,many=True).data
 
             # GET DATA IN TABLE POS SALES TRANS
-            pos_sales_trans = PosSalesTrans.objects.filter(sales_trans_id=int(float(doc_no)),document_type='SI').first()
+            pos_sales_trans = PosSalesTrans.objects.filter(sales_trans_id=int(float(doc_no)),document_type='SI',terminal_no=machineInfo.terminal_no
+                                                           ,site_code = int(machineInfo.site_no)).first()
+            
             if pos_sales_trans:
                 Amount_Tendered = pos_sales_trans.amount_tendered
+                print('amount tendered',Amount_Tendered)
                 Cashier_ID = pos_sales_trans.cashier_id
                 # cash_payment = Amount_Tendered
                 # pos_sales_trans_data = PosSalesTransSerializer(pos_sales_trans,many=True).data
-
+            else:
+                print('No amount Tendered')
             companyCode = getCompanyData()
             clientSetup = getClientSetup()
 
@@ -806,7 +829,7 @@ def PDFReceipt(request,doc_no,doc_type,cusData):
                         Total_due -= float(discount_amount)
                         y_position -= line_height
 
-
+            
             c.line(x_start, y_position, x_end, y_position)
             y_position -= line_height_dash
             c.line(x_start, y_position, x_end, y_position)
@@ -816,49 +839,135 @@ def PDFReceipt(request,doc_no,doc_type,cusData):
             c.drawRightString(width - margin_right, y_position, f'{float(Total_due):,.2f}')
             y_position -= line_height
 
+            # #*********** Service Charge *************
+            # if Service_Charge != 0:
+            #     Total_due += float(Service_Charge)
             #*********** Senior Discount *************
             if SC_Dicount == True:
                 Less_Vat = 0
                 Net_of_vat = 0
                 Less_Discount = 0
                 Amount_covered = 0
-
+                # Get all SC amounts for this transaction
                 SC_Covered = PosSalesTransSeniorCitizenDiscount.objects.filter(sales_trans_id=int(float(doc_no)),)
-
+                SCGuestCount = 0
                 if SC_Covered:
                     for amount in SC_Covered:
-                        Amount_covered +=  float(str(amount.amount_covered).replace(',',''))
+                        Amount_covered =  float(str(amount.amount_covered).replace(',',''))
+                        SCGuestCount = 1 + SCGuestCount
+                print('Amount_covered',Amount_covered)
+                # Compute SC + VAT
+                result = compute_total_due(
+                    Total_due=Total_due,
+                    Amount_covered=Amount_covered,
+                    SCGuestCount=SCGuestCount,
+                    GuestCount=GuestCount
+                )
+
+                x = Total_due / GuestCount
+
+                if GuestCount != SCGuestCount:
+                    vatable_val = float(x) * float(GuestCount - SCGuestCount)
+                    
+                    vatable_val = (vatable_val / 1.12) / SCGuestCount
+                else:
+                    vatable_val = 0
+                    
+                    vatable_val = 0
 
 
-                Less_Vat = (Amount_covered / 1.12) * 0.12
-                Net_of_vat = float(str(Total_due).replace(',','')) - Less_Vat
-                Less_Discount =(Amount_covered / 1.12) * 0.20
-                data_for_vatable = float(str(Total_due).replace(',','')) - Amount_covered
-                Total_due = float(str(Total_due).replace(',','')) - (Less_Discount + Less_Vat)
-
-                vatable = (data_for_vatable / 1.12)
-                vat_exempt = (Amount_covered - (Less_Vat + Less_Discount))
-                vat = (vatable * .12)
-
+                # Extract numeric values
+                Less_Vat_val = result["Less_Vat"]
+                Net_of_vat_val = result["Net_of_vat"]
+                Less_Discount_val = result["Less_Discount"]
+                vat_exempt_val = result["total_vat_exempt"]
+                vat_val = result["total_vat"]        # this is the VAT amount (12%)
+                SC_Total_due_val = result["total_due"]
+                total_sc_discount_val = result["total_sc_discount"]
+                # Create formatted strings for printing
+                Less_Vat = Less_Vat_val
+                Net_of_vat = Net_of_vat_val
+                Less_Discount = Less_Discount_val
+                vat_exempt = vat_exempt_val
+                vatable = vatable_val
+                vat = vat_val
+                SC_Total_due = SC_Total_due_val
+                total_sc_discount = total_sc_discount_val
+                
+               
+                # Print values
+                y_position -= line_height
+                c.drawString(10 * mm, y_position, f'Less 20% VAT: {Amount_covered}')
+                c.drawRightString(width - margin_right, y_position, f'{result["Less_Vat"]:,.2f}')
 
                 y_position -= line_height
-                c.drawString(10 * mm, y_position,'Less 20% VAT:' + f'{Amount_covered}')
-                c.drawRightString(width - margin_right, y_position, f'{float(Less_Vat):,.2f}')
+                c.drawString(10 * mm, y_position, 'Net of VAT:')
+                c.drawRightString(width - margin_right, y_position, f'{result["Net_of_vat"]:,.2f}')
 
                 y_position -= line_height
-                c.drawString(10 * mm, y_position,'Net of VAT:')
-                c.drawRightString(width - margin_right, y_position, f'{float(Net_of_vat):,.2f}')
+                c.drawString(10 * mm, y_position, 'Less 20% Discount:')
+                c.drawRightString(width - margin_right, y_position, f'{result["Less_Discount"]:,.2f}')
+                y_position -= line_height
+                # y_position -= line_height
+                # c.drawString(10 * mm, y_position, 'TOTAL DUE:')
+                # c.drawRightString(width - margin_right, y_position, f'{result["total_due"]:,.2f}')
+                # y_position -= line_height
 
-                y_position -= line_height
-                c.drawString(10 * mm, y_position,'Less 20% Discount:')
-                c.drawRightString(width - margin_right, y_position, f'{float(Less_Discount):,.2f}')
-                y_position -= line_height
+                # SC_Covered = PosSalesTransSeniorCitizenDiscount.objects.filter(sales_trans_id=int(float(doc_no)),)
+                # SCGuestCount = 0
+                # if SC_Covered:
+                #     for amount in SC_Covered:
+                #         Amount_covered =  float(str(amount.amount_covered).replace(',',''))
+                #         SCGuestCount = 1 + SCGuestCount
+
+                # if SCGuestCount== GuestCount:
+                #     Less_Vat = ((float(Amount_covered)) / 1.12) * 0.12
+                #     Net_of_vat = float(str(Total_due).replace(',','')) - Less_Vat
+                #     Less_Discount =(Amount_covered / 1.12) * 0.20
+                #     data_for_vatable = float(str(Total_due).replace(',','')) - Amount_covered
+                #     Total_due = float(str(Total_due).replace(',','')) - ((Less_Discount + Less_Vat))
+
+                #     vatable = (data_for_vatable / 1.12)
+                #     vat_exempt = (Amount_covered - (Less_Vat + Less_Discount))
+                #     vat = (vatable * .12)
+                # else:
+                #     Less_Vat = ((float(Amount_covered)) / 1.12) * 0.12
+                #     Net_of_vat = float(str(Total_due).replace(',','')) - Less_Vat
+                #     Less_Discount =(Amount_covered / 1.12) * 0.20
+                #     data_for_vatable = float(str(Total_due).replace(',','')) - Amount_covered
+                #     Total_due = float(str(Total_due).replace(',','')) - ((Less_Discount + Less_Vat))
+
+                #     vatable = (data_for_vatable / 1.12)
+                #     vat_exempt = (Amount_covered - (Less_Vat + Less_Discount))
+                #     vat = (vatable * .12)
+
+                # y_position -= line_height
+                # c.drawString(10 * mm, y_position,'Less 20% VAT:' + f'{Amount_covered}')
+                # c.drawRightString(width - margin_right, y_position, f'{float(Less_Vat):,.2f}')
+
+                # y_position -= line_height
+                # c.drawString(10 * mm, y_position,'Net of VAT:')
+                # c.drawRightString(width - margin_right, y_position, f'{float(Net_of_vat):,.2f}')
+
+                # y_position -= line_height
+                # c.drawString(10 * mm, y_position,'Less 20% Discount:')
+                # c.drawRightString(width - margin_right, y_position, f'{float(Less_Discount):,.2f}')
+                # y_position -= line_height
+                Total_due_net = float(result["total_due"])
+                Total_due = Total_due_net
+                if Service_Charge != 0:
+                    
+                    
+                    c.drawString(10 * mm, y_position,'Service Charge:')
+                    c.drawRightString(width - margin_right, y_position, f'{float(Service_Charge):,.2f}')
+                    y_position -= line_height
+                    Total_due_net = Total_due_net + Service_Charge
+                    Total_due = Total_due_net
+
                 c.line(x_start, y_position, x_end, y_position)
                 y_position -= line_height
                 c.drawString(10 * mm, y_position,'TOTAL DUE:')
-                c.drawRightString(width - margin_right, y_position, f'{float(Total_due):,.2f}')
-                y_position -= line_height
-                y_position -= line_height
+                c.drawRightString(width - margin_right, y_position, f'{float(Total_due_net):,.2f}')
 
             # ************** VAT DATA ****************
             y_position -= line_height
@@ -866,25 +975,765 @@ def PDFReceipt(request,doc_no,doc_type,cusData):
             if Item_Dicount == True:
                 vat =(float(str(Total_due).replace(',','')) / 1.12) * .12
                 vatable = float(str(Total_due).replace(',','')) - vat
+            elif SC_Dicount == True:
+                vat = vat
+                vatable = vatable
+        
             else:
                 vat =(float(str(Total_due).replace(',','')) / 1.12) * .12
                 vatable = float(str(Total_due).replace(',','')) - vat
 
 
-            c.drawString(10 * mm, y_position,'Vatable:')
-            c.drawRightString(width - margin_right, y_position, f'{float(vatable):,.2f}')
+
             y_position -= line_height
-            c.drawString(10 * mm, y_position,'VAT Exempt:')
-            c.drawRightString(width - margin_right, y_position, f'{float(vat_exempt):,.2f}')
+            c.drawString(10 * mm, y_position, 'Vatable:')
+            c.drawRightString(width - margin_right, y_position, f'{vatable:,.2f}')
+
             y_position -= line_height
-            c.drawString(10 * mm, y_position,'Non-VAT:')
-            c.drawRightString(width - margin_right, y_position, f'{float(non_vat):,.2f}')
+            c.drawString(10 * mm, y_position, 'VAT Exempt:')
+            c.drawRightString(width - margin_right, y_position, f'{vat_exempt:,.2f}')
+
             y_position -= line_height
-            c.drawString(10 * mm, y_position,'VAT Zero Rated:')
-            c.drawRightString(width - margin_right, y_position, f'{float(vat_zero_rated):,.2f}')
+            c.drawString(10 * mm, y_position, 'Non-VAT:')
+            c.drawRightString(width - margin_right, y_position, f'{non_vat:,.2f}')
+
             y_position -= line_height
-            c.drawString(10 * mm, y_position,'VAT:')
-            c.drawRightString(width - margin_right, y_position, f'{float(vat):,.2f}')
+            c.drawString(10 * mm, y_position, 'VAT Zero Rated:')
+            c.drawRightString(width - margin_right, y_position, f'{vat_zero_rated:,.2f}')
+
+            y_position -= line_height
+            c.drawString(10 * mm, y_position, 'VAT:')
+            c.drawRightString(width - margin_right, y_position, f'{vat:,.2f}')
+            y_position -= line_height
+
+
+            # c.drawString(10 * mm, y_position,'Vatable:')
+            # c.drawRightString(width - margin_right, y_position, f'{float(vatable):,.2f}')
+            # y_position -= line_height
+            # c.drawString(10 * mm, y_position,'VAT Exempt:')
+            # c.drawRightString(width - margin_right, y_position, f'{float(vat_exempt):,.2f}')
+            # y_position -= line_height
+            # c.drawString(10 * mm, y_position,'Non-VAT:')
+            # c.drawRightString(width - margin_right, y_position, f'{float(non_vat):,.2f}')
+            # y_position -= line_height
+            # c.drawString(10 * mm, y_position,'VAT Zero Rated:')
+            # c.drawRightString(width - margin_right, y_position, f'{float(vat_zero_rated):,.2f}')
+            # y_position -= line_height
+            # c.drawString(10 * mm, y_position,'VAT:')
+            # c.drawRightString(width - margin_right, y_position, f'{float(vat):,.2f}')
+
+            if Service_Charge != 0:
+                
+                    c.drawString(10 * mm, y_position,'Service Charge:')
+                    c.drawRightString(width - margin_right, y_position, f'{float(Service_Charge):,.2f}')
+                    y_position -= line_height
+            # L**************END VAT ****************
+
+            # L************** NEW double dash line ****************
+            y_position -= line_height_dash
+            c.line(x_start, y_position, x_end, y_position)
+            # L************** END double dash line ****************
+
+            if SC_Dicount == False:
+                Total_due = Total_due + Service_Charge
+
+            y_position -= line_height
+            c.drawString(10 * mm, y_position,'TOTAL DUE:')
+            c.drawRightString(width - margin_right, y_position, f'{float(Total_due):,.2f}')
+            y_position -= line_height
+          
+            if is_cash_payment:
+                y_position -= line_height
+                c.drawString(10 * mm, y_position,'CASH:')
+                if cash_payment > 0 and is_credit_card_payment | is_debit_card_payment | is_other_payment | is_online_payment | is_gift_check_payment: 
+                    
+                    c.drawRightString(width - margin_right, y_position, f'{float(cash_payment):,.2f}')
+                else:
+                    cash_payment = Amount_Tendered
+                    c.drawRightString(width - margin_right, y_position, f'{float(cash_payment):,.2f}')
+                y_position -= line_height
+                if is_credit_card_payment | is_debit_card_payment | is_other_payment | is_online_payment | is_gift_check_payment:
+                    pass
+                else:
+                    c.drawString(10 * mm, y_position,'CHANGE:')
+                    change_amount = cash_payment - Total_due
+                    c.drawRightString(width - margin_right, y_position, f'{float(change_amount):,.2f}')
+            if is_credit_card_payment:
+                Credit_card_list = SalesTransCreditCard.objects.filter(sales_trans_id=int(float(doc_no)),terminal_no = machineInfo.terminal_no,cashier_id=Cashier_ID)
+                if Credit_card_list:
+                    for item in Credit_card_list:
+                        y_position -= line_height
+                        c.drawString(10 * mm, y_position,'Credit Card:')
+                        c.drawRightString(width - margin_right, y_position, f'{float(item.amount):,.2f}')
+                        y_position -= line_height
+                        full_card_number = item.card_no
+                        masked_card_number = '*' * (len(full_card_number) - 4) + full_card_number[-4:]  # Mask all but the last four digits
+
+                        c.drawString(10 * mm, y_position,'Credit Card No.:')
+                        c.drawRightString(width - margin_right, y_position, f'{masked_card_number}')
+                        y_position -= line_height
+                        c.drawString(10 * mm, y_position,'Card Issuer:')
+                        c.drawRightString(width - margin_right, y_position, f'{item.card_name}')
+                        y_position -= line_height
+                        c.drawString(10 * mm, y_position,'Bank:')
+                        bankName = BankCompany.objects.filter(id_code=int(float(item.bank))).first()
+                        if bankName:
+                            c.drawRightString(width - margin_right, y_position, f'{bankName.company_description}')
+                            y_position -= line_height
+                        c.drawString(10 * mm, y_position,'Expiry Date:')
+                        c.drawRightString(width - margin_right, y_position, f'{item.expiry_date}')
+                        y_position -= line_height
+                        c.drawString(10 * mm, y_position,'Card Holder:')
+                        c.drawRightString(width - margin_right, y_position, f'{item.card_holder}')
+                        y_position -= line_height
+            if is_debit_card_payment:
+                debit_card_list = SalesTransEPS.objects.filter(sales_trans_id=int(float(doc_no)),terminal_no = machineInfo.terminal_no,cashier_id=Cashier_ID)
+                if debit_card_list:
+                    for item in debit_card_list:
+                        y_position -= line_height
+                        c.drawString(10 * mm, y_position,'Debit Card:')
+                        c.drawRightString(width - margin_right, y_position, f'{float(item.amount):,.2f}')
+                        y_position -= line_height
+                        full_card_number = item.card_no
+                        masked_card_number = '*' * (len(full_card_number) - 4) + full_card_number[-4:]  # Mask all but the last four digits
+
+                        c.drawString(10 * mm, y_position,'Debit Card No:')
+                        c.drawRightString(width - margin_right, y_position, f'{masked_card_number}')
+                        y_position -= line_height
+                        c.drawString(10 * mm, y_position,'Bank:')
+                        bankName = BankCompany.objects.filter(id_code=int(float(item.bank))).first()
+                        if bankName:
+                            c.drawRightString(width - margin_right, y_position, f'{bankName.company_description}')
+                        y_position -= line_height
+                        c.drawString(10 * mm, y_position,'Card Holder:')
+                        c.drawRightString(width - margin_right, y_position, f'{item.card_holder}')
+                        y_position -= line_height
+
+            if is_gift_check_payment:
+                # y_position -= line_height
+                c.drawString(10 * mm, y_position,'GIFT CHCEK:')
+                c.drawRightString(width - margin_right, y_position, f'{float(gift_check_payment):,.2f}')
+                y_position -= line_height
+            
+            if is_online_payment:
+                # y_position -= line_height
+                c.drawString(10 * mm, y_position,'ONLINE:')
+                c.drawRightString(width - margin_right, y_position, f'{float(online_payment):,.2f}')
+                y_position -= line_height
+
+            if is_other_payment:
+                # y_position -= line_height
+                c.drawString(10 * mm, y_position,'OTHER:')
+                c.drawRightString(width - margin_right, y_position, f'{float(other_payment):,.2f}')
+                y_position -= line_height
+
+            if payment_method =='CREDIT SALES':
+                y_position -= line_height
+                c.drawString(10 * mm, y_position,'CHARGE:')
+                c.drawRightString(width - margin_right, y_position, f'{float(credit_card_payment):,.2f}')
+            if is_credit_card_payment | is_debit_card_payment | is_other_payment | is_online_payment | is_gift_check_payment and cash_payment > 0   :
+                c.drawString(10 * mm, y_position,'CHANGE:')
+                change_amount = (cash_payment + online_payment + other_payment + gift_check_payment + debit_card_payment + credit_card_payment)- Total_due
+                c.drawRightString(width - margin_right, y_position, f'{float(change_amount):,.2f}')
+
+            y_position -= line_height
+            y_position -= line_height
+            c.drawString(10 * mm, y_position,'Cashier:')
+            c.drawString(10 * mm, y_position,'' )
+            cashierData = User.objects.filter(id_code = int(float(Cashier_ID))).first()
+            if cashierData:
+                c.drawRightString(width - margin_right, y_position, f'{cashierData.fullname}')
+            y_position -= line_height
+            c.drawRightString(width - margin_right, y_position,f'TERMINAL #' + f'{machineInfo.terminal_no}' + f'{doc_no}')
+            y_position -= line_height
+
+
+            if SC_Dicount == True:
+                SC_Covered = PosSalesTransSeniorCitizenDiscount.objects.filter(sales_trans_id=int(float(doc_no)),)
+                if SC_Covered:
+                    for SC_data in SC_Covered:
+                        c.drawString(10 * mm, y_position,'Senior Name:')
+                        c.drawRightString(width - margin_right, y_position, f'{SC_data.senior_member_name}')
+
+                        y_position -= line_height
+                        c.drawString(10 * mm, y_position,'ID:')
+                        c.drawRightString(width - margin_right, y_position, f'{SC_data.id_no}')
+
+                        y_position -= line_height
+                        c.drawString(10 * mm, y_position,'TIN:')
+                        c.drawRightString(width - margin_right, y_position, f'{SC_data.tin_no}')
+
+
+            c.setDash()
+            y_position -= line_height
+            c.drawString(10 * mm, y_position,'Customer Name:')
+            c.drawRightString(width - margin_right, y_position, f'hernanie D. Galigao Jr')
+
+            name_width = c.stringWidth('Customer Name:', 'Helvetica', 8)
+            end_of_name_x = 10 * mm + name_width + 5  # Adding some space between name and line
+            c.drawRightString(width - margin_right, y_position, 'hernanie D. Galigao Jr')
+            value_width = c.stringWidth('hernanie D. Galigao Jr', 'Helvetica', 8)
+            end_of_value_x = width - margin_right  # End at the right margin
+            c.line(end_of_name_x, y_position - 2, end_of_value_x, y_position - 2)
+
+
+            y_position -= line_height
+            c.drawString(10 * mm, y_position,'Address:')
+            c.drawRightString(width - margin_right, y_position, f'KORONADAL CITY')
+
+            name_width = c.stringWidth('Address:', 'Helvetica', 8)
+            end_of_name_x = 10 * mm + name_width + 5  # Adding some space between name and line
+            c.drawRightString(width - margin_right, y_position, 'KORONADAL CITY')
+            value_width = c.stringWidth('KORONADAL CITY', 'Helvetica', 8)
+            end_of_value_x = width - margin_right  # End at the right margin
+            c.line(end_of_name_x, y_position - 2, end_of_value_x, y_position - 2)
+
+
+            y_position -= line_height
+            c.drawString(10 * mm, y_position,'TIN:')
+            c.drawRightString(width - margin_right, y_position, f'1111-2222-3333-555')
+
+            name_width = c.stringWidth('TIN:', 'Helvetica', 8)
+            end_of_name_x = 10 * mm + name_width + 5  # Adding some space between name and line
+            c.drawRightString(width - margin_right, y_position, '1111-2222-3333-555')
+            value_width = c.stringWidth('1111-2222-3333-555', 'Helvetica', 8)
+            end_of_value_x = width - margin_right  # End at the right margin
+            c.line(end_of_name_x, y_position - 2, end_of_value_x, y_position - 2)
+
+
+            y_position -= line_height
+            c.drawString(10 * mm, y_position,'Business Style:')
+            c.drawRightString(width - margin_right, y_position, f'RESTAURANT')
+
+            name_width = c.stringWidth('Business Style:', 'Helvetica', 8)
+            end_of_name_x = 10 * mm + name_width + 5  # Adding some space between name and line
+            c.drawRightString(width - margin_right, y_position, 'RESTAURANT')
+            value_width = c.stringWidth('RESTAURANT', 'Helvetica', 8)
+            end_of_value_x = width - margin_right  # End at the right margin
+            c.line(end_of_name_x, y_position - 2, end_of_value_x, y_position - 2)
+            y_position -= line_height
+            y_position -= line_height
+            
+            c.setDash(3,2)
+            c.line(x_start, y_position, x_end, y_position)
+            y_position -= line_height
+            text_width = c.stringWidth("THIS SERVES AS AN OFFICIAL RECEIPT", "Helvetica",  8.5)
+            x_center = (width - text_width) / 2
+            c.drawString(x_center, y_position, "THIS SERVES AS AN OFFICIAL RECEIPT")
+            y_position -= line_height
+            y_position -= line_height
+            c.line(x_start, y_position, x_end, y_position)
+            y_position -= line_height
+            text_width = c.stringWidth("THANK YOU, COME AGAIN... ", "Helvetica",  8.5)
+            x_center = (width - text_width) / 2
+            c.drawString(x_center, y_position, "THANK YOU, COME AGAIN... ")
+            y_position -= line_height_dash
+            c.line(x_start, y_position, x_end, y_position)
+            y_position -= line_height
+            y_position -= line_height
+            lead = getLeadSetup()
+
+            if lead:
+                y_position -= line_height
+                text_width = c.stringWidth(f'{lead.company_name}', "Helvetica",  8)
+                x_center = (width - text_width) / 2
+                c.drawString(x_center, y_position, f'{lead.company_name}')
+
+                y_position -= line_height
+                text_width = c.stringWidth(f'{lead.company_name2}', "Helvetica",  8)
+                x_center = (width - text_width) / 2
+                c.drawString(x_center, y_position, f'{lead.company_name2}')
+
+                y_position -= line_height
+                text_width = c.stringWidth(f'{lead.company_address}', "Helvetica",  8)
+                x_center = (width - text_width) / 2
+                c.drawString(x_center, y_position, f'{lead.company_address}')
+
+                y_position -= line_height
+                text_width = c.stringWidth(f'{lead.company_address2}', "Helvetica",  8)
+                x_center = (width - text_width) / 2
+                c.drawString(x_center, y_position, f'{lead.company_address2}')
+
+                y_position -= line_height
+                text_width = c.stringWidth(f'{lead.tin}', "Helvetica",  8)
+                x_center = (width - text_width) / 2
+                c.drawString(x_center, y_position, f'{lead.tin}')
+
+                y_position -= line_height
+                text_width = c.stringWidth(f'{lead.accreditation_no}', "Helvetica",  8)
+                x_center = (width - text_width) / 2
+                c.drawString(x_center, y_position, f'{lead.accreditation_no}')
+
+
+                y_position -= line_height
+                text_width = c.stringWidth(f'{lead.date_issued}', "Helvetica",  8)
+                x_center = (width - text_width) / 2
+                c.drawString(x_center, y_position, f'{lead.date_issued}')
+
+                y_position -= line_height
+                text_width = c.stringWidth(f'{lead.date_valid}', "Helvetica",  8)
+                x_center = (width - text_width) / 2
+                c.drawString(x_center, y_position, f'{lead.date_valid}')
+
+
+                y_position -= line_height
+                text_width = c.stringWidth(f'{machineInfo.PTU_no}', "Helvetica",  8)
+                x_center = (width - text_width) / 2
+                c.drawString(x_center, y_position, f'{machineInfo.PTU_no}')
+
+                y_position -= line_height
+                text_width = c.stringWidth(f'{machineInfo.date_issue}', "Helvetica",  8)
+                x_center = (width - text_width) / 2
+                c.drawString(x_center, y_position, f'{machineInfo.date_issue}')
+            # Save the PDF
+            print('already save pdf Sales Invoice')
+            c.save()   
+        except Exception as e:
+            print(e)
+            traceback.print_exc()
+
+
+def ReprintPDFReceipt(request,doc_no,doc_type,cusData):
+        try:
+            margin_left = 2 * mm
+            margin_right = 10 * mm
+            margin_top = 2 * mm
+            margin_bottom = 2 * mm
+            Total_due = 0
+            Total_Payment = 0
+            Amount_Tendered = 0
+
+            x_start = 2 * mm  # Starting x-coordinate
+            x_end = x_start + 85 * mm  # Ending x-coordinate (55 characters long)
+
+            Cashier_ID = 0
+
+            Item_Dicount = False
+            SC_Dicount = False
+            Transaction_Dicount = False
+            Trade_Dicount = False
+
+            data = ''
+            total_qty = 0
+
+            CusTIN = cusData['CusTIN']
+            CusAddress =  cusData['CusAddress']
+            CusBusiness = cusData['CusBusiness']
+            Customer =  cusData['CustomerName']
+
+            Order_Type= 'DINE IN'
+            TableNo = int(float(cusData['TableNo']))
+            GuestCount = int(float(cusData['Guest_Count']))
+            QueNo = int(float(cusData['QueNo']))
+
+            
+
+            vat = 0
+            vatable = 0
+            vat_exempt = 0
+            vat_zero_rated = 0
+            non_vat = 0
+
+            change_amount = 0
+            cash_payment = 0
+
+            credit_card_payment = 0
+            debit_card_payment = 0
+            gcash_payment = 0
+            gift_check_payment = 0
+            online_payment = 0
+            other_payment = 0
+            multiple_payment = 0
+            payment_method = 'CASH'
+            is_credit_card_payment = False
+            is_debit_card_payment = False
+            is_cash_payment = False
+            is_gift_check_payment = False
+            is_online_payment = False
+            is_other_payment = False
+            Service_Charge = 0
+            total_sc_discount = 0
+            total_item_discount = 0
+            total_trade_discount = 0
+            total_transaction_discount = 0
+            total_pwd_discount = 0
+            total_athlete_discount = 0
+            
+
+
+
+            serial_number = getattr(request, "SERIALNO", None)
+            machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number).first()
+    
+            
+
+            # GET DATA IN SALES INVOICE LIST
+            data_list = PosSalesInvoiceList.objects.filter(doc_no=doc_no,doc_type=doc_type,terminal_no=machineInfo.terminal_no
+                                                           ,site_code =machineInfo.site_no).first()
+            if data_list:
+                Service_Charge = data_list.ServiceCharge_TotalAmount
+                if data_list.discount_type == 'IM':
+                    Item_Dicount = True
+                elif data_list.discount_type == 'SC':
+                    SC_Dicount = True
+                if data_list.total_cash != 0:
+                    cash_payment = data_list.total_cash
+                    is_cash_payment = True
+                if data_list.total_credit_card != 0:
+                    credit_card_payment = data_list.total_credit_card
+                    is_credit_card_payment = True
+                if data_list.total_eps !=0:
+                    debit_card_payment = data_list.total_eps
+                    is_debit_card_payment = True
+                if data_list.total_cash !=  0:
+                    cash_payment = data_list.total_cash
+                if data_list.gift_check != 0:
+                    gift_check_payment = data_list.gift_check 
+                    is_gift_check_payment = True
+                if data_list.online_payment != 0:
+                    online_payment = data_list.online_payment
+                    is_online_payment = True
+                if data_list.other_payment != 0:
+                    other_payment = data_list.other_payment
+                    is_other_payment  = True
+                # data_tmp = PosSalesInvoiceListSerializer(data_list,many=True).data
+
+                # if data_tmp:
+                #     data_tmp.
+
+            # GET DATA IN SALES INVOICE LISTING
+            data_listing = PosSalesInvoiceListing.objects.filter(doc_no=doc_no,doc_type=doc_type,terminal_no=machineInfo.terminal_no
+                                                           ,site_code =machineInfo.site_no)
+            if data_listing:
+                data = PosSalesInvoiceListingSerializer(data_listing,many=True).data
+
+            # GET DATA IN TABLE POS SALES TRANS
+            pos_sales_trans = PosSalesTrans.objects.filter(sales_trans_id=int(float(doc_no)),document_type='SI',terminal_no=machineInfo.terminal_no
+                                                           ,site_code = int(machineInfo.site_no)).first()
+            
+            if pos_sales_trans:
+                Amount_Tendered = pos_sales_trans.amount_tendered
+                Cashier_ID = pos_sales_trans.cashier_id
+                # cash_payment = Amount_Tendered
+                # pos_sales_trans_data = PosSalesTransSerializer(pos_sales_trans,many=True).data
+            else:
+                print('No amount Tendered')
+            companyCode = getCompanyData()
+            clientSetup = getClientSetup()
+
+            # Determine the width and height based on the data length
+            line_height = 0.4 * cm
+            line_height_dash = 0.1 * cm
+            margin = 0.1 * cm  # Adjust margins as needed
+            width = 85 * mm  # Width adjusted for 79 mm roll paper
+            # Set the initial height for the first page
+            card_height= 0
+
+
+            #---- GET THE HEIGTH OF CARD DETAILS
+            if is_credit_card_payment:
+                Credit_card_list = SalesTransCreditCard.objects.filter(sales_trans_id=int(float(doc_no)),terminal_no = machineInfo.terminal_no,cashier_id=Cashier_ID)
+                card_height += Credit_card_list.count() * 6
+
+            if is_debit_card_payment:
+                Debit_card_list = SalesTransEPS.objects.filter(sales_trans_id=int(float(doc_no)),terminal_no = machineInfo.terminal_no,cashier_id=Cashier_ID)
+                card_height += Debit_card_list.count() * 4
+
+            # Calculate the required height based on the data length
+            height = ((len(data)* 2) + 60 + card_height) * line_height + 2 * margin  # Adding 3 for header, footer, and hyphen lines
+
+            # Create a canvas with calculated size
+            c = canvas.Canvas(f"ReprintReceipt{int(float(doc_no))}.pdf", pagesize=(width, height))
+
+            # Set up a font and size
+        
+            c.setFont("Helvetica", 8.5)
+            y_position = height - margin - line_height 
+
+
+            text_width = c.stringWidth(f'{clientSetup.company_name}', "Helvetica", 8.5)
+            x_center = (width - text_width) / 2
+            c.drawString(x_center, y_position, f'{clientSetup.company_name}')
+            y_position -= line_height
+
+            text_width = c.stringWidth(f'{clientSetup.company_address}', "Helvetica",  8.5)
+            x_center = (width - text_width) / 2
+            c.drawString(x_center, y_position, f'{clientSetup.company_address}')
+            y_position -= line_height
+
+            text_width = c.stringWidth(f'{clientSetup.company_address2}', "Helvetica",  8.5)
+            x_center = (width - text_width) / 2
+            c.drawString(x_center, y_position, f'{clientSetup.company_address2}')
+            y_position -= line_height
+
+            text_width = c.stringWidth(f'{clientSetup.tin}', "Helvetica",  8.5)
+            x_center = (width - text_width) / 2
+            c.drawString(x_center, y_position, f'{clientSetup.tin}')
+            y_position -= line_height
+
+            text_width = c.stringWidth(f'{clientSetup.tel_no}', "Helvetica",  8.5)
+            x_center = (width - text_width) / 2
+            c.drawString(x_center, y_position, f'{clientSetup.tel_no}')
+            y_position -= line_height
+
+            text_width = c.stringWidth(f'{machineInfo.Machine_no}', "Helvetica",  8.5)
+            x_center = (width - text_width) / 2
+            c.drawString(x_center, y_position, f'{machineInfo.Machine_no}')
+            y_position -= line_height
+
+            text_width = c.stringWidth(f'{machineInfo.Serial_no}', "Helvetica", 10)
+            x_center = (width - text_width) / 2
+            c.drawString(x_center, y_position, f'{machineInfo.Serial_no}')
+            y_position -= line_height
+            y_position -= line_height
+
+            text_width = c.stringWidth("RE-PRINT", "Helvetica",  8.5)
+            x_center = (width - text_width) / 2
+            c.drawString(x_center, y_position, "RE-PRINT")
+            y_position -= line_height
+
+    
+
+            # Calculate x-coordinate for center alignment of "SALES INVOICE"
+            text_width = c.stringWidth("SALES INVOICE", "Helvetica",  8.5)
+            x_center = (width - text_width) / 2
+            c.drawString(x_center, y_position, "SALES INVOICE")
+            y_position -= line_height
+            y_position -= line_height
+
+            c.drawString(10 * mm, y_position, "Cusomer: " f'{Customer}')
+            if TableNo != 0:
+                
+                y_position -= line_height
+                c.drawString(10 * mm, y_position, f"Table No.: {TableNo}")
+
+                # Right align "Guest Count"
+                guest_count_text = f"Guest Count: {GuestCount}"
+                text_width = c.stringWidth(guest_count_text, "Helvetica", 12)  # Use appropriate font and size
+                c.drawRightString(width - margin_right, y_position, guest_count_text)
+
+            if QueNo != 0:
+                Order_Type = 'TAKE OUT'
+                y_position -= line_height
+                c.drawString(10 * mm, y_position, f"QueNo.: {QueNo}")
+                guest_count_text = f"Guest Count: {GuestCount}"
+                text_width = c.stringWidth(guest_count_text, "Helvetica", 12)  # Use appropriate font and size
+                c.drawRightString(width - margin_right, y_position, guest_count_text)
+
+            y_position -= line_height
+
+            text_width = c.stringWidth(f'{Order_Type}', "Helvetica-Bold",  8.5)
+            x_center = (width - text_width) / 2
+            y_position -= line_height
+            c.drawString(x_center, y_position, f'{Order_Type}')
+            y_position -= line_height
+
+            c.setDash(3, 2) 
+            c.line(x_start, y_position, x_end, y_position)
+            text_width = c.stringWidth(f'SI#{int(float(doc_no))}', "Helvetica-Bold",  8.5)
+            x_center = (width - text_width) / 2
+            y_position -= line_height
+            c.drawString(x_center, y_position, f'SI#{int(float(doc_no))}')
+            y_position -= line_height
+
+            # Get the current date and time
+            date_time = GetPHilippineDateTime()
+            text_width = c.stringWidth(date_time, "Helvetica",  8.5)
+            x_center = (width - text_width) / 2
+            # Draw the date and time
+            c.drawString(x_center, y_position, f'{date_time}')
+
+            # Update y_position for the next content
+            y_position -= (line_height - 0.2 * cm)
+
+        # 3 points on, 2 points off
+            c.line(x_start, y_position, x_end, y_position)
+            y_position -= line_height
+        
+            for item in data:
+                pc_price = json.dumps(item['pc_price'], ensure_ascii=False)
+                sub_total= json.dumps(item['sub_total'], ensure_ascii=False)
+                description = json.dumps(item['description'], ensure_ascii=False)
+                quantity = json.dumps(int(float(item['rec_qty'])), ensure_ascii=False)
+                description = description.replace('"', '')  # Remove double quotes
+                pc_price = pc_price.replace('"', '')  # 
+                sub_total = sub_total.replace('"', '')  # 
+
+                total_qty = total_qty + float(item['rec_qty'])
+                Total_due = Total_due + float(item['sub_total'])
+                c.setFont("Helvetica", 8.5)
+                c.setFillColor(colors.black)
+                quantity_str = str(quantity).ljust(3)  
+                text_to_draw = f"{description}"
+                qty_and_price = f"{quantity_str}    @{pc_price}"
+
+                wrapped_description = textwrap.wrap(text_to_draw, width=32)
+
+                if wrapped_description:
+                    text_to_draw = f"{wrapped_description[0]}"
+                    c.drawString(10 * mm, y_position, text_to_draw)
+                    # y_position -= line_height
+                    # Draw the rest of the wrapped lines without quantity
+                for line in wrapped_description[1:]:
+                    y_position -= line_height
+                    text_to_draw = f"{line}"
+                    c.drawString(10 * mm, y_position, text_to_draw)
+                sub_total_char_width = c.stringWidth(f'{sub_total}', "Helvetica", 8.5)  # Use appropriate font and size
+                c.drawRightString(width - margin_right, y_position, f'{float(sub_total):,.2f}')
+                y_position -= line_height
+                c.drawString(10 * mm, y_position,f'{qty_and_price}')
+                y_position -= line_height
+                #*********** Senior Discount *************
+                if Item_Dicount == True:
+                    if float(item['disc_amt']) !=0:
+                        discount_amount = json.dumps(item['disc_amt'], ensure_ascii=False)
+                        discount_rate= json.dumps(item['desc_rate'], ensure_ascii=False)
+                        discount_amount = discount_amount.replace('"', '')  # 
+                        discount_rate = discount_rate.replace('"', '')  # 
+                        c.drawString(10 * mm, y_position,'Less:        ' + str(int(float(discount_rate)))+'%')
+                        c.drawRightString(width - margin_right, y_position, f'-{float(discount_amount):,.2f}')
+                        Total_due -= float(discount_amount)
+                        y_position -= line_height
+
+            
+            c.line(x_start, y_position, x_end, y_position)
+            y_position -= line_height_dash
+            c.line(x_start, y_position, x_end, y_position)
+            y_position -= line_height
+            c.drawString(10 * mm, y_position,'Items:' + str(int(float(total_qty))))
+            total_due_char_width = c.stringWidth(f'{Total_due}', "Helvetica", 8.5)  # Use appropriate font and size
+            c.drawRightString(width - margin_right, y_position, f'{float(Total_due):,.2f}')
+            y_position -= line_height
+
+            # #*********** Service Charge *************
+            # if Service_Charge != 0:
+            #     Total_due += float(Service_Charge)
+            #*********** Senior Discount *************
+            if SC_Dicount == True:
+                Less_Vat = 0
+                Net_of_vat = 0
+                Less_Discount = 0
+                Amount_covered = 0
+                # Get all SC amounts for this transaction
+                SC_Covered = PosSalesTransSeniorCitizenDiscount.objects.filter(sales_trans_id=int(float(doc_no)),)
+                SCGuestCount = 0
+                if SC_Covered:
+                    for amount in SC_Covered:
+                        Amount_covered =  float(str(amount.amount_covered).replace(',',''))
+                        SCGuestCount = 1 + SCGuestCount
+                print('Amount_covered',Amount_covered)
+                # Compute SC + VAT
+                result = compute_total_due(
+                    Total_due=Total_due,
+                    Amount_covered=Amount_covered,
+                    SCGuestCount=SCGuestCount,
+                    GuestCount=GuestCount
+                )
+
+                x = Total_due / GuestCount
+
+                if GuestCount != SCGuestCount:
+                    vatable_val = float(x) * float(GuestCount - SCGuestCount)
+                    
+                    vatable_val = (vatable_val / 1.12) / SCGuestCount
+                else:
+                    vatable_val = 0
+                    
+                    vatable_val = 0
+
+
+                # Extract numeric values
+                Less_Vat_val = result["Less_Vat"]
+                Net_of_vat_val = result["Net_of_vat"]
+                Less_Discount_val = result["Less_Discount"]
+                vat_exempt_val = result["total_vat_exempt"]
+                vat_val = result["total_vat"]        # this is the VAT amount (12%)
+                SC_Total_due_val = result["total_due"]
+                total_sc_discount_val = result["total_sc_discount"]
+                # Create formatted strings for printing
+                Less_Vat = Less_Vat_val
+                Net_of_vat = Net_of_vat_val
+                Less_Discount = Less_Discount_val
+                vat_exempt = vat_exempt_val
+                vatable = vatable_val
+                vat = vat_val
+                SC_Total_due = SC_Total_due_val
+                total_sc_discount = total_sc_discount_val
+                
+               
+                # Print values
+                y_position -= line_height
+                c.drawString(10 * mm, y_position, f'Less 20% VAT: {Amount_covered}')
+                c.drawRightString(width - margin_right, y_position, f'{result["Less_Vat"]:,.2f}')
+
+                y_position -= line_height
+                c.drawString(10 * mm, y_position, 'Net of VAT:')
+                c.drawRightString(width - margin_right, y_position, f'{result["Net_of_vat"]:,.2f}')
+
+                y_position -= line_height
+                c.drawString(10 * mm, y_position, 'Less 20% Discount:')
+                c.drawRightString(width - margin_right, y_position, f'{result["Less_Discount"]:,.2f}')
+                y_position -= line_height
+
+                Total_due_net = float(result["total_due"])
+                Total_due = Total_due_net
+                if Service_Charge != 0:
+                    
+                    
+                    c.drawString(10 * mm, y_position,'Service Charge:')
+                    c.drawRightString(width - margin_right, y_position, f'{float(Service_Charge):,.2f}')
+                    y_position -= line_height
+                    Total_due_net = Total_due_net + Service_Charge
+                    Total_due = Total_due_net
+
+                c.line(x_start, y_position, x_end, y_position)
+                y_position -= line_height
+                c.drawString(10 * mm, y_position,'TOTAL DUE:')
+                c.drawRightString(width - margin_right, y_position, f'{float(Total_due_net):,.2f}')
+
+            # ************** VAT DATA ****************
+            y_position -= line_height
+        
+            if Item_Dicount == True:
+                vat =(float(str(Total_due).replace(',','')) / 1.12) * .12
+                vatable = float(str(Total_due).replace(',','')) - vat
+            elif SC_Dicount == True:
+                vat = vat
+                vatable = vatable
+        
+            else:
+                vat =(float(str(Total_due).replace(',','')) / 1.12) * .12
+                vatable = float(str(Total_due).replace(',','')) - vat
+
+
+
+            y_position -= line_height
+            c.drawString(10 * mm, y_position, 'Vatable:')
+            c.drawRightString(width - margin_right, y_position, f'{vatable:,.2f}')
+
+            y_position -= line_height
+            c.drawString(10 * mm, y_position, 'VAT Exempt:')
+            c.drawRightString(width - margin_right, y_position, f'{vat_exempt:,.2f}')
+
+            y_position -= line_height
+            c.drawString(10 * mm, y_position, 'Non-VAT:')
+            c.drawRightString(width - margin_right, y_position, f'{non_vat:,.2f}')
+
+            y_position -= line_height
+            c.drawString(10 * mm, y_position, 'VAT Zero Rated:')
+            c.drawRightString(width - margin_right, y_position, f'{vat_zero_rated:,.2f}')
+
+            y_position -= line_height
+            c.drawString(10 * mm, y_position, 'VAT:')
+            c.drawRightString(width - margin_right, y_position, f'{vat:,.2f}')
+            y_position -= line_height
+
+
+            if Service_Charge != 0:
+                
+                    c.drawString(10 * mm, y_position,'Service Charge:')
+                    c.drawRightString(width - margin_right, y_position, f'{float(Service_Charge):,.2f}')
+                    y_position -= line_height
             # L**************END VAT ****************
 
             # L************** NEW double dash line ****************
@@ -900,7 +1749,7 @@ def PDFReceipt(request,doc_no,doc_type,cusData):
             if is_cash_payment:
                 y_position -= line_height
                 c.drawString(10 * mm, y_position,'CASH:')
-                if is_credit_card_payment or is_debit_card_payment or is_other_payment or is_online_payment or is_gift_check_payment: 
+                if cash_payment > 0 and is_credit_card_payment | is_debit_card_payment | is_other_payment | is_online_payment | is_gift_check_payment: 
                     
                     c.drawRightString(width - margin_right, y_position, f'{float(cash_payment):,.2f}')
                 else:
@@ -1147,6 +1996,356 @@ def PDFReceipt(request,doc_no,doc_type,cusData):
             print(e)
             traceback.print_exc()
 
+
+
+def compute_total_due(Total_due, Amount_covered, SCGuestCount, GuestCount, VAT_rate=0.12, SC_discount_rate=0.20):
+    Total_due = float(Total_due)
+    Amount_covered = float(Amount_covered)
+
+    # Senior portion
+    if SCGuestCount > 0:
+        per_sc = Amount_covered / SCGuestCount
+        Less_Vat_per_sc = per_sc / (1 + VAT_rate) * VAT_rate
+        Less_Discount_per_sc = per_sc / (1 + VAT_rate) * SC_discount_rate
+
+        total_less_vat = Less_Vat_per_sc * SCGuestCount
+        total_less_discount = Less_Discount_per_sc * SCGuestCount
+
+        total_vat_exempt = Amount_covered - (total_less_vat + total_less_discount)
+    else:
+        total_less_vat = 0
+        total_less_discount = 0
+        total_vat_exempt = 0
+
+    # Non-senior portion
+    non_sc_amount = Total_due - Amount_covered
+    if non_sc_amount > 0:
+        vatable_base = non_sc_amount / (1 + VAT_rate)
+        total_vat = vatable_base * VAT_rate
+        non_sc_total = vatable_base + total_vat
+    else:
+        total_vat = 0
+        non_sc_total = 0
+
+    # Final total due
+    net_total_due = total_vat_exempt + non_sc_total
+
+    return {
+        "total_due": round(net_total_due, 2),
+        "total_vat": round(total_vat, 2),
+        "total_vat_exempt": round(total_vat_exempt, 2),
+        "total_sc_discount": round(total_less_discount, 2),
+        "Less_Vat": round(total_less_vat, 2),
+        "Less_Discount": round(total_less_discount, 2),
+        "Net_of_vat": round(Total_due - total_less_vat, 2)
+    }
+
+
+@api_view(['GET'])
+@permission_classes((IsAuthenticated,))
+def PrintBill(request):
+        try:
+            margin_left = 2 * mm
+            margin_right = 10 * mm
+            margin_top = 2 * mm
+            margin_bottom = 2 * mm
+            Total_due = 0
+            Total_Payment = 0
+            Amount_Tendered = 0
+
+            x_start = 2 * mm  # Starting x-coordinate
+            x_end = x_start + 85 * mm  # Ending x-coordinate (55 characters long)
+
+            Cashier_ID = request.user.id_code
+
+            Item_Dicount = False
+            SC_Dicount = False
+            Transaction_Dicount = False
+            Trade_Dicount = False
+
+            data = ''
+            total_qty = 0
+
+            vat = 0
+            vatable = 0
+            vat_exempt = 0
+            vat_zero_rated = 0
+            non_vat = 0
+            waiter_id = 0
+         
+            GuestCount =0
+            Order_Type ='DINE IN'
+
+            SO_NO =''
+
+
+            serial_number = getattr(request, "SERIALNO", None)
+            machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number).first()
+            
+     
+            tableno = request.GET.get('tableno','0')
+            queno = request.GET.get('queno','0')
+            if tableno == '':
+                tableno = None
+            if queno == '':
+                queno = None
+            TableNo = int(tableno) if tableno is not None else 0
+            QueNo = int(queno) if queno is not None else 0
+            data = []
+            if tableno is not None:
+                paid = PosSalesOrder.objects.filter(paid = 'N',active='Y',terminal_no = machineInfo.terminal_no,site_code = int(machineInfo.site_no) ,table_no =tableno)
+                if paid.exists():
+                    for order in paid:
+                        document_no = order.document_no
+                        GuestCount = order.guest_count
+                        waiter_id = order.waiter_id
+                        
+                        if SO_NO == '':
+                            SO_NO = order.SO_no
+                        else:
+                            SO_NO = SO_NO + ',' + order.SO_no
+
+                        matched_records = PosSalesTransDetails.objects.filter(sales_trans_id=document_no,terminal_no = machineInfo.terminal_no,site_code = int(machineInfo.site_no) )
+                        if matched_records.exists():
+                            data.extend(matched_records.values())
+
+
+
+
+            else:
+                paid = PosSalesOrder.objects.filter(paid = 'N',active='Y',terminal_no = machineInfo.terminal_no,site_code = int(machineInfo.site_no) ,q_no = queno)
+                if paid.exists():
+                     for order in paid:
+                        document_no = order.document_no
+                        GuestCount = order.guest_count
+                        waiter_id = order.waiter_id
+                        
+                        if SO_NO == '':
+                            SO_NO = order.SO_no
+                        else:
+                            SO_NO = SO_NO + ',' + order.SO_no
+
+                        matched_records = PosSalesTransDetails.objects.filter(sales_trans_id=document_no,terminal_no = machineInfo.terminal_no,site_code = int(machineInfo.site_no))
+                        if matched_records.exists():
+                            data.extend(matched_records.values())
+                        
+
+            # Determine the width and height based on the data length
+            line_height = 0.4 * cm
+            line_height_dash = 0.1 * cm
+            margin = 0.1 * cm  # Adjust margins as needed
+            width = 85 * mm  # Width adjusted for 79 mm roll paper
+            # Set the initial height for the first page
+            card_height= 0
+
+
+            # Calculate the required height based on the data length
+            height = ((len(data)* 2) + 23 + card_height) * line_height + 2 * margin  # Adding 3 for header, footer, and hyphen lines
+
+            # Create a canvas with calculated size
+            c = canvas.Canvas(f"BILLS{int(float(Cashier_ID))}.pdf", pagesize=(width, height))
+
+            # Set up a font and size
+        
+            c.setFont("Helvetica", 8.5)
+            y_position = height - margin - line_height 
+
+    
+            c.setFont("Helvetica-Bold", 12)
+            # Calculate x-coordinate for center alignment of "SALES INVOICE"
+            text_width = c.stringWidth("BILLD", "Helvetica-Bold",  12)
+            x_center = (width - text_width) / 2
+            c.drawString(x_center, y_position, "BILLS")
+            y_position -= line_height
+            y_position -= line_height
+            c.setFont("Helvetica", 8.5)
+            if TableNo != 0:
+                
+                y_position -= line_height
+                c.drawString(10 * mm, y_position, f"Table No.: {TableNo}")
+
+                # Right align "Guest Count"
+                guest_count_text = f"Guest Count: {GuestCount}"
+                text_width = c.stringWidth(guest_count_text, "Helvetica", 8.5)  # Use appropriate font and size
+                c.drawRightString(width - margin_right, y_position, guest_count_text)
+
+            if QueNo != 0:
+                y_position -= line_height
+                c.drawString(10 * mm, y_position, f"QueNo.: {QueNo}")
+                guest_count_text = f"Guest Count: {GuestCount}"
+                text_width = c.stringWidth(guest_count_text, "Helvetica", 8.5)  # Use appropriate font and size
+                c.drawRightString(width - margin_right, y_position, guest_count_text)
+
+            y_position -= line_height
+            c.setFont("Helvetica-Bold", 12)
+            text_width = c.stringWidth(f'{Order_Type}', "Helvetica-Bold",  12)
+            x_center = (width - text_width) / 2
+            y_position -= line_height
+        
+            c.drawString(x_center, y_position, f'{Order_Type}')
+            y_position -= line_height
+            c.setFont("Helvetica-Bold", 8.5)
+            c.setDash(3, 2) 
+            c.line(x_start, y_position, x_end, y_position)
+            text_width = c.stringWidth(f'SO#{SO_NO}', "Helvetica",  8.5)
+            x_center = (width - text_width) / 2
+            y_position -= line_height
+            c.drawString(x_center, y_position, f'SO#{SO_NO}')
+            y_position -= line_height
+
+            # Get the current date and time
+            date_time = GetPHilippineDateTime()
+            text_width = c.stringWidth(date_time, "Helvetica",  8.5)
+            x_center = (width - text_width) / 2
+            # Draw the date and time
+            c.drawString(x_center, y_position, f'{date_time}')
+
+            # Update y_position for the next content
+            y_position -= (line_height - 0.2 * cm)
+
+        # 3 points on, 2 points off
+            c.line(x_start, y_position, x_end, y_position)
+            y_position -= line_height
+        
+            for item in data:
+                c.setFont("Helvetica", 8.5)
+                desc_rate = json.dumps(item['desc_rate'], ensure_ascii=False)
+                desc_rate = desc_rate.replace('"', '')  # 
+                if float(desc_rate) !=0:
+                    Item_Dicount = True
+                is_SC = json.dumps(item['is_SC'], ensure_ascii=False)
+                if is_SC == 'YES':
+                    SC_Dicount = True
+                pc_price = json.dumps(item['price'], ensure_ascii=False)
+                description = json.dumps(item['description'], ensure_ascii=False)
+                quantity = json.dumps(int(float(item['quantity'])), ensure_ascii=False)
+                description = description.replace('"', '')  # Remove double quotes
+                pc_price = pc_price.replace('"', '')  # 
+                quantity = quantity.replace('"', '')  #
+                sub_total = float(pc_price) * float(quantity)  # 
+
+
+                total_qty = total_qty + float(item['quantity'])
+                Total_due = Total_due + float(sub_total)
+                
+                c.setFillColor(colors.black)
+                quantity_str = str(quantity).ljust(3)  
+                text_to_draw = f"{description}"
+                qty_and_price = f"{quantity_str}    @{pc_price}"
+
+                wrapped_description = textwrap.wrap(text_to_draw, width=32)
+
+                if wrapped_description:
+                    text_to_draw = f"{wrapped_description[0]}"
+                    c.drawString(10 * mm, y_position, text_to_draw)
+                for line in wrapped_description[1:]:
+                    y_position -= line_height
+                    text_to_draw = f"{line}"
+                    c.drawString(10 * mm, y_position, text_to_draw)
+                sub_total_char_width = c.stringWidth(f'{sub_total}', "Helvetica", 8.5)  # Use appropriate font and size
+                c.drawRightString(width - margin_right, y_position, f'{float(sub_total):,.2f}')
+                y_position -= line_height
+                c.drawString(10 * mm, y_position,f'{qty_and_price}')
+                y_position -= line_height
+                #*********** Senior Discount *************
+                if Item_Dicount == True:
+                    if float(item['item_disc']) !=0:
+                        discount_amount = json.dumps(item['item_disc'], ensure_ascii=False)
+                        discount_rate= json.dumps(item['desc_rate'], ensure_ascii=False)
+                        discount_amount = discount_amount.replace('"', '')  # 
+                        discount_rate = discount_rate.replace('"', '')  # 
+                        c.setFont("Helvetica", 6)
+                        c.drawString(10 * mm, y_position,'Less:        ' + str(int(float(discount_rate)))+'%')
+                        c.drawRightString(width - margin_right, y_position, f'-{float(discount_amount):,.2f}')
+                        Total_due -= float(discount_amount)
+                        y_position -= line_height
+
+            c.setFont("Helvetica", 8.5)
+            c.line(x_start, y_position, x_end, y_position)
+            y_position -= line_height_dash
+            c.line(x_start, y_position, x_end, y_position)
+            y_position -= line_height
+            c.drawString(10 * mm, y_position,'Items:' + str(int(float(total_qty))))
+            total_due_char_width = c.stringWidth(f'{Total_due}', "Helvetica", 8.5)  # Use appropriate font and size
+            c.drawRightString(width - margin_right, y_position, f'{float(Total_due):,.2f}')
+            y_position -= line_height
+
+            # ************** VAT DATA ****************
+            y_position -= line_height
+        
+            if Item_Dicount == True:
+                vat =(float(str(Total_due).replace(',','')) / 1.12) * .12
+                vatable = float(str(Total_due).replace(',','')) - vat
+            else:
+                vat =(float(str(Total_due).replace(',','')) / 1.12) * .12
+                vatable = float(str(Total_due).replace(',','')) - vat
+
+            # L**************END VAT ****************
+
+            # L************** NEW double dash line ****************
+            y_position -= line_height_dash
+            c.line(x_start, y_position, x_end, y_position)
+            # L************** END double dash line ****************
+
+            y_position -= line_height
+            c.drawString(10 * mm, y_position,'TOTAL DUE:')
+            c.drawRightString(width - margin_right, y_position, f'{float(Total_due):,.2f}')
+            y_position -= line_height
+          
+
+            y_position -= line_height
+            y_position -= line_height
+
+            c.drawString(10 * mm, y_position,'Cashier:')
+            c.drawString(10 * mm, y_position,'' )
+            cashierData = User.objects.filter(id_code = int(float(Cashier_ID))).first()
+            if cashierData:
+                c.drawRightString(width - margin_right, y_position, f'{cashierData.fullname}')
+            y_position -= line_height
+
+            c.drawString(10 * mm, y_position,'Waiter:')
+            c.drawString(10 * mm, y_position,'' )
+            cashierData = PosWaiterList.objects.filter(waiter_id = int(float(waiter_id))).first()
+            if cashierData:
+                c.drawRightString(width - margin_right, y_position, f'{cashierData.waiter_name}')
+            y_position -= line_height
+
+
+
+            c.drawRightString(width - margin_right, y_position,f'TERMINAL #' + f'{machineInfo.terminal_no}')
+            y_position -= line_height
+
+            print('already save pdf Bill')
+
+            c.save()
+            file_path = f"BILLS{int(float(Cashier_ID))}.pdf"  # ✅ Correct f-string
+
+            if not os.path.isfile(file_path):
+                print('File not found')
+                return Response({'error': 'File not found.'}, status=404)
+
+            # Open the file in binary read mode
+            f = open(file_path, 'rb')
+            response = FileResponse(f, as_attachment=True, filename=f"BILLS{int(float(Cashier_ID))}.pdf")
+
+            # ✅ Attach a callback to delete the file after the response is closed
+            def cleanup_file(response):
+                try:
+                    f.close()
+                    os.remove(file_path)
+                    print(f"Deleted temporary file: {file_path}")
+                except Exception as e:
+                    print(f"Error deleting file: {e}")
+                return response
+
+            response.close = lambda *args, **kwargs: cleanup_file(response)
+
+            return response
+        except Exception as e:
+            print(e)
+            traceback.print_exc()
+
+
 def PDFCashBreakDown(request,login_record):
     try:
             margin_left = 2 * mm
@@ -1157,8 +2356,6 @@ def PDFCashBreakDown(request,login_record):
             x_end = x_start + 85 * mm  # Ending x-coordinate (55 characters long)
             GTotal = 0
             terminaNo = 0
-            print('Cash BreakDown',request.user.id_code)
-            print('Cash BreakDown',request.user.fullname)
             Cashier_ID = request.user.id_code
             Cashier_name = request.user.fullname
 
@@ -1339,9 +2536,6 @@ def PDFCashBreakDown(request,login_record):
             print('already save pdf CashCOunt')
             c.save() 
             
-
-
-
     except Exception as e:
         print('error',e)
         traceback.print_exc()
@@ -1882,7 +3076,37 @@ def download_pdf(request):
         OR_no = request.GET.get('or', '')
         file_path = f"Receipt{int(float(OR_no))}.pdf"  # ✅ Correct f-string
 
-        print('file_path:', file_path)
+        if not os.path.isfile(file_path):
+            print('File not found')
+            return Response({'error': 'File not found.'}, status=404)
+
+        # Open the file in binary read mode
+        f = open(file_path, 'rb')
+        response = FileResponse(f, as_attachment=True, filename=f"Receipt{OR_no}.pdf")
+
+        # ✅ Attach a callback to delete the file after the response is closed
+        def cleanup_file(response):
+            try:
+                f.close()
+                os.remove(file_path)
+                print(f"Deleted temporary file: {file_path}")
+            except Exception as e:
+                print(f"Error deleting file: {e}")
+            return response
+
+        response.close = lambda *args, **kwargs: cleanup_file(response)
+
+        return response
+
+    except Exception as e:
+        print(f"Error: {e}")
+        return Response({'error': str(e)}, status=500)
+
+@api_view(['GET'])
+def download_Reprint_pdf(request):
+    try:
+        OR_no = request.GET.get('or', '')
+        file_path = f"ReprintReceipt{int(float(OR_no))}.pdf"  # ✅ Correct f-string
 
         if not os.path.isfile(file_path):
             print('File not found')
@@ -1909,6 +3133,7 @@ def download_pdf(request):
     except Exception as e:
         print(f"Error: {e}")
         return Response({'error': str(e)}, status=500)
+
 
 @api_view(['GET'])
 def download_pdf_cash_count(request):
@@ -1998,6 +3223,10 @@ def download_pdf_cash_count(request):
 def download_sales_order_pdf(request):
     try:
         CashierID = request.GET.get('CashierID', '')
+        print('cashier',CashierID)
+        if CashierID =='':
+            CashierID = request.user.id_code
+        print('cashiers',CashierID)
         file_path = f"SalesOrderaLL{CashierID}.pdf"
 
         print('file_path:', file_path)
@@ -2066,11 +3295,24 @@ def check_mobile(request):
 def user_login_api(request):
     try:
         if request.method == 'POST':
+
             username = request.data.get('username')
             password = request.data.get('password')
             serial_number = request.data.get('SERIALNO')
+            machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number).first()
+            ul = ProductSiteSetup.objects.filter(site_code = int(machineInfo.site_no)).first()
+            ul_code = 0
+            ul_desc = ''
+            if ul:
+                
+                ul_info = UnitLocation.objects.filter(ul_code=ul.ul_code,active ='Y').first()
+                if ul_info:
+                    ul_code = ul_info.ul_code
+                    ul_desc = ul_info.location_description
+
+                
             hashed_password = make_password(password)
-            print('login')
+
 
             password1 = 'Lsi#1288'
             current_date = date.today()
@@ -2090,8 +3332,9 @@ def user_login_api(request):
             # CHECK IF MOBILE DEVICE
             user_agent = get_user_agent(request)
             is_mobile = user_agent.is_mobile
-
-            if (username.lower()=='Admin') & (password==password_with_date):
+            
+            if username.lower() == 'admin' and password == password_with_date:
+            # if (username.lower()=='admin') & (password==password_with_date):
                 # print('yy',serial_number)
                 if is_mobile == False:
                             infolist ={
@@ -2101,7 +3344,10 @@ def user_login_api(request):
                                 'UserName':'Admin',
                                 'TerminalNo':0,
                                 'SiteCode': 0,
-                                'PTU': 0 
+                                'PTU': 0 ,
+                                'location':f'{ul_code}  ' - '  {ul_desc}'
+                                
+
                             }
                             # is_delete = User.objects.get(id_code='9999',sys_type ='POS')
                             # if is_delete:
@@ -2166,14 +3412,20 @@ def user_login_api(request):
                     return JsonResponse({'message':'Error'},status=404)
                     
             user = authenticate(request, username=username, password=password)
+
+            
+            
+            
             if user is not None:
                 stored_hashed_password = user.password
                 # stored_hashed_password = make_password(password_with_date)
                 if check_password(password, stored_hashed_password):
                     # pdb.set_trace()
-                    machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number.strip()).first()
+                    
                     latest_trans_id = PosCashiersLogin.objects.aggregate(max_trans_id=Max('trans_id'))['max_trans_id']
                     new_trans_id = 0
+                    if user.user_rank =='Cashier' and is_mobile == True:
+                        return JsonResponse({'message': 'Invalid credentials'}, status=401)
                     if is_mobile == False:
                         if user.user_rank =='Cashier':
                             current_date_ph = GetPHilippineDate()
@@ -2238,7 +3490,8 @@ def user_login_api(request):
                                 'TerminalNo': machineInfo.terminal_no,
                                 'SiteCode': machineInfo.site_no,
                                 'PTU': machineInfo.PTU_no,
-                                'TransID':new_trans_id
+                                'TransID':new_trans_id,
+                                'location':f'{ul_code}  -   {ul_desc}'
                             }
                             
                             if user is None:
@@ -2328,7 +3581,8 @@ def user_login_api(request):
                                     'TerminalNo': machineInfo.terminal_no,
                                     'SiteCode': machineInfo.site_no,
                                     'PTU': machineInfo.PTU_no,
-                                    'TransID':new_trans_id
+                                    'TransID':new_trans_id,
+                                    'location':f'{ul_code}  -   {ul_desc}'
                                 }
                                 # user = authenticate(request, username=username, password=password_with_date)
                                 if user is None:
@@ -2383,7 +3637,8 @@ def user_login_api(request):
                                     'TerminalNo': machineInfo.terminal_no,
                                     'SiteCode': machineInfo.site_no,
                                     'PTU': machineInfo.PTU_no,
-                                    'TransID':new_trans_id
+                                    'TransID':new_trans_id,
+                                    'location':f'{ul_code}  -   {ul_desc}'
                                 }
                                 # user = authenticate(request, username=username, password=password_with_date)
                                 if user is None:
@@ -2473,7 +3728,8 @@ def user_login_api(request):
                                 'TerminalNo': machineInfo.terminal_no,
                                 'SiteCode': machineInfo.site_no,
                                 'PTU': machineInfo.PTU_no,
-                                'TransID':new_trans_id
+                                'TransID':new_trans_id,
+                                'location':f'{ul_code}  -   {ul_desc}'
                             }
                        
 
@@ -2705,7 +3961,7 @@ def user_endshift_api(request):
 
 def verification_account(request):
     if request.method == 'GET':
-        print('verified')
+  
         # body_unicode = request.body
         # body_data = json.loads(body_unicode)
         username = request.GET.get('username')
@@ -2718,11 +3974,12 @@ def verification_account(request):
             if check_password(password, stored_hashed_password):
             
                 infolist ={
+                    'id_code':user.id_code,
                     'UserRank': user.user_rank,
                     'FullName':user.fullname,   
                 }
-                print('infolist',infolist)
                 
+
                 return JsonResponse({'Info':infolist}, status=200)
             else:
                 return JsonResponse({'message': 'Invalid credentials'}, status=401)  

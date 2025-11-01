@@ -371,6 +371,29 @@ class PosPriceTypeSiteSetup(models.Model):
     class Meta:
         managed = False
         db_table = 'tbl_pos_pricetype_site_setup'
+
+class ProductMultiplePrice(models.Model):
+    autonum = models.BigAutoField(primary_key=True)
+    bar_code = models.CharField(max_length=20)
+    site_code = models.IntegerField()
+    price_type = models.CharField(max_length=20)
+    price_name = models.CharField(max_length=100, default='0', blank=True)
+    amount = models.DecimalField(max_digits=21, decimal_places=4, default=0.0000)
+    parent_autonum_ref = models.CharField(max_length=50, default='', blank=True)
+    sync_created = models.CharField(max_length=50, default='', blank=True)
+    sync_status_server1 = models.CharField(max_length=4, default='NO')
+    sync_status = models.CharField(max_length=4, default='NO')
+    sync_created_server1 = models.CharField(max_length=50, default='', blank=True)
+
+
+
+    class Meta:
+        db_table = 'tbl_product_multiple_price'
+        verbose_name = 'Product Multiple Price'
+        verbose_name_plural = 'Product Multiple Prices'
+
+    def __str__(self):
+        return f"{self.bar_code} - {self.price_type} - {self.price_name}"
        
 class PosSalesTransSeniorCitizenDiscount(models.Model):
     autonum = models.BigAutoField(primary_key=True)
@@ -716,7 +739,6 @@ class Customer(models.Model):
     mobile_no = models.CharField(max_length=15, default=' ')
     fax_no = models.CharField(max_length=15, default=' ')
     st_address = models.CharField(max_length=60, default=' ')
-    # province = models.CharField(max_length=225, default=' ')
     city_address = models.CharField(max_length=30, default=' ')
     zip_code = models.IntegerField(default=0)
     vat = models.CharField(max_length=1, default='')
@@ -735,8 +757,6 @@ class Customer(models.Model):
     group_name = models.CharField(max_length=150, default=' ')
     area_id = models.IntegerField(default=0)
     area_name = models.CharField(max_length=150, default=' ')
-    # sub_area_id = models.IntegerField(default=0)
-    # sub_area_name = models.CharField(max_length=150, default='')
     office_name = models.CharField(max_length=150, default=' ')
     agent_id = models.IntegerField(default=0)
     agent_name = models.CharField(max_length=150, default=' ')
@@ -749,11 +769,8 @@ class Customer(models.Model):
     date_entered = models.DateField(default='1900-01-01')
     ul_code = models.IntegerField(default=0)
     Concessionare = models.CharField(max_length=10, default='')
-    # sys_type = models.CharField(max_length=11, default='')
-    # joblot_no_ref = models.BigIntegerField(default=0)
     sl_category = models.CharField(max_length=50, default='')
-    # sl_sub_category_id = models.IntegerField(default=0)
-    # sl_sub_category_description = models.CharField(max_length=50, default='')
+
     class Meta:
         db_table = 'tbl_customer'
         managed = False
@@ -767,9 +784,11 @@ class PosWaiterList(models.Model):
         db_table = 'tbl_pos_waiterlist'
         managed = False
 
-class MainRefSlSupplier(models.Model):
-    autonum = models.AutoField(primary_key=True)
-    id_code = models.PositiveIntegerField(default=0)
+from django.db import models
+
+class Supplier(models.Model):
+    autonum = models.AutoField(primary_key=True)  # AUTO_INCREMENT primary key
+    id_code = models.PositiveIntegerField(default=0, unique=True)  # unique key RestrictDupIDCode
     trade_name = models.CharField(max_length=150, default='')
     supplier_class = models.CharField(max_length=15, default=' ')
     last_name = models.CharField(max_length=30)
@@ -780,24 +799,30 @@ class MainRefSlSupplier(models.Model):
     fax_no = models.CharField(max_length=15, default=' ')
     st_address = models.CharField(max_length=150, default=' ')
     city_address = models.CharField(max_length=150, default=' ')
-    # province = models.CharField(max_length=150, default=' ')
-    # zip_code = models.PositiveIntegerField(default=0)
-    # trade = models.CharField(max_length=1, default='')
-    # vat_registration_type = models.CharField(max_length=1, default='')
-    # tax_id_no = models.CharField(max_length=25, default=' ')
+    zip_code = models.PositiveIntegerField(default=0)
+    trade = models.CharField(max_length=1, default='')
+    vat = models.CharField(max_length=1, default='')
+    bir_reg_no = models.CharField(max_length=20, default=' ')
+    tax_id_no = models.CharField(max_length=25, default=' ')
+    credit_terms = models.SmallIntegerField(default=0)
+    credit_limit = models.DecimalField(max_digits=15, decimal_places=3, default=0.000)
+    balance = models.DecimalField(max_digits=15, decimal_places=3, default=0.000)
+    date_as_of = models.DateField(default='1960-01-01')
     active = models.CharField(max_length=1, default='Y')
-    # group_id = models.PositiveIntegerField(default=0)
-    # group_name = models.CharField(max_length=150, default=' ')
-    # remarks = models.CharField(max_length=100, default=' ')
-    # supplier_image = models.BinaryField(null=True, blank=True)
-    # date_entered = models.DateField(default='1960-01-01')
-    # ul_code = models.PositiveIntegerField(default=0)
-    # sl_sub_category_id = models.PositiveIntegerField(default=0)
-    # sl_sub_category_description = models.CharField(max_length=50, default='')
+    group_id = models.IntegerField(default=0)
+    group_name = models.CharField(max_length=150, default=' ')
+    remarks = models.CharField(max_length=100, default=' ')
+    supplier_image = models.BinaryField(null=True, blank=True)  # longblob
+    date_entered = models.DateField(default='1960-01-01')
+    ul_code = models.IntegerField(default=0)
+    sl_category = models.CharField(max_length=50, default='')
+    sync_status = models.CharField(max_length=4, default='NO')
+    date_created = models.CharField(max_length=30, default='')
+    edited = models.CharField(max_length=1, default='')
 
     class Meta:
         db_table = 'tbl_supplier'
-        managed = False
+        unique_together = ('id_code', 'trade_name', 'last_name', 'first_name', 'middle_name')  # composite unique
 
 class MainRefCustomer(models.Model):
     id = models.AutoField(primary_key=True)
@@ -1575,4 +1600,59 @@ class PosOtherPmtSetup(models.Model):
     class Meta:
         db_table = 'tbl_pos_other_pmt_setup'
         managed = False
+
+
+class TmpPosWebScDiscountList(models.Model):
+    terminal_no = models.BigIntegerField(default=0)
+    site_no = models.BigIntegerField(default=0)
+    cashier_id = models.BigIntegerField(default=0)
+    so_no = models.BigIntegerField(default=0)
+    SeniorCount = models.BigIntegerField(default=0)
+    SGuestCount = models.BigIntegerField(default=0)
+    SAmountCovered = models.DecimalField(max_digits=9, decimal_places=3, default=0.000)
+    SVatSales = models.DecimalField(max_digits=9, decimal_places=3, default=0.000)
+    SLessVat12 = models.DecimalField(max_digits=9, decimal_places=3, default=0.000)
+    SNetOfVat = models.DecimalField(max_digits=9, decimal_places=3, default=0.000)
+    SLess20SCDiscount = models.DecimalField(max_digits=9, decimal_places=3, default=0.000)
+    SDiscountedPrice = models.DecimalField(max_digits=9, decimal_places=3, default=0.000)
+
+    class Meta:
+        db_table = 'tmp_tbl_pos_web_sc_discount_list'
+        managed = False
+
+
+class TmpPosWebScDiscountListing(models.Model):
+    terminal_no = models.BigIntegerField(default=0)
+    site_no = models.BigIntegerField(default=0)
+    cashier_id = models.BigIntegerField(default=0)
+    so_no = models.BigIntegerField(default=0)
+    SID = models.BigIntegerField(default=0)
+    SNAME = models.CharField(max_length=225, default='')
+    STIN = models.CharField(max_length=225, default='')
+
+    class Meta:
+        db_table = 'tmp_tbl_pos_web_sc_discount_listing'
+        managed = False  # ✅ Set to True if Django should create/manage this table
+
+
+class UnitLocation(models.Model):
+    autonum = models.AutoField(primary_key=True)
+    ul_code = models.PositiveSmallIntegerField(default=0)
+    unit_description = models.CharField(max_length=30, default=' ')
+    location_description = models.CharField(max_length=40, default=' ')
+    alpha_code = models.CharField(max_length=10, default='')
+    active = models.CharField(max_length=1, default='Y')
+    date_created = models.CharField(max_length=30, default='')
+    edited = models.CharField(max_length=1, default='')
+
+    class Meta:
+        db_table = 'tbl_unit_location'
+        managed = False
+   
+
+
+
+
+
+
 

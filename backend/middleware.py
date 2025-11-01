@@ -32,7 +32,7 @@ class CookieJWTAuthMiddleware(BaseMiddleware):
         headers = dict(scope.get("headers", []))
         cookies = headers.get(b'cookie', b'').decode()
         raw_token = None
-        print('token',raw_token)
+        
 
         # Parse cookies
         for c in cookies.split(";"):
@@ -44,13 +44,14 @@ class CookieJWTAuthMiddleware(BaseMiddleware):
         token_data = None
         if raw_token:
             user, token_data = await get_user_from_token(raw_token)
-
+        print('token',raw_token)
         # Attach user & extra info to scope
         scope["user"] = user if user else AnonymousUser()
         if token_data:
             scope["SERIALNO"] = token_data.get("SERIALNO")
             scope["TERMINALNO"] = token_data.get("TERMINALNO")
             scope["MACHINENO"] = token_data.get("MACHINENO")
+
 
         return await super().__call__(scope, receive, send)
 

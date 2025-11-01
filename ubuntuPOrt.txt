@@ -1,0 +1,56 @@
+# Run in Windows PowerShell as Admin
+netsh interface portproxy add v4tov4 listenport=443 listenaddress=192.168.68.110 connectport=443 connectaddress=<WSL_IP>
+
+
+sudo ln -s /etc/nginx/sites-available/backendD /etc/nginx/sites-enabled/
+Enable site and restart NGINX:
+
+sudo ln -s /etc/nginx/sites-available/backendD /etc/nginx/sites-enabled/
+sudo nginx -t
+sudo systemctl restart nginx
+
+Step 2️⃣: Generate self-signed certificate
+sudo mkdir -p /etc/ssl/private /etc/ssl/certs
+
+sudo openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+-keyout /etc/ssl/private/mykey.pem \
+-out /etc/ssl/certs/mycert.pem \
+-subj "/C=PH/ST=State/L=City/O=MyCompany/OU=IT/CN=192.168.68.110"
+
+
+CN must match the IP used by Windows/Electron (192.168.68.110).
+
+Step 3️⃣: Test NGINX inside WSL
+curl -vk https://0.0.0.0
+
+
+Should show Django HTML output.
+
+If this works, SSL + NGINX are fine locally.
+
+Step 4️⃣: Allow port 443 in Windows Firewall
+
+Open PowerShell as Admin:
+
+New-NetFirewallRule -DisplayName "Allow NGINX HTTPS" -Direction Inbound -LocalPort 443 -Protocol TCP -Action Allow
+
+
+Also make sure Norton or any security software allows WSL processes.
+
+Step 5️⃣: Forward LAN IP to WSL (WSL1 limitation)
+
+WSL1 cannot bind directly to Windows LAN IP (192.168.68.110). Use portproxy:
+
+# Forward LAN 192.168.68.110:443 → WSL 127.0.0.1:443
+netsh interface portproxy add v4tov4 listenport=443 listenaddress=192.168.68.110 connectport=443 connectaddress=127.0.0.1
+
+
+Verify:
+
+netsh interface portproxy show all
+
+
+Now Windows/Electron can reach NGINX via LAN IP.
+
+
+

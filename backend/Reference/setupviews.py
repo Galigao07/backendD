@@ -421,8 +421,6 @@ def get_allowed_price_type(request):
             siteCode = request.query_params.get('site_code',None)
             siteDesc = request.query_params.get('site_desc',None)
 
-            print(siteCode,siteDesc)
-
             if siteCode:
                 product_setup2 = []
                 product_setup = ProductSiteSetup.objects.filter(site_code=siteCode,site_desc=siteDesc)
@@ -438,7 +436,7 @@ def get_allowed_price_type(request):
                 product_setup_serialize = ProductSiteSetupSerializer(product_setup,many=True)
 
                 for item in product_setup_serialize.data[0]:
-                    print('sadadas',product_setup_serialize.data[0])
+    
                     if isinstance(item, dict):
                         site_code = int(item['site_code'])
                         multiple_price = PosMultiplePriceTypeSiteSetup.objects.filter(site_code=site_code, site_name=item['site_name'])

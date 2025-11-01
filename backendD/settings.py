@@ -29,7 +29,7 @@ SECRET_KEY = 'django-insecure-q(#tia376$n+1ugieitp!znvus1!!q0v(vz#(-da5m&ot!w53y
 # DEBUG = True
 
 
-ALLOWED_HOSTS = ["*", "192.168.1.3", "localhost","192.168.68.120"]
+ALLOWED_HOSTS = ["*", "192.168.1.3", "localhost","192.168.68.110"]
 
 DEBUG = True
 
@@ -114,20 +114,20 @@ CORS_ORIGIN_ALLOW_ALL = True
 
 
 # ****** FOR DEVELOPMENT SETUP *****
-SESSION_COOKIE_SAMESITE = "Lax"
-SESSION_COOKIE_SECURE = False
-CSRF_COOKIE_SAMESITE = "Lax"
-CSRF_COOKIE_SECURE = False
-JWT_COOKIE_SECURE = False
-JWT_COOKIE_SAMESITE = "Lax"
+# SESSION_COOKIE_SAMESITE = "Lax"
+# SESSION_COOKIE_SECURE = False
+# CSRF_COOKIE_SAMESITE = "Lax"
+# CSRF_COOKIE_SECURE = False
+# JWT_COOKIE_SECURE = False
+# JWT_COOKIE_SAMESITE = "Lax"
 
 # ****** FOR PRODUCTION SETUP *****
-# JWT_COOKIE_SECURE = True
-# JWT_COOKIE_SAMESITE = "None"
-# SESSION_COOKIE_SAMESITE = "None"   # allow cross-site (important for HTTPS + frontend)
-# SESSION_COOKIE_SECURE = True       # cookies sent only over HTTPS
-# CSRF_COOKIE_SAMESITE = "None"
-# CSRF_COOKIE_SECURE = True
+JWT_COOKIE_SECURE = True
+JWT_COOKIE_SAMESITE = "None"
+SESSION_COOKIE_SAMESITE = "None"   # allow cross-site (important for HTTPS + frontend)
+SESSION_COOKIE_SECURE = True       # cookies sent only over HTTPS
+CSRF_COOKIE_SAMESITE = "None"
+CSRF_COOKIE_SECURE = True
 
 
 CORS_ALLOW_ORIGIN_REGEX = r'^https?://\w+(\.\w+)+(:\d{1,5})?$'  # Regex to match origins
@@ -188,7 +188,8 @@ CORS_ALLOWED_ORIGINS = [
     "http://127.0.0.1:3000",
     "app://.",
     "file://",
-    "http://192.168.68.120:3000"
+    "http://192.168.68.110:3000",
+    "http://192.168.68.110:19000",  # Your Expo dev server
 ]
 
 CORS_ALLOWED_ORIGIN_REGEXES = [
@@ -196,10 +197,10 @@ CORS_ALLOWED_ORIGIN_REGEXES = [
     r"^file://.*$",
     r"^http://localhost.*$",
     r"^http://192\.168\.1\.3.*$",
-    r"^http://192\.168\.68\.120.*$"
+    r"^http://192\.168\.68\.110.*$"
 ]
 
-CSRF_TRUSTED_ORIGINS = ["http://localhost:3000", "app://.","http://192.168.68.120:3000"]
+CSRF_TRUSTED_ORIGINS = ["http://localhost:3000", "app://.","http://192.168.68.110:3000"]
 
 DATABASES = {
     'default': {
@@ -207,7 +208,7 @@ DATABASES = {
         'NAME': 'db_gerry_bels2Q25v2',
         'USER': 'root',
         'PASSWORD': 'lsi2010',
-        'HOST': '192.168.68.120',  # Use the service name
+        'HOST': '192.168.68.110',  # Use the service name
         'PORT': '3309'    # MySQL default port
 
     }
