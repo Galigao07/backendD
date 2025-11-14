@@ -1169,7 +1169,9 @@ class PosSalesInvoiceList(models.Model):
     cashier_id = models.IntegerField(default=0)
     so_no = models.CharField(max_length=50, default=' ')
     so_doc_no = models.CharField(max_length=999, default='')
-    doc_date = models.CharField(max_length=25, default=' ')
+    doc_date = models.DateTimeField(null=True, blank=True)
+
+    # doc_date = models.CharField(max_length=25, default=' ')
     customer_code = models.IntegerField(default=0)
     customer_name = models.CharField(max_length=100, default=' ')
     customer_address = models.CharField(max_length=250, default=' ')
@@ -1354,6 +1356,10 @@ class POSSettings(models.Model):
     ProductColPerRows = models.IntegerField(default=6)
     TableColPerRows = models.IntegerField(default=6)
     ShowArrowUpAndDown = models.CharField(max_length=6, default='False')
+    transaction_discount = models.CharField(max_length=6, default='False')
+    naac_discount = models.CharField(max_length=6, default='N')
+    pwd_discount = models.CharField(max_length=6, default='N')
+
 
     class Meta:
         db_table = 'tbl_pos_settings'
@@ -1649,6 +1655,258 @@ class UnitLocation(models.Model):
         db_table = 'tbl_unit_location'
         managed = False
    
+
+
+class PosPriceOverride(models.Model):
+    salesdetails_id = models.IntegerField(null=True, blank=True)
+    terminal_no = models.BigIntegerField(default=0)
+    details_id = models.IntegerField(primary_key=True, default=0)
+    original_price = models.DecimalField(max_digits=11, decimal_places=2, null=True, blank=True)
+    override_price = models.DecimalField(max_digits=11, decimal_places=2, null=True, blank=True)
+    override_by = models.CharField(max_length=100, null=True, blank=True)
+    parent_autonum_ref = models.CharField(max_length=50, default='', blank=True)
+    sync_created = models.CharField(max_length=50, default='', blank=True)
+    sync_status_server1 = models.CharField(max_length=4, default='NO', blank=True)
+    sync_status = models.CharField(max_length=4, default='NO', blank=True)
+    sync_created_server1 = models.CharField(max_length=50, default='', blank=True)
+
+    class Meta:
+        db_table = 'tbl_pos_price_overrides'
+        managed = False  # change to False if Django shouldn't create or modify this table
+        verbose_name = 'POS Price Override'
+        verbose_name_plural = 'POS Price Overrides'
+
+    def __str__(self):
+        return f"Override {self.details_id} - {self.override_by}"
+
+
+class PosDiscountSetup(models.Model):
+    autonum = models.BigAutoField(primary_key=True)
+    description = models.CharField(max_length=225, null=True, blank=True)
+    disc_rate = models.DecimalField(max_digits=9, decimal_places=3, default=0.000)
+
+    class Meta:
+        db_table = 'tbl_pos_discount_setup'
+        verbose_name = 'POS Discount Setup'
+        verbose_name_plural = 'POS Discount Setups'
+
+    def __str__(self):
+        return self.description or f"Discount {self.autonum}"
+
+
+class PosSalesReturnList(models.Model):
+    autonum = models.BigAutoField(primary_key=True)
+    company_code = models.CharField(max_length=10, default='')
+    ul_code = models.PositiveIntegerField(default=0)
+    site_code = models.IntegerField(default=0)
+    trans_type = models.CharField(max_length=100, default=' ')
+    discount_type = models.CharField(max_length=4, default='')
+    zread_no = models.FloatField(default=0.000)
+    doc_type = models.CharField(max_length=10, default='')
+    doc_no = models.FloatField(default=0.000)
+    invoice_ret_ref = models.CharField(max_length=21, default='')
+    terminal_no = models.CharField(max_length=21, default='0')
+    cashier_id = models.IntegerField(default=0)
+    so_no = models.CharField(max_length=50, default=' ')
+    doc_date = models.CharField(max_length=25, default=' ')
+    customer_code = models.IntegerField(default=0)
+    customer_name = models.CharField(max_length=100, default=' ')
+    customer_address = models.CharField(max_length=250, default=' ')
+    business_unit = models.CharField(max_length=100, default=' ')
+    customer_type = models.CharField(max_length=1, default='')
+    salesman_id = models.IntegerField(default=0)
+    salesman = models.CharField(max_length=100, default=' ')
+    collector_id = models.IntegerField(default=0)
+    collector = models.CharField(max_length=100, default=' ')
+    pricing = models.CharField(max_length=25, default=' ')
+    terms = models.IntegerField(default=0)
+    remarks = models.TextField(null=True, blank=True)
+    due_date = models.DateField(null=True, blank=True)
+    ServiceCharge_TotalAmount = models.FloatField(null=True, blank=True)
+    other_income = models.FloatField(default=0.000)
+    total_cash = models.FloatField(default=0.000)
+    total_check = models.FloatField(default=0.000)
+    total_pdc = models.FloatField(default=0.000)
+    total_eps = models.FloatField(default=0.000)
+    total_credit_card = models.FloatField(default=0.000)
+    total_credit_sales = models.FloatField(default=0.000)
+    online_payment = models.FloatField(default=0.000)
+    gift_check = models.FloatField(default=0.000)
+    other_payment = models.FloatField(default=0.000)
+    total_adv = models.FloatField(default=0.000)
+    total_qty = models.FloatField(default=0.000)
+    discount = models.DecimalField(max_digits=21, decimal_places=9, default=0.000000000)
+    vat = models.DecimalField(max_digits=21, decimal_places=9, default=0.000000000)
+    vat_exempt = models.DecimalField(max_digits=21, decimal_places=9, default=0.000000000)
+    vat_exempted = models.DecimalField(max_digits=21, decimal_places=9, default=0.000000000)
+    net_vat = models.DecimalField(max_digits=21, decimal_places=9, default=0.000000000)
+    net_discount = models.DecimalField(max_digits=21, decimal_places=9, default=0.000000000)
+    sub_total = models.DecimalField(max_digits=21, decimal_places=9, default=0.000000000)
+    lvl1_disc = models.DecimalField(max_digits=15, decimal_places=5, default=0.00000)
+    lvl2_disc = models.DecimalField(max_digits=15, decimal_places=5, default=0.00000)
+    lvl3_disc = models.DecimalField(max_digits=15, decimal_places=5, default=0.00000)
+    lvl4_disc = models.DecimalField(max_digits=15, decimal_places=5, default=0.00000)
+    lvl5_disc = models.DecimalField(max_digits=15, decimal_places=5, default=0.00000)
+    HMO = models.CharField(max_length=150, default=' ')
+    PHIC = models.CharField(max_length=1, default='')
+    status = models.CharField(max_length=1, default='')
+    prepared_id = models.IntegerField(default=0)
+    prepared_by = models.CharField(max_length=60, default=' ')
+    reviewed_by = models.CharField(max_length=60, null=True, blank=True)
+    approved_date = models.CharField(max_length=25, null=True, blank=True)
+    approved_by = models.CharField(max_length=60, null=True, blank=True)
+    reviewed_date = models.CharField(max_length=25, null=True, blank=True)
+    cancel_by = models.CharField(max_length=60, default=' ')
+    cancel_date = models.CharField(max_length=25, default=' ')
+    sys_type = models.CharField(max_length=11, default='')
+    parent_autonum_ref = models.CharField(max_length=50, default='')
+    sync_created = models.CharField(max_length=50, default='')
+    sync_status_server1 = models.CharField(max_length=4, default='NO')
+    sync_status = models.CharField(max_length=4, default='NO')
+    sync_terminal_no = models.IntegerField(default=0)
+    sync_created_server1 = models.CharField(max_length=50, default='')
+
+    class Meta:
+        db_table = 'tbl_pos_sales_return_list'
+        managed = False
+
+
+class PosSalesReturnListing(models.Model):
+    autonum = models.BigAutoField(primary_key=True)
+    company_code = models.CharField(max_length=10, default='')
+    ul_code = models.PositiveIntegerField(default=0)
+    site_code = models.IntegerField(default=0)
+    doc_type = models.CharField(max_length=10, default='')
+    doc_no = models.FloatField(default=0.000)
+    invoice_ret_ref = models.CharField(max_length=21, default='')
+    terminal_no = models.CharField(max_length=21, default='0')
+    zread_no = models.FloatField(default=0.000)
+    cashier_id = models.IntegerField(default=0)
+    doc_date = models.CharField(max_length=25, default=' ')
+    line_number = models.PositiveIntegerField(default=0)
+    bar_code = models.CharField(max_length=20, default=' ')
+    alternate_code = models.CharField(max_length=20, default=' ')
+    item_code = models.CharField(max_length=20, default=' ')
+    rec_qty = models.FloatField(default=0.000)
+    rec_uom = models.CharField(max_length=30, default=' ')
+    description = models.CharField(max_length=500, default=' ')
+    unit_price = models.FloatField(default=0.000)
+    sub_total = models.FloatField(default=0.000)
+    pc_price = models.FloatField(default=0.000)
+    qtyperuom = models.FloatField(default=0.000)
+    disc_amt = models.FloatField(null=True, blank=True)
+    desc_rate = models.CharField(max_length=100, default='0.000')
+    vat_amt = models.FloatField(default=0.000)
+    vat_exempt = models.DecimalField(max_digits=21, decimal_places=9, default=0.000000000)
+    net_total = models.FloatField(default=0.000)
+    isvoid = models.CharField(max_length=3, null=True, blank=True)
+    unit_cost = models.DecimalField(max_digits=21, decimal_places=9, default=0.000000000)
+    vatable = models.CharField(max_length=2, default='')
+    status = models.CharField(max_length=1, default='')
+    so_no = models.FloatField(default=0.000)
+    sn_bc = models.CharField(max_length=10, default='')
+    discounted_by = models.CharField(max_length=21, default='')
+    parent_autonum_ref = models.CharField(max_length=50, default='')
+    sync_created = models.CharField(max_length=50, default='')
+    sync_status_server1 = models.CharField(max_length=4, default='NO')
+    sync_status = models.CharField(max_length=4, default='NO')
+    sync_terminal_no = models.IntegerField(default=0)
+    sync_created_server1 = models.CharField(max_length=50, default='')
+
+    class Meta:
+        db_table = 'tbl_pos_sales_return_listing'
+        managed = False
+
+
+
+
+class PosZReading(models.Model):
+    autonum = models.BigAutoField(primary_key=True)
+    company_code = models.CharField(max_length=10, null=True, blank=True)
+    ul_code = models.IntegerField(default=0)
+    site_code = models.IntegerField(default=0)
+    terminal_no = models.IntegerField(default=0)
+    machine_no = models.CharField(max_length=50, default=' ')
+    date_trans = models.DateField(null=True, blank=True)
+    zread_no = models.IntegerField(default=0)
+    doc_type = models.CharField(max_length=10, null=True, blank=True)
+
+    total_daily_sales = models.DecimalField(max_digits=15, decimal_places=3, default=0.000)
+    total_sales_return = models.DecimalField(max_digits=15, decimal_places=3, default=0.000)
+    total_cash = models.DecimalField(max_digits=15, decimal_places=3, default=0.000)
+    total_check = models.DecimalField(max_digits=15, decimal_places=3, default=0.000)
+    total_pdc = models.DecimalField(max_digits=15, decimal_places=3, default=0.000)
+    total_eps = models.DecimalField(max_digits=15, decimal_places=3, default=0.000)
+    total_credit_card = models.DecimalField(max_digits=15, decimal_places=3, default=0.000)
+    total_credit_sales = models.DecimalField(max_digits=15, decimal_places=3, default=0.000)
+    total_online_payment = models.DecimalField(max_digits=15, decimal_places=3, default=0.000)
+    total_gift_check = models.DecimalField(max_digits=15, decimal_places=3, default=0.000)
+    other_payment = models.DecimalField(max_digits=15, decimal_places=3, default=0.000)
+    new_grand_total = models.DecimalField(max_digits=15, decimal_places=3, default=0.000)
+    old_grand_total = models.DecimalField(max_digits=15, decimal_places=3, default=0.000)
+    sales_with_VAT = models.DecimalField(max_digits=15, decimal_places=3, default=0.000)
+    sales_VAT_Exempt = models.DecimalField(max_digits=15, decimal_places=3, default=0.000)
+    sales_Zero_Rated = models.DecimalField(max_digits=15, decimal_places=3, default=0.000)
+    sales_NON_VAT = models.DecimalField(max_digits=15, decimal_places=3, default=0.000)
+
+    or_from = models.DecimalField(max_digits=15, decimal_places=0, default=0)
+    or_to = models.DecimalField(max_digits=15, decimal_places=0, default=0)
+    or_total = models.DecimalField(max_digits=15, decimal_places=0, default=0)
+    ci_from = models.DecimalField(max_digits=15, decimal_places=0, default=0)
+    ci_to = models.DecimalField(max_digits=15, decimal_places=0, default=0)
+    ci_total = models.DecimalField(max_digits=15, decimal_places=0, default=0)
+    from_si_no = models.DecimalField(max_digits=15, decimal_places=0, default=0)
+    to_si_no = models.DecimalField(max_digits=15, decimal_places=0, default=0)
+    from_sr_no = models.DecimalField(max_digits=15, decimal_places=0, default=0)
+    to_sr_no = models.DecimalField(max_digits=15, decimal_places=0, default=0)
+    total_invoices = models.DecimalField(max_digits=15, decimal_places=0, default=0)
+
+    zread_time = models.CharField(max_length=30, default=' ')
+    parent_autonum_ref = models.CharField(max_length=50, default='', blank=True)
+    sync_created = models.CharField(max_length=50, default='', blank=True)
+    sync_status_server1 = models.CharField(max_length=4, default='NO')
+    sync_status = models.CharField(max_length=4, default='NO')
+    sync_terminal_no = models.IntegerField(default=0)
+    sync_created_server1 = models.CharField(max_length=50, default='', blank=True)
+
+    class Meta:
+        db_table = 'tbl_pos_zreading'
+        managed = False  # set to True if Django should manage the table
+
+    def __str__(self):
+        return f"Z-Reading #{self.zread_no} ({self.date_trans})"
+
+
+from django.db import models
+
+class TblPosDailyRecords(models.Model):
+    id = models.IntegerField(primary_key=True)
+    prepared_by = models.IntegerField(default=0, null=True)
+    datetime_stamp = models.CharField(max_length=30, null=True, blank=True)
+    site_code = models.CharField(max_length=100, null=True, blank=True)
+    ul_code = models.IntegerField(null=True, blank=True)
+    company_code = models.CharField(max_length=50, null=True, blank=True)
+    terminal_no = models.CharField(max_length=50, null=True, blank=True)
+    machine_no = models.CharField(max_length=50, null=True, blank=True)
+    tin_no = models.CharField(max_length=50, null=True, blank=True)
+    sn_no = models.CharField(max_length=50, null=True, blank=True)
+    min_no = models.CharField(max_length=50, null=True, blank=True)
+    register_no = models.CharField(max_length=50, null=True, blank=True)
+    iszread = models.CharField(max_length=3, default='NO', null=True, blank=True)
+    parent_autonum_ref = models.CharField(max_length=50, default='', null=True, blank=True)
+    sync_created = models.CharField(max_length=50, default='', null=True, blank=True)
+    sync_status_server1 = models.CharField(max_length=4, default='NO', null=True, blank=True)
+    sync_status = models.CharField(max_length=4, default='NO', null=True, blank=True)
+    sync_terminal_no = models.IntegerField(default=0, null=True, blank=True)
+    sync_created_server1 = models.CharField(max_length=50, default='', null=True, blank=True)
+
+    class Meta:
+        managed = False  # Django will not create, modify, or delete this table
+        db_table = 'tbl_pos_daily_records'
+
+
+
+
 
 
 

@@ -1,5 +1,11 @@
+#delete Existing portproxy
+netsh interface portproxy delete v4tov4 listenaddress=192.168.1.6 listenport=443
+
 # Run in Windows PowerShell as Admin
 netsh interface portproxy add v4tov4 listenport=443 listenaddress=192.168.68.110 connectport=443 connectaddress=<WSL_IP>
+
+#sample
+netsh interface portproxy add v4tov4 listenaddress=192.168.1.6 listenport=443 connectaddress=172.31.126.117 connectport=443
 
 
 sudo ln -s /etc/nginx/sites-available/backendD /etc/nginx/sites-enabled/
@@ -16,6 +22,7 @@ sudo openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
 -keyout /etc/ssl/private/mykey.pem \
 -out /etc/ssl/certs/mycert.pem \
 -subj "/C=PH/ST=State/L=City/O=MyCompany/OU=IT/CN=192.168.68.110"
+
 
 
 CN must match the IP used by Windows/Electron (192.168.68.110).

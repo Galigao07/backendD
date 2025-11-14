@@ -72,6 +72,11 @@ class POSSettingsSerializer(serializers.ModelSerializer):
         model =  POSSettings
         fields = '__all__'
 
+class PosDiscountSetupSerializer(serializers.ModelSerializer):
+    class Meta:
+        model =  PosDiscountSetup
+        fields = '__all__'
+
 
 class AcctListSerializer(serializers.ModelSerializer):
     class Meta:
@@ -340,7 +345,19 @@ class SupplierSerializer(serializers.ModelSerializer):
         model =  Supplier
         fields = '__all__'
 
+class PosSalesReturnListSerializer(serializers.ModelSerializer):
+    class Meta:
+        model =  PosSalesReturnList
+        fields = '__all__'
 
+class PosSalesReturnListingSerializer(serializers.ModelSerializer):
+    class Meta:
+        model =  PosSalesReturnListing
+        fields = '__all__'
+class PosZReadingSerializer(serializers.ModelSerializer):
+    class Meta:
+        model =  PosZReading
+        fields = '__all__'
 
 
 

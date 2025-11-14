@@ -6,18 +6,19 @@ class BackendConfig(AppConfig):
     name = 'backend'
 
     def ready(self):
-        self.add_columns_if_not_exist()
+        self.add_columns_if_not_exist_pos_Settings()
         self.add_user_columns_if_not_exist()
         self.create_unmanaged_tables()
         self.add_tbl_product_site_setup_columns_if_not_exist()
         # import backend.signals
 
-    def add_columns_if_not_exist(self):
+    def add_columns_if_not_exist_pos_Settings(self):
         columns_to_add = [
             ("withHotel", "VARCHAR(6)", "'False'"),
             ("ProductColPerRows", "INT", "6"),
             ("TableColPerRows", "INT", "6"),
             ("ShowArrowUpAndDown", "VARCHAR(6)", "'False'"),
+            ("transaction_discount", "VARCHAR(6)", "'False'"),
         ]
 
         with connection.cursor() as cursor:
@@ -188,7 +189,15 @@ class BackendConfig(AppConfig):
                 STIN VARCHAR(225) DEFAULT '',
                 PRIMARY KEY (id)
                 ) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4;
-                """
+                """,
+                "tbl_pos_discount_setup": """
+                CREATE TABLE IF NOT EXISTS tbl_pos_discount_setup (
+                autonum BIGINT(20) NOT NULL AUTO_INCREMENT,
+                description VARCHAR(225) DEFAULT NULL,
+                disc_rate double(9,3) DEFAULT 0.000,
+                PRIMARY KEY (autonum)
+                ) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4;
+                """,
         }
 
         with connection.cursor() as cursor:

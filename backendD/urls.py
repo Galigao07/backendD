@@ -19,9 +19,10 @@ from django.urls import path,include
 
 urlpatterns = [
     # path('admin/', admin.site.urls),
-    path('api/',include('backend.urls')),
-    path('api/',include('backend.referenceurls')),
-    path('api/',include('backend.setupurls')),
-    path('api/',include('backend.administrationurls')),
+    path('api/',include('backend.url_all.urls')),
+    path('api/',include('backend.url_all.referenceurls')),
+    path('api/',include('backend.url_all.setupurls')),
+    path('api/',include('backend.url_all.taskpaneurls')),
+    path('api/',include('backend.url_all.administrationurls')),
     
 ]
