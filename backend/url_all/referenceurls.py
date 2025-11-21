@@ -16,11 +16,8 @@ urlpatterns = [
 #     path('update-waiter/', update_waiter, name='update_waiter'),
 #     path('delete-waiter/', delete_waiter, name='delete_waiter'),
 
-    path('add-users/', add_user, name='add_user'),
-    path('view-users/', view_user, name='view_user'),
-    path('employee-list/', get_employee_list, name='get_employee_list'),
-    path('update-users/', update_user, name='update_user'),
-    path('delete-users/', delete_user, name='delete_user'),
+
+    # path('employee-list/', get_employee_list, name='get_employee_list'),
     path('view-waiter/', view_waiter, name='view_waiter'),
     path('add-waiter/', add_waiter, name='add_waiter'),
     path('update-waiter/', update_waiter, name='update_waiter'),
@@ -30,9 +27,9 @@ urlpatterns = [
     path('update-table/', update_table, name='update_table'),
     path('delete-table/', delete_table, name='delete_table'),
     path('video-upload/', UploadVideo, name='UploadVideo'),
-    path('terminal-setup/', terminal_setup, name='terminal_setup'),
-    path('lead-setup/', lead_setup, name='lead_setup'),
-    path('client-setup/', Client_setup, name='Client_setup'),
+    # path('terminal-setup/', terminal_setup, name='terminal_setup'),
+    # path('lead-setup/', lead_setup, name='lead_setup'),
+    # path('client-setup/', Client_setup, name='Client_setup'),
     path('customer-details/', CustomerDetails, name='CustomerDetails'),
     path('customer-search/', CustomerSearchResults, name='CustomerSearchResults'),
     path('supplier-details/', SupplierDetails.as_view(), name='SupplierDetails'),
@@ -43,4 +40,9 @@ urlpatterns = [
     path('product-category-setup/', get_product_Category_setup, name='get_product_Category_setup'),
     path('gift-check-series/', Gift_Check_series, name='Gift_Check_series'),
     path('gift-check-denomination/', Gift_Check_Denomination, name='Gift_Check_Denomination'),
-] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+    path('item-type/', item_type_view, name='item_type_view'),
+    path('category-type/', category_all_view, name='category_all_view'),
+
+] 
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

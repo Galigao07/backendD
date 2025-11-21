@@ -62,6 +62,8 @@ from rest_framework.response import Response
 from backend.auth.authentication import CookieJWTAuthentication
 from rest_framework_simplejwt.exceptions import InvalidToken
 
+from rest_framework.settings import api_settings
+
 @api_view(['GET'])
 def check_access_token(request):
     auth = CookieJWTAuthentication()
@@ -4147,6 +4149,8 @@ def user_endshift_api(request):
 
             current_date_ph = GetPHilippineDate()
             current_datetime_ph = GetPHilippineDateTime()
+            print(TransID)
+            print(UserID)
 
             cashier_data = PosCashiersLogin.objects.get(id_code=UserID,trans_id = TransID,islogout='NO',isshift_end='NO')
 
@@ -4304,11 +4308,15 @@ def PrintXread(request,trans_id,cashier_name):
         _date = PosCashiersLogin.objects.filter(trans_id=trans_id).first()
         current_date_ph = GetPHilippineDate()
         current_datetime_ph = GetPHilippineDateTime()
-        filter_str = _date.date_stamp if _date and _date.date_stamp else current_date_ph
+        # filter_str = _date.date_stamp if _date and _date.date_stamp else current_date_ph
+        filter_str = request.data.get('DateFrom',None)
+        filter_str_to = request.data.get('DateTo',None)
 
         # Start and end of day as strings
-        date_from= filter_str + " 00:00:00"
-        date_to  = filter_str + " 23:59:59"
+        date_from = datetime.strptime(filter_str + " 00:00:00", "%Y-%m-%d %H:%M:%S")
+        date_to   = datetime.strptime(filter_str_to + " 23:59:59", "%Y-%m-%d %H:%M:%S")
+        # date_from= filter_str + " 00:00:00"
+        # date_to  = filter_str_to + " 23:59:59"
 
 
         trans_id = trans_id
@@ -4634,8 +4642,9 @@ def PrintXread(request,trans_id,cashier_name):
         start_line = x_start + 5 * mm
         end_line = x_end - 5 * mm
         
-        dt_obj = datetime.strptime(date_from, "%Y-%m-%d %H:%M:%S")
-        date_sales = datetime.strftime(dt_obj,'%m/%d/%Y')
+        # dt_obj = datetime.strptime(date_from, "%Y-%m-%d %H:%M:%S")
+        date_sales = datetime.strftime(date_from,'%m/%d/%Y')
+        date_sales_to = datetime.strftime(date_to,'%m/%d/%Y')
 
 
         c.drawString(10 * mm, y_position, f'Admin: {request.user.fullname}')
@@ -4644,7 +4653,12 @@ def PrintXread(request,trans_id,cashier_name):
         y_position -= line_height
         c.drawString(10 * mm, y_position, f'Cashier: {cashier_name}')
         y_position -= line_height
-        c.drawString(10 * mm, y_position, f'Date of Sales: {date_sales}')
+        if date_from.date() == date_to.date():
+            c.drawString(10 * mm, y_position, f'Date of Sales: {date_sales}')
+        else :
+            c.drawString(10 * mm, y_position, f'Date of Sales: {date_sales} To {date_sales_to}')
+        
+
         y_position -= line_height
         y_position -= line_height
         
@@ -5058,13 +5072,13 @@ def download_xread_pdf(request):
 @permission_classes([AllowAny])
 def PrintZread(request):
     if request.method == 'GET':
-        print('zread')
         try:
             serial_number = getattr(request, "SERIALNO", None)
             machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number).first()
             current_date_ph = GetPHilippineDate()
             current_datetime_ph = GetPHilippineDateTime()
             filter_str = request.GET.get('DateFrom',None)
+            filter_str_to = request.GET.get('DateTo',None)
 
             latest_zread = PosZReading.objects.aggregate(max_zread=Max('zread_no'),old_grand_total=Max('new_grand_total'))
             zread_no = (latest_zread['max_zread'] or 0) + 1
@@ -5078,7 +5092,7 @@ def PrintZread(request):
             # date_to  = filter_str + " 23:59:59"
 
             date_from = datetime.strptime(filter_str + " 00:00:00", "%Y-%m-%d %H:%M:%S")
-            date_to   = datetime.strptime(filter_str + " 23:59:59", "%Y-%m-%d %H:%M:%S")
+            date_to   = datetime.strptime(filter_str_to + " 23:59:59", "%Y-%m-%d %H:%M:%S")
             
             xread_date = current_date_ph
 
@@ -6173,11 +6187,15 @@ def RePrint_Xread(request):
         _date = PosCashiersLogin.objects.filter(trans_id=trans_id).first()
         current_date_ph = GetPHilippineDate()
         current_datetime_ph = GetPHilippineDateTime()
-        filter_str = _date.date_stamp if _date and _date.date_stamp else current_date_ph
+        # filter_str = _date.date_stamp if _date and _date.date_stamp else current_date_ph
+
+        filter_str = request.GET.get('dateFrom',None)
+        filter_str_to = request.GET.get('dateTo',None)
+        zread_no = request.GET.get('zread_no',None)
 
         # Start and end of day as strings
-        date_from= filter_str + " 00:00:00"
-        date_to  = filter_str + " 23:59:59"
+        date_from = datetime.strptime(filter_str + " 00:00:00", "%Y-%m-%d %H:%M:%S")
+        date_to   = datetime.strptime(filter_str_to + " 23:59:59", "%Y-%m-%d %H:%M:%S")
 
 
         
@@ -6242,6 +6260,7 @@ def RePrint_Xread(request):
             doc_date__lt=date_to,
             cashier_id=id_code,
             status='A',
+            zread_no =zread_no,
             terminal_no=int(machineInfo.terminal_no),
             site_code=int(machineInfo.site_no)
                 ).aggregate(
@@ -6254,6 +6273,7 @@ def RePrint_Xread(request):
             doc_date__lt=date_to,
             cashier_id=id_code,
             status='A',
+            zread_no =zread_no,
             terminal_no=int(machineInfo.terminal_no),
             site_code=int(machineInfo.site_no)
         ).aggregate(
@@ -6329,6 +6349,7 @@ def RePrint_Xread(request):
                 doc_date__lt=date_to,
                 cashier_id=id_code,
                 status='A',
+                zread_no =zread_no,
                 terminal_no=int(machineInfo.terminal_no),
                 site_code=int(machineInfo.site_no)
             )
@@ -6421,6 +6442,7 @@ def RePrint_Xread(request):
 
 
         fund = PosCashiersLogin.objects.filter(
+            trans_id=trans_id,
             id_code=id_code,
             terminal_no=int(machineInfo.terminal_no),
             site_code=int(machineInfo.site_no)
@@ -6503,8 +6525,9 @@ def RePrint_Xread(request):
         start_line = x_start + 5 * mm
         end_line = x_end - 5 * mm
         
-        dt_obj = datetime.strptime(date_from, "%Y-%m-%d %H:%M:%S")
-        date_sales = datetime.strftime(dt_obj,'%m/%d/%Y')
+        # dt_obj = datetime.strptime(date_from, "%Y-%m-%d %H:%M:%S")
+        date_sales = datetime.strftime(date_from,'%m/%d/%Y')
+        date_sales_to = datetime.strftime(date_to,'%m/%d/%Y')
 
 
         c.drawString(10 * mm, y_position, f'Admin: {request.user.fullname}')
@@ -6513,7 +6536,10 @@ def RePrint_Xread(request):
         y_position -= line_height
         c.drawString(10 * mm, y_position, f'Cashier: {cashier_name}')
         y_position -= line_height
-        c.drawString(10 * mm, y_position, f'Date of Sales: {date_sales}')
+        if date_from.date() == date_to.date():
+            c.drawString(10 * mm, y_position, f'Date of Sales: {date_sales}')
+        else :
+            c.drawString(10 * mm, y_position, f'Date of Sales: {date_sales} To {date_sales_to}')
         y_position -= line_height
         c.drawString(10 * mm, y_position, f'Reprint Date: {current_datetime_ph}')
         y_position -= line_height
@@ -7915,3 +7941,30 @@ def Reprint_Zread(request):
             traceback.print_exc()
             return JsonResponse({"error": str(e)}, status=500)
 
+
+
+
+def paginate_queryset(request, queryset, serializer_class):
+    """
+    Reusable function to paginate a queryset using DRF default pagination.
+    
+    Args:
+        request: DRF request object
+        queryset: Django queryset to paginate
+        serializer_class: DRF serializer class for the queryset
+
+    Returns:
+        DRF paginated Response object
+    """
+    # 1. Get default paginator class
+    paginator_class = api_settings.DEFAULT_PAGINATION_CLASS
+    paginator = paginator_class()
+    
+    # 2. Paginate the queryset
+    paginated_qs = paginator.paginate_queryset(queryset, request)
+    
+    # 3. Serialize paginated queryset
+    serializer = serializer_class(paginated_qs, many=True)
+    
+    # 4. Return paginated response
+    return paginator.get_paginated_response(serializer.data)

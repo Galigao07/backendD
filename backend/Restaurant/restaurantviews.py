@@ -326,9 +326,18 @@ def get_productCategory_data(request):
         distinct_categories = ProductCategorySetup.objects.filter(pos_category='Y')
         serializer = ProductCategorySetupSerializer(distinct_categories, many=True)
 
+        extra = {
+            'autonum' :'0',
+            'category_code':'0',
+            'category_desc' :'SHOW ALL',
+        }
+        result = list(serializer.data)
 
-       
-        return Response(serializer.data)
+        result = [extra] + list(serializer.data)
+
+        print('result',result)
+
+        return Response(result)
     except Exception as e:
         print(e)
         traceback.print_exc()
@@ -8063,6 +8072,7 @@ def get_sales_list_of_transaction(request):
         except Exception as e:
             print(e)
             traceback.print_exc()
+            
 
 
 @api_view(['GET'])

@@ -10,6 +10,8 @@ class BackendConfig(AppConfig):
         self.add_user_columns_if_not_exist()
         self.create_unmanaged_tables()
         self.add_tbl_product_site_setup_columns_if_not_exist()
+
+        self.add_columns_if_not_exist('tbl_pos_setup','sl_type','char(5) null')
         # import backend.signals
 
     def add_columns_if_not_exist_pos_Settings(self):
@@ -207,25 +209,53 @@ class BackendConfig(AppConfig):
                     print(f"✅ Table '{table_name}' ensured.")
                 except Exception as e:
                     print(f"⚠️ Error creating table '{table_name}': {e}")
-    # def add_columns_if_not_exist(self):
-    #     with connection.cursor() as cursor:
-    #         try:
-    #             # Check if column exists
-    #             cursor.execute("""
-    #                 SELECT column_name 
-    #                 FROM information_schema.columns
-    #                 WHERE table_name = 'tbl_pos_settings'
-    #                 AND column_name = 'TableColPerRows';
-    #             """)
-    #             exists = cursor.fetchone()
+   
 
-    #             if not exists:
-    #                 cursor.execute("""
-    #                     ALTER TABLE tbl_pos_settings
-    #                     ADD COLUMN withHotel VARCHAR(6) DEFAULT 'False',
-    #                     ADD COLUMN ProductColPerRows INT DEFAULT 6,
-    #                     ADD COLUMN TableColPerRows INT DEFAULT 6,
-    #                     ADD COLUMN ShowArrowUpAndDown VARCHAR(6) DEFAULT 'False';
-    #                 """)
-    #         except Exception as e:
-    #             print(f"⚠️ Error updating tbl_pos_settings: {e}")
+
+    def add_columns_if_not_exist(self, table, column, col_type):
+        with connection.cursor() as cursor:
+            try:
+                # Check if column exists
+                cursor.execute("""
+                    SELECT column_name
+                    FROM information_schema.columns
+                    WHERE table_name = %s
+                    AND column_name = %s;
+                """, [table, column])
+
+                exists = cursor.fetchone()
+
+                # If not exists, add column
+                if not exists:
+                    cursor.execute(
+                        f"ALTER TABLE {table} ADD COLUMN {column} {col_type}"
+                    )
+                    print(f"✅ Column '{column}' added to table '{table}'")
+                else:
+                    print(f"ℹ️ Column '{column}' already exists in '{table}'")
+
+            except Exception as e:
+                print(f"⚠️ Error updating {table}: {e}")
+
+        # def add_columns_if_not_exist(self):
+        #     with connection.cursor() as cursor:
+        #         try:
+        #             # Check if column exists
+        #             cursor.execute("""
+        #                 SELECT column_name 
+        #                 FROM information_schema.columns
+        #                 WHERE table_name = 'tbl_pos_settings'
+        #                 AND column_name = 'TableColPerRows';
+        #             """)
+        #             exists = cursor.fetchone()
+
+        #             if not exists:
+        #                 cursor.execute("""
+        #                     ALTER TABLE tbl_pos_settings
+        #                     ADD COLUMN withHotel VARCHAR(6) DEFAULT 'False',
+        #                     ADD COLUMN ProductColPerRows INT DEFAULT 6,
+        #                     ADD COLUMN TableColPerRows INT DEFAULT 6,
+        #                     ADD COLUMN ShowArrowUpAndDown VARCHAR(6) DEFAULT 'False';
+        #                 """)
+        #         except Exception as e:
+        #             print(f"⚠️ Error updating tbl_pos_settings: {e}")

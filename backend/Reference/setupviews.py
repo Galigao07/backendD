@@ -7,12 +7,8 @@ import pdb
 from django.conf import settings
 from django.http import FileResponse, JsonResponse
 from rest_framework.response import Response
-from backend.models import (BankCompany, POS_Terminal,TSetup,AcctSubsidiary,OtherAccount,Employee,Customer,RCCDetails,CCCDetails,ProductCategorySetup,
-                            ProductSiteSetup,PosPriceTypeSiteSetup,PosMultiplePriceTypeSiteSetup,ProductCategorySales,PosSetup,AcctList)
-from backend.serializers import (BankCompanySerializer,TSetupSerializer,AcctSubsidiarySerializer,OtherAccountSerializer,EmployeeSetupSerializer,
-                                 CustomerSerializer,RCCDetailsSerializer,CCCDetailsSerializer,ProductCategorySetupSerializer,ProductSiteSetupSerializer,
-                                 PosPriceTypeSiteSetupSerializer,PosMultiplePriceTypeSiteSetupSerializer,ProductCategorySalesSerializer,PosSetupSerializer,
-                                 AcctListSerializer)
+from backend.models import *
+from backend.serializers import *
 from rest_framework.decorators import api_view,permission_classes
 from rest_framework.views import APIView
 from django.db.models import Min,Max
@@ -30,17 +26,19 @@ from django.db.models import Sum
 import traceback
 from django.db import transaction
 from django.db.models import  F, Value
+import pdb
+from collections.abc import Callable
 from django.db.models.functions import Concat
+
 
 @api_view(['GET','POST','DELETE'])
 @permission_classes([IsAuthenticated])
 def Setup(request):
     if request.method == 'GET':
         try:
-            TransType = request.query_params.get('TransType',None)
-            Transaction = request.query_params.get('Transaction',None)
-            print(TransType,Transaction)
-            # pdb.set_trace()
+            TransType = request.GET.get('TransType',None)
+            Transaction = request.GET.get('Transaction',None)
+            print('TransType',Transaction)
             setupData = []
             if TransType == 'Bank':
                 Data = BankCompany.objects.all()
@@ -129,6 +127,31 @@ def Setup(request):
             elif TransType =='GIFT CHECK EXCESS':
                 dataList = [
                     "Gift Check Excess"]
+                
+                for item in dataList:
+                    setups = TSetup.objects.filter(event_name=item)
+                    if setups:
+                        for setup in setups:
+                            listdata ={
+                                'event':item,
+                                 'accttitle':setup.acct_title,
+                                'slacct':setup.sl_acct,
+                                'slid': setup.sl_id,
+                                 'sl_type': setup.sl_type,
+                                    }
+                            setupData.append(listdata)
+                    else:
+                        listdata ={
+                                'event':item,
+                                'accttitle':'',
+                                'slacct':'',
+                                'slid': '0',
+                                'sl_type': '',
+                            }
+                        setupData.append(listdata)
+            elif TransType =='Tagging for Rounding Difference':
+                dataList = [
+                    "Rounding difference"]
                 
                 for item in dataList:
                     setups = TSetup.objects.filter(event_name=item)
@@ -257,18 +280,81 @@ def Setup(request):
                                 'sl_type': '',
                                 }
                                 setupData.append(listdata)
-                                        
-            print(setupData)
+                elif Transaction =='Tagging for Rounding Difference':
+                    dataList = [
+                        "Rounding difference"]
+                    
+                    for item in dataList:
+                        setups = TSetup.objects.filter(event_name=item)
+                        if setups:
+                            for setup in setups:
+                                listdata ={
+                                    'event':item,
+                                    'accttitle':setup.acct_title,
+                                    'slacct':setup.sl_acct,
+                                    'slid': setup.sl_id,
+                                    'sl_type': setup.sl_type,
+                                        }
+                                setupData.append(listdata)
+                        else:
+                            listdata ={
+                                    'event':item,
+                                    'accttitle':'',
+                                    'slacct':'',
+                                    'slid': '0',
+                                    'sl_type': '',
+                                }
+                            setupData.append(listdata)               
             return Response(setupData)
         except Exception as e:
             print(e)
             traceback.print_exc()
             return Response('Error Happened!')
     elif request.method == 'POST':
+
         return Response('Success')
     
     elif request.method == 'DELETE':
         return Response('Success')
+
+
+@api_view(['GET','POST','DELETE'])
+@permission_classes([IsAuthenticated])
+def price_type_list(request):
+    if request.method == 'GET':
+        try:
+            ul_code = request.GET.get('data[ul_code]',None)
+            site_code = request.GET.get('data[site_code]',None)
+            site_name = request.GET.get('data[site_desc]',None)
+            sys_type = request.GET.get('data[sys_type]',None)
+            site_address = request.GET.get('data[site_address]',None)
+            virtual_code = request.GET.get('data[virtual_code]',None)
+            payor = request.GET.get('data[payor]',None)
+            payor_address = request.GET.get('data[payor_address]',None)
+            tin = request.GET.get('data[tin]',None)
+
+            data = []
+            _list = ProductPriceType.objects.all()
+
+            if site_code is not None:
+                if _list:
+                    for item in _list:
+                        _data =PosMultiplePriceTypeSiteSetup.objects.filter(site_code=site_code,site_name=site_name,pricetype=item.price_type,pricetype_name=item.price_name)
+                        if not _data.exists():
+
+                            data.append(item)
+                serializers = ProductPriceTypeSerializer(data,many=True)
+
+                return Response(serializers.data)
+            else:
+                serializers = ProductPriceTypeSerializer(_list,many=True)
+
+                return Response(serializers.data)
+
+
+        except Exception as e:
+            print(e)
+            traceback.print_exc()
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
@@ -367,30 +453,43 @@ def setup_configure(request):
         try:
             received_data = json.loads(request.body)
             data = received_data.get('data', [])
-            print(data)
-            for items in data:
-                # pdb.set_trace()
-                event_name = items['event']
-                acct_title = items['accttitle']
-                sl_acct = items['slacct']
-                sl_id = items['slid']
-                sl_type = items['sl_type']
-            try:
-                t_setup = TSetup.objects.get(event_name=event_name)
-                t_setup.acct_title = acct_title
-                t_setup.sl_acct = sl_acct
-                t_setup.sl_id = sl_id
-                t_setup.sl_type = sl_type
-                t_setup.save()
-            except TSetup.DoesNotExist:
-                t_setup = TSetup(
-                    event_name=event_name,
-                    acct_title=acct_title,
-                    sl_acct=sl_acct,
-                    sl_id=sl_id,
-                    sl_type=sl_type
+            TransType = received_data.get('TransType','')
+            print(TransType)
+
+            if TransType =='PriceType':
+                for items in data:
+                    print(items['site_code'])
+                        
+                    PosPriceTypeSiteSetup.objects.filter(
+                    site_code=items['site_code'],
+                ).update(
+                    default_pricetype=items['default_pricetype'],        # new value
+                    default_pricetype_name=items['default_pricetype_name']  # new value
                 )
-                t_setup.save()
+            else:
+                for items in data:
+                    # pdb.set_trace()
+                    event_name = items['event']
+                    acct_title = items['accttitle']
+                    sl_acct = items['slacct']
+                    sl_id = items['slid']
+                    sl_type = items['sl_type']
+                    try:
+                        t_setup = TSetup.objects.get(event_name=event_name)
+                        t_setup.acct_title = acct_title
+                        t_setup.sl_acct = sl_acct
+                        t_setup.sl_id = sl_id
+                        t_setup.sl_type = sl_type
+                        t_setup.save()
+                    except TSetup.DoesNotExist:
+                        t_setup = TSetup(
+                            event_name=event_name,
+                            acct_title=acct_title,
+                            sl_acct=sl_acct,
+                            sl_id=sl_id,
+                            sl_type=sl_type
+                        )
+                        t_setup.save()
             return Response('Success',status=200)
         except Exception as e:
             print(e)
@@ -411,6 +510,24 @@ def get_cost_of_sales(request):
             print(e)
             traceback.print_exc()
             transaction.rollback()
+    elif request.method =='POST':
+        try:
+            data = request.data.get('data')
+            print('data',data)
+            ProductCategorySetup.objects.filter(
+                category_code=data.get('category_code')
+            ).update(
+                acct_code=data.get('acct_code'),
+                acct_title = data.get('acct_title'),
+                acct_code2=data.get('acct_code2'),
+                acct_title2=data.get('acct_title2')
+            )
+            return Response('Success')
+        except Exception as e:
+            print(e)
+            traceback.print_exc()
+            return Response({'error':'Request Failed'},status=500) 
+    
 
 @api_view(['POST','GET'])
 @transaction.atomic     
@@ -446,7 +563,35 @@ def get_allowed_price_type(request):
         except Exception as e:
             print(e)
             traceback.print_exc()
+            return Response({"message": "An error occurred"}, status=500)
+    elif request.method == 'POST':
+        try:
+            site_code = request.data.get('site_code',None)
+            site_name = request.data.get('site_name',None),
+            _list = request.data.get('data',None),
 
+        
+            if isinstance(site_name, tuple) and len(site_name) == 1:
+                site_name = site_name[0]
+
+            if isinstance(_list, tuple) and len(_list) == 1:
+                _list = _list[0]
+
+            PosMultiplePriceTypeSiteSetup.objects.filter(site_code=site_code,site_name=site_name).delete()
+
+            for itm in list(_list):
+                print(itm['pricetype'])
+                PosMultiplePriceTypeSiteSetup.objects.create(
+                    site_code=site_code,
+                    site_name=site_name,
+                    pricetype =itm['pricetype'],
+                    pricetype_name=itm['pricetype_name'],
+                )
+            return Response('Success')
+        except Exception as e:
+            print(e)
+            traceback.print_exc()
+            return Response({"message": "An error occurred"}, status=500)
 @api_view(['POST','GET'])
 @transaction.atomic  
 @permission_classes([IsAuthenticated])
@@ -804,7 +949,6 @@ def get_tagging_per_terminal(request):
                 else:
                     # If data doesn't exist, create a new entry
                     PosSetup.objects.create(**item)
-            print(dataList)
             return Response(dataList)
         except Exception as e:
             print(e)
@@ -830,7 +974,6 @@ def get_tagging_per_terminal(request):
                     data2.subsidiary_account = item['subsidiary_account']
                     data2.save()
                 
-                    print('success',data)
             return Response('Success')
 
         except Exception as e:

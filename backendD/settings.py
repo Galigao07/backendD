@@ -31,7 +31,7 @@ SECRET_KEY = 'django-insecure-q(#tia376$n+1ugieitp!znvus1!!q0v(vz#(-da5m&ot!w53y
 
 ALLOWED_HOSTS = ["*", "192.168.1.3", "localhost","192.168.68.108","192.168.1.6"]
 
-DEBUG = False
+DEBUG = True
 
 
 
@@ -146,7 +146,9 @@ REST_FRAMEWORK = {
     ),
     "DEFAULT_PERMISSION_CLASSES": (
         "rest_framework.permissions.IsAuthenticated",
-    )
+    ),
+    "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
+    "PAGE_SIZE": 25,
 }
 
 
@@ -255,8 +257,8 @@ TIME_ZONE = 'Asia/Manila'
 STATIC_URL = 'static/'
 MEDIA_URL = 'media/'
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
-# MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
-MEDIA_ROOT = '/home/galigao/backendD_media' # Folder for media files in WSL
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media/')
+# MEDIA_ROOT = '/home/galigao/backendD_media' # Folder for media files in WSL
 STATICFILES_DIRS = [os.path.join(BASE_DIR, 'static')]
 
 # Default primary key field type

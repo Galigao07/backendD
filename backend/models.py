@@ -292,6 +292,7 @@ class PosSetup(models.Model):
     account_title = models.CharField(max_length=100, default=' ')
     subsidiary_code = models.PositiveBigIntegerField(default=0)
     subsidiary_account = models.CharField(max_length=100, default=' ')
+    sl_type = models.CharField(max_length=100, default=' ')
 
     class Meta:
         managed = False
@@ -427,6 +428,33 @@ class ProductCategorySetup(models.Model):
 
     class Meta:
         db_table = 'tbl_product_category_setup'
+        managed = False
+
+class ProductSubCategory1(models.Model):
+    autonum = models.BigAutoField(primary_key=True)
+    category_code = models.PositiveSmallIntegerField(default=0)
+    category_desc = models.CharField(max_length=150, default=' ')
+
+    class Meta:
+        db_table = 'tbl_product_category_sub1'
+        managed = False
+
+class ProductSubCategory2(models.Model):
+    autonum = models.BigAutoField(primary_key=True)
+    category_code = models.PositiveSmallIntegerField(default=0)
+    category_desc = models.CharField(max_length=150, default=' ')
+
+    class Meta:
+        db_table = 'tbl_product_category_sub2'
+        managed = False
+
+class ProductSubCategory3(models.Model):
+    autonum = models.BigAutoField(primary_key=True)
+    category_code = models.PositiveSmallIntegerField(default=0)
+    category_desc = models.CharField(max_length=150, default=' ')
+
+    class Meta:
+        db_table = 'tbl_product_category_sub3'
         managed = False
 
 class PosExtended(models.Model):
@@ -1908,6 +1936,25 @@ class TblPosDailyRecords(models.Model):
 
 
 
+class TblProductType(models.Model):
+    autonum = models.IntegerField(primary_key=True)
+    item_code = models.FloatField(null=True, blank=True)
+    item_desc = models.CharField(max_length=255, null=True, blank=True)
+
+    class Meta:
+        managed = False
+        db_table = 'tbl_product_type'
+
+class ProductPriceType(models.Model):
+    autonum = models.BigAutoField(primary_key=True)
+    price_type = models.CharField(max_length=15, default='', blank=True)
+    price_name = models.CharField(max_length=100, default='0', blank=True)
+    doc_type = models.CharField(max_length=10, default='', blank=True)
+    site_code = models.IntegerField(default=1)
+    status = models.CharField(max_length=1, default='Y')
+
+    class Meta:
+        db_table = 'tbl_product_price_type'
 
 
 

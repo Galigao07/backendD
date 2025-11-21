@@ -359,5 +359,34 @@ class PosZReadingSerializer(serializers.ModelSerializer):
         model =  PosZReading
         fields = '__all__'
 
+class TblProductTypeSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = TblProductType
+        fields = '__all__'
+
+class ProductSubCategory1Serializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = ProductSubCategory1
+        fields = '__all__'
+
+class ProductSubCategory2Serializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = ProductSubCategory2
+        fields = '__all__'
+
+class ProductSubCategory3Serializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = ProductSubCategory3
+        fields = '__all__'
 
 
+class ProductPriceTypeSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ProductPriceType
+        fields = '__all__'
+
+
+        

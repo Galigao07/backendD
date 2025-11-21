@@ -30,176 +30,339 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated,AllowAny
 from rest_framework import status
 from django.core.exceptions import ValidationError
+from rest_framework.generics import ListAPIView
+from rest_framework.settings import api_settings
+from backend.views import paginate_queryset
 
 
 
+# @api_view(['GET'])
+# def get_product_profile(request):
+#     # 1. Query all products
+#     products = Product.objects.all().order_by('-autonum')
 
-@api_view(['GET'])
-@permission_classes([IsAuthenticated])
-def get_employee_list(request):
-    if request.method == 'GET':
-        name = request.GET.get('employee','')
-        if name == '':
-            data = Employee.objects.filter(active='Y').order_by('-autonum')
-        else:
-            data = Employee.objects.filter(Q(last_name__icontains=name) | Q(first_name__icontains=name),active='Y').order_by('-autonum')
-        
-        EmployeeList = EmployeeSetupSerializer(data, many=True).data
-        return JsonResponse({'EmployeeList': EmployeeList}, status=200)
+#     # 2. Use DRF default pagination
+#     paginator_class = api_settings.DEFAULT_PAGINATION_CLASS
+#     paginator = paginator_class()
     
-@api_view(['GET','POST'])
+#     paginated_products = paginator.paginate_queryset(products, request)
+    
+#     # 3. Serialize paginated data
+#     serializer = Product2Serializer(paginated_products, many=True)
+    
+#     # 4. Return paginated response
+#     return paginator.get_paginated_response(serializer.data)
+
+@api_view(['GET','POST','PUT'])
 @permission_classes([IsAuthenticated])
 def get_product_profile(request):
-    if request.method == 'GET':
-        try:
-            description = request.GET.get('Search')
-            if description== None:
-                product_list = Product.objects.all()
-                serialize = Product2Serializer(product_list,many=True)
+    if request.method =='GET':
+        # Query all products ordered by autonum descending
+        # products = Product.objects.all().order_by('-autonum')
 
-                return Response(serialize.data)
-            else:
-                product_list = Product.objects.filter(long_desc__icontains=description)
-                serialize = Product2Serializer(product_list,many=True)
-                return Response(serialize.data)
-        except Exception as e:
-            print(e)
-            traceback.print_exc()
+        description = request.GET.get('Search')
+        if description== None:
+            products = Product.objects.all().order_by('-autonum')
+            return paginate_queryset(request, products, Product2Serializer)
+        else:
+            products = Product.objects.filter(long_desc__icontains=description).order_by('-autonum')
+            return paginate_queryset(request, products, Product2Serializer)
+
+        # Paginate using reusable function
+        
     elif request.method =='POST':
         try:
             receive_data = json.loads(request.body)
-            data = receive_data.get('data')
+            form_data = receive_data.get('data')
+
             img = receive_data.get('image_prod')
+
+            product = Product(
+                pos_item = form_data.get("posItem", "YES"),
+                weight_scale = form_data.get("weightScale", "N"),
+                pos_site_code = form_data.get("posSiteCode", "0"),
+                print_cat = form_data.get("printCat", 0),
+                item_type = form_data.get("itemType", ""),
+                category_id = form_data.get("categoryId", 0),
+                category = form_data.get("category", ""),
+                brand = form_data.get("brand", ""),
+                model = form_data.get("model", ""),
+                style = form_data.get("style", ""),
+                p_size = form_data.get("pSize", ""),
+                color = form_data.get("color", ""),
+                qty_onhand = form_data.get("qtyOnhand", 0),
+                qty_avl = form_data.get("qtyAvl", 0),
+                uom = form_data.get("uom", ""),
+                item_code = form_data.get("itemCode", ""),
+                bar_code = form_data.get("barCode", ""),
+                alternate_code = form_data.get("alternateCode", ""),
+                long_desc = form_data.get("longDesc", ""),
+                short_desc = form_data.get("shortDesc", ""),
+                reg_price = form_data.get("regPrice", 0),
+                key_price = form_data.get("keyPrice", 0),
+                ws_price = form_data.get("wsPrice", 0),
+                ec_price = form_data.get("ecPrice", 0),
+                last_purch = form_data.get("lastPurch", 0),
+                po_qty_allowance = form_data.get("poQtyAllowance", 0),
+                so_qty_allowance = form_data.get("soQtyAllowance", 0),
+                standard_price = form_data.get("standardPrice", 0),
+                rm_cost = form_data.get("rmCost", 0),
+                dl_cost = form_data.get("dlCost", 0),
+                oh_cost = form_data.get("dlCost", 0),
+                ave_cost = form_data.get("aveCost", 0),
+                fifo_cost = form_data.get("fifoCost", 0),
+                tax_code = form_data.get("taxCode", ""),
+                vat_category_code = form_data.get("vatCategoryCode", ""),
+                # add other fields if needed
+            )
+
+            product.save()
             if img:
-                image = base64.b64decode(img.split(',')[1])
-                if data:
-                    product_list = Product.objects.filter(bar_code=data['barcode']).first()
-                    if product_list:
-                        product_list.prod_img = image
-                        product_list.save()
-                        return Response('Success')
+                image_bytes = base64.b64decode(img.split(',')[1])
+                # Remove base64 prefix if exists
+                # if img.startswith('data:image/png;base64,'):
+                #     header, encoded = img.split(',', 1)
+                #     image_bytes = base64.b64decode(encoded)  # Decode to bytes
+                # elif  "," in img:
+                #     img = img.split(",")[1]
+                #     image_bytes = base64.b64decode(img)
+
+                if form_data:
+                    product = Product.objects.filter(bar_code=form_data.get("barCode")).first()
+                    if product:
+                        product.prod_img = image_bytes  # save as bytes
+                        product.save()    
+                return Response('Success') 
+        
         
         except Exception as e:
             print(e)
             traceback.print_exc()
 
-
-
-####* **************************** USER *******************************
-@api_view(['POST'])
-@permission_classes([IsAuthenticated])
-def add_user(request):
-    if request.method == 'POST':
+    elif request.method == 'PUT':
         try:
-       
-            received_data = json.loads(request.body)
-            id_code = received_data.get('id_code')
-            full_name = received_data.get('fullName')
-            username = received_data.get('username')
-            password = received_data.get('password')
-            rank = received_data.get('rank')
-            hashed_password = make_password(password)
+            receive_data = json.loads(request.body)
+            form_data = receive_data.get('data')
+            img = receive_data.get('image_prod')
 
+            # ---- STEP 1: Find existing product ----
+            bar_code = form_data.get("barCode")
+            product = Product.objects.filter(bar_code=bar_code).first()
 
-            if full_name and username and hashed_password and rank:
-                if User.objects.filter(user_name=username).exists():
-                    return JsonResponse({'error': 'Username already exists'}, status=400)
-                else:
-                    new_user = User(id_code=id_code,fullname=full_name, user_name=username, password=hashed_password, user_rank=rank,sys_type='POS')
-                    new_user.save()
-                    return JsonResponse({'message': 'User created successfully'}, status=200)
-            else:
-                return JsonResponse({'error': 'All fields are required'}, status=400)
+            if not product:
+                return Response({"error": "Product not found"}, status=404)
 
-        except json.JSONDecodeError as e:
-            return JsonResponse({'error': 'Invalid JSON format'}, status=400)
+            # ---- STEP 2: Update fields ----
+            product.pos_item = form_data.get("posItem", "YES")
+            product.weight_scale = form_data.get("weightScale", "N")
+            product.pos_site_code = form_data.get("posSiteCode", "0")
+            product.print_cat = form_data.get("printCat", 0)
+            product.item_type = form_data.get("itemType", "")
+            product.category_id = form_data.get("categoryId", 0)
+            product.category = form_data.get("category", "")
+            product.brand = form_data.get("brand", "")
+            product.model = form_data.get("model", "")
+            product.style = form_data.get("style", "")
+            product.p_size = form_data.get("pSize", "")
+            product.color = form_data.get("color", "")
+            product.qty_onhand = form_data.get("qtyOnhand", 0)
+            product.qty_avl = form_data.get("qtyAvl", 0)
+            product.uom = form_data.get("uom", "")
+            product.item_code = form_data.get("itemCode", "")
+            product.alternate_code = form_data.get("alternateCode", "")
+            product.long_desc = form_data.get("longDesc", "")
+            product.short_desc = form_data.get("shortDesc", "")
+            product.reg_price = form_data.get("regPrice", 0)
+            product.key_price = form_data.get("keyPrice", 0)
+            product.ws_price = form_data.get("wsPrice", 0)
+            product.ec_price = form_data.get("ecPrice", 0)
+            product.last_purch = form_data.get("lastPurch", 0)
+            product.po_qty_allowance = form_data.get("poQtyAllowance", 0)
+            product.so_qty_allowance = form_data.get("soQtyAllowance", 0)
+            product.standard_price = form_data.get("standardPrice", 0)
+            product.rm_cost = form_data.get("rmCost", 0)
+            product.dl_cost = form_data.get("dlCost", 0)
+            product.oh_cost = form_data.get("ohCost", 0)     # ← FIXED
+            product.ave_cost = form_data.get("aveCost", 0)
+            product.fifo_cost = form_data.get("fifoCost", 0)
+            product.tax_code = form_data.get("taxCode", "")
+            product.vat_category_code = form_data.get("vatCategoryCode", "")
 
-    return JsonResponse({'error': 'Invalid request method'}, status=400)
-
-@api_view(['GET'])
-@permission_classes([IsAuthenticated])
-def view_user(request):
-    if request.method == 'GET':
-        try:
-            data = User.objects.filter(sys_type ='POS').order_by('-autonum')
-            userList = UserSerializer(data, many=True).data
-            return JsonResponse({'userList': userList}, status=200)
-        except Exception as e:
-            print(e)
-            traceback.print_exc()
-        
-    
-@api_view(['POST'])
-@permission_classes([IsAuthenticated])
-def update_user(request):
-    if request.method == 'POST':
-        received_data = request.data
-        id_code = received_data.get('id_code')
-        full_name = received_data.get('fullName')
-        username = received_data.get('username')
-        password = received_data.get('password')
-        rank = received_data.get('rank')
-        
-        hashed_password = make_password(password)
-
-        if all([full_name, username, hashed_password, rank]):
-            # Check if the user already exists based on some identifier like username
-            existing_user = User.objects.filter(id_code=id_code).first()
-            if existing_user:
-                # Update existing user data
-                existing_user.fullname = full_name
-                existing_user.password = hashed_password
-                existing_user.user_rank = rank
-                existing_user.user_name = username
-                existing_user.sys_type = 'POS'
-                existing_user.save()
-                return JsonResponse({'message': 'User updated successfully'}, status=200)
-            else:
-                # Create a new User instance and save it to the database
-                new_user = User.objects.create(
-                    username=username,
-                    fullname=full_name,
-                    password=hashed_password,
-                    user_rank=rank
-                )
-                return JsonResponse({'message': 'User created successfully'}, status=200)
-        else:
-            return JsonResponse({'error': 'All fields are required'}, status=400)
-
-    return JsonResponse({'error': 'Invalid request method'}, status=400)
-
-
-@api_view(['DELETE'])  
-@permission_classes([IsAuthenticated])
-def delete_user(request):
-    if request.method == 'DELETE':
-        received_data = json.loads(request.body.decode('utf-8'))  # Decode and load JSON data
-        
-        user_data = received_data.get('user')  # Assuming the data is under 'user' key
-        if user_data:
-            id_code = user_data.get('id_code')
-            full_name = user_data.get('fullName')
-            username = user_data.get('username')
-            password = user_data.get('password')
-            rank = user_data.get('rank')
-
-
-            if user_data:
+            # ---- STEP 3: Save image if provided ----
+            if img:
                 try:
-                    user = User.objects.get(id_code=id_code,user_name=username)
-                    user.delete()
-                    return JsonResponse({'message': 'User deleted successfully'}, status=200)
-                except User.DoesNotExist:
-                    return JsonResponse({'error': 'User does not exist'}, status=404)
-            else:
-                return JsonResponse({'error': 'All fields are required'}, status=400)
-        else:
-            return JsonResponse({'error': 'User data not provided'}, status=400)
+                    encoded = img.split(",")[1]
+                    image_bytes = base64.b64decode(encoded)
+                    product.prod_img = image_bytes  # prod_img MUST be BLOB
+                except Exception as e:
+                    print("Image decode error:", e)
 
-    return JsonResponse({'error': 'Invalid request method'}, status=400)
+            product.save()
 
+            return Response("Success")
 
-####* **************************** WAITER *******************************
+        except Exception as e:
+            print("Error:", e)
+            traceback.print_exc()
+            return Response({"error": str(e)}, status=500)
+
+    
+# @api_view(['GET','POST','PUT'])
+# @permission_classes([IsAuthenticated])
+# def get_product_profile(request):
+#     if request.method == 'GET':
+#         print('www')
+#         try:
+#             description = request.GET.get('Search')
+#             if description== None:
+#                 product_list = Product.objects.all().order_by('-autonum')
+#                 serialize = Product2Serializer(product_list,many=True)
+#                 print(1)
+#                 return Response(serialize.data)
+#             else:
+#                 product_list = Product.objects.filter(long_desc__icontains=description)
+#                 serialize = Product2Serializer(product_list,many=True)
+#                 return Response(serialize.data)
+#         except Exception as e:
+#             print(e)
+#             traceback.print_exc()
+#     elif request.method =='POST':
+#         try:
+#             receive_data = json.loads(request.body)
+#             form_data = receive_data.get('data')
+
+#             img = receive_data.get('image_prod')
+
+#             product = Product(
+#                 pos_item = form_data.get("posItem", "YES"),
+#                 weight_scale = form_data.get("weightScale", "N"),
+#                 pos_site_code = form_data.get("posSiteCode", "0"),
+#                 print_cat = form_data.get("printCat", 0),
+#                 item_type = form_data.get("itemType", ""),
+#                 category_id = form_data.get("categoryId", 0),
+#                 category = form_data.get("category", ""),
+#                 brand = form_data.get("brand", ""),
+#                 model = form_data.get("model", ""),
+#                 style = form_data.get("style", ""),
+#                 p_size = form_data.get("pSize", ""),
+#                 color = form_data.get("color", ""),
+#                 qty_onhand = form_data.get("qtyOnhand", 0),
+#                 qty_avl = form_data.get("qtyAvl", 0),
+#                 uom = form_data.get("uom", ""),
+#                 item_code = form_data.get("itemCode", ""),
+#                 bar_code = form_data.get("barCode", ""),
+#                 alternate_code = form_data.get("alternateCode", ""),
+#                 long_desc = form_data.get("longDesc", ""),
+#                 short_desc = form_data.get("shortDesc", ""),
+#                 reg_price = form_data.get("regPrice", 0),
+#                 key_price = form_data.get("keyPrice", 0),
+#                 ws_price = form_data.get("wsPrice", 0),
+#                 ec_price = form_data.get("ecPrice", 0),
+#                 last_purch = form_data.get("lastPurch", 0),
+#                 po_qty_allowance = form_data.get("poQtyAllowance", 0),
+#                 so_qty_allowance = form_data.get("soQtyAllowance", 0),
+#                 standard_price = form_data.get("standardPrice", 0),
+#                 rm_cost = form_data.get("rmCost", 0),
+#                 dl_cost = form_data.get("dlCost", 0),
+#                 oh_cost = form_data.get("dlCost", 0),
+#                 ave_cost = form_data.get("aveCost", 0),
+#                 fifo_cost = form_data.get("fifoCost", 0),
+#                 tax_code = form_data.get("taxCode", ""),
+#                 vat_category_code = form_data.get("vatCategoryCode", ""),
+#                 # add other fields if needed
+#             )
+
+#             product.save()
+#             if img:
+#                 image_bytes = base64.b64decode(img.split(',')[1])
+#                 # Remove base64 prefix if exists
+#                 # if img.startswith('data:image/png;base64,'):
+#                 #     header, encoded = img.split(',', 1)
+#                 #     image_bytes = base64.b64decode(encoded)  # Decode to bytes
+#                 # elif  "," in img:
+#                 #     img = img.split(",")[1]
+#                 #     image_bytes = base64.b64decode(img)
+
+#                 if form_data:
+#                     product = Product.objects.filter(bar_code=form_data.get("barCode")).first()
+#                     if product:
+#                         product.prod_img = image_bytes  # save as bytes
+#                         product.save()    
+#                 return Response('Success') 
+        
+        
+#         except Exception as e:
+#             print(e)
+#             traceback.print_exc()
+
+#     elif request.method == 'PUT':
+#         try:
+#             receive_data = json.loads(request.body)
+#             form_data = receive_data.get('data')
+#             img = receive_data.get('image_prod')
+
+#             # ---- STEP 1: Find existing product ----
+#             bar_code = form_data.get("barCode")
+#             product = Product.objects.filter(bar_code=bar_code).first()
+
+#             if not product:
+#                 return Response({"error": "Product not found"}, status=404)
+
+#             # ---- STEP 2: Update fields ----
+#             product.pos_item = form_data.get("posItem", "YES")
+#             product.weight_scale = form_data.get("weightScale", "N")
+#             product.pos_site_code = form_data.get("posSiteCode", "0")
+#             product.print_cat = form_data.get("printCat", 0)
+#             product.item_type = form_data.get("itemType", "")
+#             product.category_id = form_data.get("categoryId", 0)
+#             product.category = form_data.get("category", "")
+#             product.brand = form_data.get("brand", "")
+#             product.model = form_data.get("model", "")
+#             product.style = form_data.get("style", "")
+#             product.p_size = form_data.get("pSize", "")
+#             product.color = form_data.get("color", "")
+#             product.qty_onhand = form_data.get("qtyOnhand", 0)
+#             product.qty_avl = form_data.get("qtyAvl", 0)
+#             product.uom = form_data.get("uom", "")
+#             product.item_code = form_data.get("itemCode", "")
+#             product.alternate_code = form_data.get("alternateCode", "")
+#             product.long_desc = form_data.get("longDesc", "")
+#             product.short_desc = form_data.get("shortDesc", "")
+#             product.reg_price = form_data.get("regPrice", 0)
+#             product.key_price = form_data.get("keyPrice", 0)
+#             product.ws_price = form_data.get("wsPrice", 0)
+#             product.ec_price = form_data.get("ecPrice", 0)
+#             product.last_purch = form_data.get("lastPurch", 0)
+#             product.po_qty_allowance = form_data.get("poQtyAllowance", 0)
+#             product.so_qty_allowance = form_data.get("soQtyAllowance", 0)
+#             product.standard_price = form_data.get("standardPrice", 0)
+#             product.rm_cost = form_data.get("rmCost", 0)
+#             product.dl_cost = form_data.get("dlCost", 0)
+#             product.oh_cost = form_data.get("ohCost", 0)     # ← FIXED
+#             product.ave_cost = form_data.get("aveCost", 0)
+#             product.fifo_cost = form_data.get("fifoCost", 0)
+#             product.tax_code = form_data.get("taxCode", "")
+#             product.vat_category_code = form_data.get("vatCategoryCode", "")
+
+#             # ---- STEP 3: Save image if provided ----
+#             if img:
+#                 try:
+#                     encoded = img.split(",")[1]
+#                     image_bytes = base64.b64decode(encoded)
+#                     product.prod_img = image_bytes  # prod_img MUST be BLOB
+#                 except Exception as e:
+#                     print("Image decode error:", e)
+
+#             product.save()
+
+#             return Response("Success")
+
+#         except Exception as e:
+#             print("Error:", e)
+#             traceback.print_exc()
+#             return Response({"error": str(e)}, status=500)
+
+###* **************************** WAITER *******************************
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def view_waiter(request):
@@ -447,6 +610,7 @@ def UploadVideo(request):
 
     elif request.method == 'GET':
         try:
+       
             serial_number = getattr(request, "SERIALNO", None) or request.GET.get('serialNo')
             machineInfo = POS_Terminal.objects.filter(Serial_no=serial_number.strip()).first()
             if not machineInfo:
@@ -454,14 +618,19 @@ def UploadVideo(request):
 
             video_record = PosVideo.objects.filter(serial_no=machineInfo.Serial_no).order_by('-autonum').first()
             if not video_record or not video_record.filename:
+             
                 return JsonResponse({'error': 'No videos found'}, status=404)
-          
             video_url = request.build_absolute_uri(settings.MEDIA_URL + video_record.filename)
-            if video_url.startswith('http://'):
-                video_url = video_url.replace('http://', 'https://', 1)
+            # video_url = request.build_absolute_uri(settings.MEDIA_URL + video_record.filename)
+
+            if not settings.DEBUG:
+                if video_url.startswith('http://'):
+                    video_url = video_url.replace('http://', 'https://', 1)
+            print(video_url)
             return JsonResponse({'data': video_url})
 
         except Exception as e:
+            print(2)
             print(e)
             traceback.print_exc()
             return JsonResponse({'error': str(e)}, status=500)
@@ -560,190 +729,7 @@ def UploadVideo(request):
 #             print(e)
 #             traceback.print_exc()
 
-####* **************************** Terminal Setup *******************************
-@api_view(['GET','POST'])       
-def terminal_setup(request):
-    if request.method == 'GET':
-        data = POS_Terminal.objects.all()
-        
-        serializer = POS_TerminalSerializer(data,many=True).data
-        return JsonResponse({'data': serializer}, status=200)
-    
-    elif request.method == 'POST':
-    
-        received_data = json.loads(request.body)
-        autonum = received_data.get('autonum')
-        ulcode = received_data.get('ulcode')
-        terminalno = received_data.get('terminalno')
-        description = received_data.get('description')
-        siteno = received_data.get('siteno')
-        serialno = received_data.get('serialno')
-        machineno = received_data.get('machineno')
-        modelno = received_data.get('modelno')
-        ptu = received_data.get('ptu')
-        dateissue = received_data.get('dateissue')
-        datevalid = received_data.get('datevalid')
 
-        CheckDtata = POS_Terminal.objects.filter(autonum=autonum).first()
-        # pdb.set_trace()
-        if CheckDtata:
-                CheckDtata.ul_code = ulcode
-                CheckDtata.terminal_no = terminalno
-                CheckDtata.description= description
-                CheckDtata.site_no = siteno
-                CheckDtata.Serial_no = serialno
-                CheckDtata.Machine_no = machineno
-                CheckDtata.Model_no = modelno
-                CheckDtata.PTU_no = ptu
-                CheckDtata.date_issue =dateissue
-                CheckDtata.date_valid = datevalid
-                CheckDtata.save()
-                return JsonResponse({'data':'Terminal Successfully Update'},status=200)
-
-        else:    
-            SaveTerminalSetup = POS_Terminal (
-                ul_code = ulcode,
-                terminal_no = terminalno,
-                description= description,
-                site_no = siteno,
-                Serial_no = serialno,
-                Machine_no = machineno,
-                Model_no = modelno,
-                PTU_no = ptu,
-                date_issue =dateissue,
-                date_valid = datevalid,
-            )
-
-            SaveTerminalSetup.save()
-
-            return JsonResponse({'data':'Terminal Successfully Added'},status=200)
-
-
-####* **************************** Lead/Supplier Setup *******************************
-@api_view(['GET','POST'])   
-def lead_setup(request):
-    if request.method == 'GET':
-        data = LeadSetup.objects.all()
-        
-        serializer = LeadSetupSerializer(data,many=True).data
-        return JsonResponse({'data': serializer}, status=200)
-    
-    elif request.method == 'POST':
-
-        try:
-            received_data = json.loads(request.body)
-
-            autonum = received_data.get('autonum')
-            company_code = received_data.get('companycode')
-            company_name = received_data.get('companyname')
-            company_name2 = received_data.get('companyname2')
-            company_address = received_data.get('companyaddress')
-            company_address2 = received_data.get('companyaddress2')
-            tin = received_data.get('tin')
-            accreditation_no = received_data.get('accreditation')
-            date_issued = received_data.get('dateissued')
-            date_valid = received_data.get('datevalid')
-            if autonum == '':
-                autonum = 0
-            CheckDtata = LeadSetup.objects.filter(autonum=autonum).first()
-            
-            if CheckDtata:
-                    CheckDtata.company_code = company_code
-                    CheckDtata.company_name = company_name
-                    CheckDtata.company_name2= company_name2
-                    CheckDtata.company_address = company_address
-                    CheckDtata.company_address2 = company_address2
-                    CheckDtata.tin = tin
-                    CheckDtata.accreditation_no = accreditation_no
-                    CheckDtata.date_issued = date_issued
-                    CheckDtata.date_valid =date_valid
-                    CheckDtata.save()
-                    return JsonResponse({'data':'Terminal Successfully Update'},status=200)
-
-            else:    
-                lead_setup = LeadSetup(
-                    company_code=company_code,
-                    company_name=company_name,
-                    company_name2=company_name2,
-                    company_address=company_address,
-                    company_address2=company_address2,
-                    tin=tin,
-                    accreditation_no=accreditation_no,
-                    date_issued=date_issued,
-                    date_valid=date_valid
-                )
-
-                lead_setup.save()
-                return JsonResponse({'data':'Terminal Successfully Added'},status=200)
-        except Exception as e:
-            print(e)
-            traceback.print_exc()
-
-####* **************************** Client Setup *******************************
-@api_view(['GET','POST'])   
-def Client_setup(request):
-    if request.method == 'GET':
-        data = PosClientSetup.objects.all()
-        
-        serializer = PosClientSetup(data,many=True).data
-        return JsonResponse({'data': serializer}, status=200)
-    
-    elif request.method == 'POST':
-
-        received_data = json.loads(request.body)
-
-
-        autonum = received_data.get('autonum')
-        company_code = received_data.get('companycode')
-        company_name = received_data.get('companyname')
-        company_name2 = received_data.get('companyname2')
-        company_address = received_data.get('companyaddress')
-        company_address2 = received_data.get('companyaddress2')
-        company_address3 = received_data.get('companyaddress3')
-        tin = received_data.get('tin')
-        tel_no = received_data.get('telno')
-        remarks = received_data.get('remarks')
-        remarks2 = received_data.get('remarks2')
-        remarks3 = received_data.get('remarks3')
-
-        if autonum == '':
-            autonum=0
-        CheckDtata = PosClientSetup.objects.filter(autonum=autonum).first()
-        # pdb.set_trace()
-        if CheckDtata:
-                CheckDtata.company_code = company_code
-                CheckDtata.company_name = company_name
-                CheckDtata.company_name2= company_name2
-                CheckDtata.company_address = company_address
-                CheckDtata.company_address2 = company_address2
-                CheckDtata.company_address3 = company_address3
-                CheckDtata.tin = tin
-                CheckDtata.tel_no = tel_no
-                CheckDtata.remarks = remarks
-                CheckDtata.remarks2 =remarks2
-                CheckDtata.remarks3 =remarks3
-                CheckDtata.save()
-                return JsonResponse({'data':'Terminal Successfully Update'},status=200)
-
-        else:   
-            # pdb.set_trace()
-            lead_setup = PosClientSetup(
-                company_code=company_code,
-                company_name=company_name,
-                company_name2=company_name2,
-                company_address=company_address,
-                company_address2=company_address2,
-                company_address3 = company_address3,
-                tin=tin,
-                tel_no = tel_no,
-                remarks = remarks,
-                remarks2 =remarks2,
-                remarks3 =remarks3
-
-            )
-
-            lead_setup.save()
-            return JsonResponse({'data':'Terminal Successfully Added'},status=200)
 
 ####* **************************** Customer Details *******************************
 
@@ -1214,3 +1200,50 @@ def Gift_Check_Denomination(request):
             traceback.print_exc()
 
 
+@api_view(['GET','POST','DELETE'])
+@permission_classes([IsAuthenticated])
+def item_type_view(request):
+    if request.method =='GET':
+        try:
+            data = TblProductType.objects.all()
+
+            serializer = TblProductTypeSerializer(data,many=True)
+
+            return Response(serializer.data)
+        
+        except Exception as e:
+            print(e)
+            traceback.print_exc()
+            return JsonResponse({'message':'Failed Request',},status=500)
+        
+@api_view(['GET','POST','DELETE'])
+@permission_classes([IsAuthenticated])
+def category_all_view(request):
+    if request.method =='GET':
+        try:
+            main = ProductCategorySetup.objects.all()
+            mainCat = ProductCategorySetupSerializer(main,many=True)
+
+            sub1 =ProductSubCategory1.objects.all()
+            subCat1 = ProductSubCategory1Serializer(sub1,many=True)
+
+            sub2 = ProductSubCategory2.objects.all()
+            subCat2 = ProductSubCategory2Serializer(sub2,many=True)
+
+            sub3 = ProductSubCategory3.objects.all()
+            subCat3 = ProductSubCategory3Serializer(sub3,many=True)
+
+            data = {
+                'maincat': mainCat.data,
+                'subcat1': subCat1.data if subCat1.data is not None else [],
+                'subcat2': subCat2.data if subCat2.data is not None else [],
+                'subcat3': subCat3.data if subCat3.data is not None else [],
+                }
+
+
+            return Response(data)
+        
+        except Exception as e:
+            print(e)
+            traceback.print_exc()
+            return JsonResponse({'message':'Failed Request',},status=500)
